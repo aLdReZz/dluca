@@ -18,8 +18,22 @@ const parseDate = (dateStr: string): Date | null => {
     return isNaN(date.getTime()) ? null : date;
 };
 
+const sanitizeNumber = (value: string | number | undefined | null): number => {
+    if (typeof value === 'number') {
+        return isNaN(value) ? 0 : value;
+    }
+    if (!value) return 0;
+    const cleaned = value
+        .toString()
+        .replace(/[^0-9,.-]/g, '')
+        .replace(/,(?=\d{3}(?:[,.]|$))/g, '');
+    const normalized = cleaned.replace(',', '.');
+    const parsed = parseFloat(normalized);
+    return isNaN(parsed) ? 0 : parsed;
+};
+
 const formatPeso = (amount: number) => {
-    return '₱' + amount.toLocaleString('en-PH', {
+    return '\u20B1 ' + amount.toLocaleString('en-PH', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     });
@@ -53,9 +67,9 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
             return rowDate && rowDate >= start && rowDate <= end;
         });
 
-        const totalSales = filteredData.reduce((sum, row) => sum + parseFloat(row.Total || '0'), 0);
-        const totalProfit = filteredData.reduce((sum, row) => sum + parseFloat(row.Profit || '0'), 0);
-        const totalCOGS = filteredData.reduce((sum, row) => sum + parseFloat(row.Cost || '0'), 0);
+        const totalSales = filteredData.reduce((sum, row) => sum + sanitizeNumber(row.Total), 0);
+        const totalProfit = filteredData.reduce((sum, row) => sum + sanitizeNumber(row.Profit), 0);
+        const totalCOGS = filteredData.reduce((sum, row) => sum + sanitizeNumber(row.Cost), 0);
         const profitMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
 
         setStats({ totalSales, totalProfit, totalCOGS, profitMargin });
@@ -74,7 +88,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
 
         const groupedData = data.reduce((acc, row) => {
             const date = parseDate(row.Date)?.toLocaleDateString('en-CA') || 'Unknown'; // YYYY-MM-DD for sorting
-            acc[date] = (acc[date] || 0) + parseFloat(row.Total || '0');
+            acc[date] = (acc[date] || 0) + sanitizeNumber(row.Total);
             return acc;
         }, {} as { [key: string]: number });
 
@@ -218,3 +232,8 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
 };
 
 export default Dashboard;
+
+
+
+
+

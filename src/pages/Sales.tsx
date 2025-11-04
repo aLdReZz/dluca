@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState } from 'react';
 import type { SalesData } from '../types';
 import { UploadIcon } from '../components/Icons';
@@ -49,19 +49,50 @@ const Sales: React.FC<SalesProps> = ({ salesData, setSalesData }) => {
         }
     };
 
+    const parseCsvLine = (line: string): string[] => {
+        const values: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+                if (inQuotes && i < line.length - 1 && line[i + 1] === '"') {
+                    current += '"';
+                    i++;
+                } else {
+                    inQuotes = !inQuotes;
+                }
+            } else if (char === ',' && !inQuotes) {
+                values.push(current.trim());
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        values.push(current.trim());
+        return values.map(v => v.replace(/^"|"$/g, ''));
+    };
+
     const parseSalesCSV = (text: string) => {
-        const lines = text.split('\n');
-        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+        const rows = text.replace(/\r\n/g, '\n').split('\n').filter(line => line.trim().length > 0);
+        if (rows.length === 0) {
+            alert('No data found in the CSV file.');
+            return;
+        }
+
+        const headers = parseCsvLine(rows[0].replace(/^\uFEFF/, ''));
         const data: SalesData[] = [];
-        for (let i = 1; i < lines.length; i++) {
-            if (!lines[i].trim()) continue;
-            const values = lines[i].split(',');
+
+        for (let i = 1; i < rows.length; i++) {
+            const values = parseCsvLine(rows[i]);
+            if (values.every(value => value.trim() === '')) continue;
             const row: SalesData = {};
             headers.forEach((header, index) => {
-                row[header] = values[index] ? values[index].trim().replace(/"/g, '') : '';
+                row[header] = values[index] ? values[index].trim() : '';
             });
             data.push(row);
         }
+
         setSalesData(data);
     };
     
@@ -129,3 +160,4 @@ const Sales: React.FC<SalesProps> = ({ salesData, setSalesData }) => {
 };
 
 export default Sales;
+
