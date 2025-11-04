@@ -284,8 +284,20 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
                             </div>
                         </div>
                         <div className="flex gap-2 w-full md:w-auto">
-                            <button type="button" onClick={onClose} className="w-full px-4 py-2 rounded-lg font-semibold bg-bg-tertiary hover:bg-hover-bg transition">Cancel</button>
-                            <button type="button" onClick={handleSave} className="w-full px-4 py-2 rounded-lg font-semibold bg-accent-blue text-white hover:bg-opacity-80 transition">Save Recipe</button>
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="w-full md:w-[140px] px-5 py-3 rounded-md font-semibold bg-bg-tertiary hover:bg-hover-bg transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSave}
+                                className="w-full md:w-[140px] px-5 py-3 rounded-md font-semibold bg-accent-blue text-white hover:bg-opacity-80 transition"
+                            >
+                                Save Recipe
+                            </button>
                         </div>
                     </div>
                 </form>

@@ -1,7 +1,6 @@
 
 import React from 'react';
 import type { Role } from '../types';
-import { LOGO_BASE64 } from '../types';
 
 interface RoleSelectionProps {
     onSelectRole: (role: Role) => void;
@@ -10,7 +9,7 @@ interface RoleSelectionProps {
 const RoleSelection: React.FC<RoleSelectionProps> = ({ onSelectRole }) => {
     return (
         <div className="flex flex-col items-center justify-center h-screen bg-bg-primary text-text-primary p-4">
-            <img src={LOGO_BASE64} alt="D'Luca Logo" className="w-24 h-24 mb-6" />
+            <img src="/dlc-mainlogo.png" alt="D'Luca Logo" className="w-32 h-32 mb-6 object-contain" />
             <h1 className="text-4xl font-semibold mb-2">Welcome to D'Luca</h1>
             <p className="text-lg text-text-secondary mb-10">Select your role to continue</p>
             <div className="flex flex-col sm:flex-row gap-6">

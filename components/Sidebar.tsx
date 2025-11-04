@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import type { Page, Role } from '../types';
-import { LOGO_BASE64 } from '../types';
 import { ChartBarIcon, CubeIcon, CalculatorIcon, ClockIcon, CreditCardIcon, CalendarIcon, HomeIcon, ChevronDownIcon, ArchiveBoxIcon, TagIcon, ShoppingCartIcon } from './Icons';
 
 interface SidebarProps {
@@ -59,7 +58,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, currentPage, onNavigate, isOpen
     return (
         <aside className={`fixed lg:relative lg:flex-shrink-0 w-64 bg-bg-secondary p-4 border-r border-border-color flex flex-col h-full transition-transform duration-300 ease-in-out z-30 ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
             <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border-color px-2">
-                <img src={LOGO_BASE64} alt="D'Luca Logo" className="w-8 h-8" />
+                <img src="/dlc-sublogo.png" alt="D'Luca Logo" className="w-12 h-12 object-contain" />
                 <div className="text-xl font-semibold text-text-primary">D'Luca</div>
             </div>
 
