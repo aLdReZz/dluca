@@ -22,6 +22,101 @@ body {
   scrollbar-width: none;
 }
 
+@keyframes glowPulseBlue {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(0, 122, 255, 0);
+    border-color: rgba(0, 122, 255, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(0, 122, 255, 0.4);
+    border-color: rgba(0, 122, 255, 0.85);
+  }
+}
+
+@keyframes glowPulseGreen {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(48, 209, 88, 0);
+    border-color: rgba(48, 209, 88, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(48, 209, 88, 0.4);
+    border-color: rgba(48, 209, 88, 0.85);
+  }
+}
+
+@keyframes pinCaretBlink {
+  0%, 100% {
+    opacity: 0.25;
+    transform: scale(0.7);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.pin-caret-dot {
+  animation: pinCaretBlink 1s ease-in-out infinite;
+}
+
+@keyframes pinOverlayFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pinModalPop {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.94);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-6px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.pin-overlay-animate {
+  animation: pinOverlayFade 0.35s ease-out;
+}
+
+.pin-modal-animate {
+  animation: pinModalPop 0.4s ease-out;
+}
+
+.role-select-btn {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+
+.role-select-btn::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  transition: width 0.35s ease-out, height 0.35s ease-out, opacity 0.3s ease-out;
+  pointer-events: none;
+}
+
+.role-select-btn:active::after {
+  width: 260px;
+  height: 260px;
+  opacity: 0;
+}
+
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
