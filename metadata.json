@@ -1,0 +1,5 @@
+{
+  "name": "D'Luca",
+  "description": "A comprehensive dashboard for managing D'Luca cafe, including sales tracking, inventory, staff attendance, payroll, and a content calendar. The system provides role-based access for admins and staff.",
+  "requestFramePermissions": []
+}

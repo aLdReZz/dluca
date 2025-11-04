@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  @apply bg-bg-primary text-text-primary;
+}
+
+.horizontal-scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.horizontal-scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@media print {
+  body,
+  #root,
+  #root > div,
+  #root > div > div,
+  main {
+    overflow: visible !important;
+    height: auto !important;
+    position: static !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .payslip-print-area,
+  .payslip-print-area * {
+    visibility: visible;
+  }
+
+  .payslip-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: auto;
+    border: none;
+    box-shadow: none;
+    background-color: white !important;
+    color: black !important;
+    padding: 2rem;
+  }
+
+  .payslip-print-area .text-text-primary,
+  .payslip-print-area .text-text-secondary,
+  .payslip-print-area .font-bold {
+    color: black !important;
+  }
+
+  .payslip-print-area .bg-bg-tertiary {
+    background-color: #f3f4f6 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
