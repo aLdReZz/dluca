@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import RoleSelection from './components/RoleSelection';
 import PinModal from './components/PinModal';
 import Sidebar from './components/Sidebar';
@@ -143,6 +143,8 @@ const App: React.FC = () => {
     const [isPinModalOpen, setPinModalOpen] = useState<boolean>(false);
     const [page, setPage] = useState<Page>('costing');
     const [isSidebarOpen, setSidebarOpen] = useState<boolean>(false);
+    const [dashboardIntro, setDashboardIntro] = useState(false);
+    const dashboardIntroTimeout = useRef<number | null>(null);
 
     // App Data State
     const [salesData, setSalesData] = useState<SalesData[]>([]);
@@ -298,14 +300,40 @@ const App: React.FC = () => {
     };
 
     const handlePinVerify = (pin: string) => {
-        if (pin === ADMIN_PIN) {
-            setRole('admin');
-            setPinModalOpen(false);
-        } else {
-            return false; // Indicates failure
-        }
-        return true; // Indicates success
+        return pin === ADMIN_PIN;
     };
+
+    const handlePinSuccess = () => {
+        setRole('admin');
+        setPinModalOpen(false);
+    };
+
+    useEffect(() => {
+        if (role) {
+            setDashboardIntro(true);
+            if (dashboardIntroTimeout.current) {
+                window.clearTimeout(dashboardIntroTimeout.current);
+            }
+            dashboardIntroTimeout.current = window.setTimeout(() => {
+                setDashboardIntro(false);
+                dashboardIntroTimeout.current = null;
+            }, 650);
+        } else {
+            if (dashboardIntroTimeout.current) {
+                window.clearTimeout(dashboardIntroTimeout.current);
+                dashboardIntroTimeout.current = null;
+            }
+            setDashboardIntro(false);
+        }
+    }, [role]);
+
+    useEffect(() => {
+        return () => {
+            if (dashboardIntroTimeout.current) {
+                window.clearTimeout(dashboardIntroTimeout.current);
+            }
+        };
+    }, []);
 
     const handleLogout = () => {
         setRole(null);
@@ -381,6 +409,7 @@ const App: React.FC = () => {
                             attendanceRecords={attendanceRecords}
                             payrollRecords={payrollRecords} 
                             setPayrollRecords={setPayrollRecords} 
+                            salesData={salesData}
                         />;
             case 'calendar':
                 return <Calendar events={calendarEvents} setEvents={setCalendarEvents} />;
@@ -397,6 +426,7 @@ const App: React.FC = () => {
                     <PinModal
                         onClose={() => setPinModalOpen(false)}
                         onVerify={handlePinVerify}
+                        onSuccess={handlePinSuccess}
                     />
                 )}
             </>
@@ -430,7 +460,7 @@ const App: React.FC = () => {
             {/* Mobile Overlay */}
             <div className={`fixed inset-0 z-20 bg-black bg-opacity-50 transition-opacity lg:hidden ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setSidebarOpen(false)}></div>
             
-            <div className="relative flex-1 flex flex-col min-w-0">
+            <div className={`relative flex-1 flex flex-col min-w-0 ${dashboardIntro ? 'dashboard-container-intro' : ''}`}>
                 <div className="fixed top-0 left-0 right-0 z-10 lg:absolute lg:right-auto lg:w-full p-4 lg:p-8 flex justify-between items-center bg-bg-primary border-b border-border-color lg:bg-transparent lg:border-none lg:backdrop-blur-none lg:pointer-events-none">
                     <button 
                         onClick={() => setSidebarOpen(!isSidebarOpen)} 
@@ -449,7 +479,7 @@ const App: React.FC = () => {
                         </button>
                     </div>
                 </div>
-                <main className="flex-1 overflow-y-auto bg-bg-primary pt-20 lg:pt-28">
+                <main className={`flex-1 overflow-y-auto bg-bg-primary pt-20 lg:pt-28 ${dashboardIntro ? 'dashboard-content-intro' : ''}`}>
                     {renderPage()}
                 </main>
             </div>

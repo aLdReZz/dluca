@@ -12,6 +12,7 @@ interface AttendanceProps {
     attendanceRecords: AttendanceRecord[];
     setAttendanceRecords: React.Dispatch<React.SetStateAction<AttendanceRecord[]>>;
     setPayrollRecords: React.Dispatch<React.SetStateAction<PayrollRecord[]>>;
+    salesData: SalesData[];
 }
 
 const StatusTag: React.FC<{text: string, type: 'off' | 'absent'}> = ({text, type}) => {

@@ -1,16 +1,19 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { Employee, AttendanceRecord, PayrollRecord } from '../types';
+import type { Employee, AttendanceRecord, PayrollRecord, SalesData } from '../types';
 import { 
     XMarkIcon, CreditCardIcon, PencilIcon, TrashIcon, 
     CalendarDaysIcon, CheckIcon
 } from './Icons';
 import CalendarPopup from './CalendarPopup';
 import PayslipModal from './PayslipModal';
+import { extractDateKey, extractServiceCharge } from '../utils/salesData';
 
 interface EmployeeProfileProps {
     employee: Employee;
+    employees: Employee[];
     attendanceRecords: AttendanceRecord[];
+    salesData: SalesData[];
     onClose: () => void;
     onEdit: () => void;
     onDelete: () => void;
@@ -99,7 +102,7 @@ const Tag: React.FC<{text: string, type: 'present' | 'off' | 'absent' | 'late'}>
     return <span className={`inline-block text-center px-2 py-1 text-xs font-medium rounded-md uppercase ${classes[type]}`}>{text}</span>
 };
 
-const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, attendanceRecords, onClose, onEdit, onDelete, onUpdateEmployee }) => {
+const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, attendanceRecords, salesData, onClose, onEdit, onDelete, onUpdateEmployee }) => {
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     const calendarRef = useRef<HTMLDivElement>(null);
     const [editingOtDateKey, setEditingOtDateKey] = useState<string | null>(null);
@@ -213,6 +216,94 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, attendanceR
         return log.sort((a,b) => a.date - b.date);
     }, [employee, attendanceRecords, committedRange]);
 
+    const serviceChargesByDate = useMemo(() => {
+        if (!committedRange.start || !committedRange.end) return {};
+        const startKey = committedRange.start;
+        const endKey = committedRange.end;
+        const map: Record<string, number> = {};
+        for (const row of salesData) {
+            const dateKey = extractDateKey(row);
+            if (!dateKey) continue;
+            if (dateKey < startKey || dateKey > endKey) continue;
+            const amount = extractServiceCharge(row);
+            if (amount > 0) {
+                map[dateKey] = (map[dateKey] || 0) + amount;
+            }
+        }
+        return map;
+    }, [salesData, committedRange]);
+
+    const computePaidMinutes = (emp: Employee, record: AttendanceRecord | undefined, dateKey: string) => {
+        const schedule = emp.schedule[dateKey];
+        if (!schedule || schedule.off || !schedule.timeIn || !schedule.timeOut) return 0;
+        if (!record || !record.timeIn || !record.timeOut) return 0;
+
+        const actualIn = timeStringToMinutes(record.timeIn);
+        const actualOut = timeStringToMinutes(record.timeOut);
+        const scheduledIn = timeStringToMinutes(schedule.timeIn);
+        const scheduledOut = timeStringToMinutes(schedule.timeOut);
+
+        if (actualIn === null || actualOut === null || scheduledIn === null || scheduledOut === null) return 0;
+
+        const effectiveIn = Math.max(actualIn, scheduledIn);
+        const baseWorked = Math.max(0, Math.min(actualOut, scheduledOut) - effectiveIn);
+        const totalLogin = actualOut - actualIn;
+
+        let paidRegular = baseWorked;
+        if (totalLogin > 4 * 60) {
+            paidRegular = Math.max(0, baseWorked - 60);
+        }
+
+        const approvedOTMinutes = emp.approvedOvertime?.[dateKey] || 0;
+        return Math.max(0, paidRegular) + Math.max(0, approvedOTMinutes);
+    };
+
+    const serviceChargeAllocations = useMemo(() => {
+        if (!committedRange.start || !committedRange.end) return {};
+        const start = new Date(committedRange.start + 'T00:00:00Z');
+        const end = new Date(committedRange.end + 'T00:00:00Z');
+
+        const attendanceByEmployee = attendanceRecords.reduce<Record<string, AttendanceRecord[]>>((acc, record) => {
+            const key = record.employee.trim().toLowerCase();
+            (acc[key] ||= []).push(record);
+            return acc;
+        }, {});
+
+        const workMap: Record<string, { total: number; employees: Record<number, number> }> = {};
+
+        for (const emp of employees) {
+            const empKey = emp.name.trim().toLowerCase();
+            const records = attendanceByEmployee[empKey] || [];
+
+            for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+                const currentDate = new Date(d);
+                const dateKey = currentDate.toISOString().split('T')[0];
+                const recordForDay = records.find(r => r.date === dateKey);
+                const minutes = computePaidMinutes(emp, recordForDay, dateKey);
+                if (minutes > 0) {
+                    if (!workMap[dateKey]) {
+                        workMap[dateKey] = { total: 0, employees: {} };
+                    }
+                    workMap[dateKey].total += minutes;
+                    workMap[dateKey].employees[emp.id] = (workMap[dateKey].employees[emp.id] || 0) + minutes;
+                }
+            }
+        }
+
+        const allocations: Record<number, number> = {};
+        for (const [dateKey, info] of Object.entries(workMap)) {
+            const pool = serviceChargesByDate[dateKey];
+            if (!pool || info.total <= 0) continue;
+            for (const [empIdStr, minutes] of Object.entries(info.employees)) {
+                const share = pool * (minutes / info.total);
+                const empId = Number(empIdStr);
+                allocations[empId] = (allocations[empId] || 0) + share;
+            }
+        }
+
+        return allocations;
+    }, [employees, attendanceRecords, committedRange, serviceChargesByDate]);
+
     const summary = useMemo(() => {
         let scheduled = 0, worked = 0, totalDelay = 0, absence = 0, approvedOT = 0, paidMinutes = 0, totalLoginMinutes = 0;
         let lateCount = 0;
@@ -315,6 +406,41 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, attendanceR
         const deductions = { sss: 0, philhealth: 0, pagibig: 0, total: 0 };
         const netPay = grossPay - deductions.total;
 
+        const dailyWorkMinutes: Record<string, { total: number; employee: number }> = {};
+        dailyLog.forEach(log => {
+            const dateKey = log.date.toISOString().split('T')[0];
+            let minutes = 0;
+            if (log.worked > 0) {
+                minutes += log.worked;
+            }
+            if (log.overtime > 0) {
+                const approved = employee.approvedOvertime?.[dateKey];
+                if (typeof approved === 'number' && approved > 0) {
+                    minutes += approved;
+                } else if (!approved) {
+                    minutes += log.overtime;
+                }
+            }
+            if (minutes > 0) {
+                if (!dailyWorkMinutes[dateKey]) {
+                    dailyWorkMinutes[dateKey] = { total: minutes, employee: minutes };
+                } else {
+                    dailyWorkMinutes[dateKey].total += minutes;
+                    dailyWorkMinutes[dateKey].employee += minutes;
+                }
+            }
+        });
+
+        const serviceChargeShare = Object.entries(dailyWorkMinutes).reduce((sum, [dateKey, info]) => {
+            const pool = serviceChargesByDate[dateKey];
+            if (!pool || info.total <= 0) return sum;
+            return sum + (pool * (info.employee / info.total));
+        }, 0);
+
+        const roundedServiceCharge = Math.round(serviceChargeShare * 100) / 100;
+        const grossWithService = grossPay + roundedServiceCharge;
+        const netWithService = grossWithService - deductions.total;
+
         const newRecord: PayrollRecord = {
             id: employee.id,
             employee: employee.name,
@@ -325,10 +451,10 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, attendanceR
             totalHours: totalRegularHours + totalOvertimeHours,
             regularPay,
             overtimePay,
-            serviceCharge: 0,
-            grossPay,
+            serviceCharge: roundedServiceCharge,
+            grossPay: grossWithService,
             deductions,
-            netPay,
+            netPay: netWithService,
             daysPresent,
             daysAbsent,
             daysLate

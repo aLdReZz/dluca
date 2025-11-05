@@ -5,6 +5,21 @@ import { Chart, registerables } from 'chart.js';
 import StatCard from '../components/StatCard';
 import { CurrencyPesoIcon, ArrowTrendingUpIcon, BanknotesIcon, CalendarDaysIcon, SparklesIcon } from '../components/Icons';
 import CalendarPopup from '../components/CalendarPopup';
+import {
+    parseSalesDate,
+    parseNumericValue,
+    getSalesFieldValue,
+    TOTAL_HEADERS,
+    TOTAL_INCLUDE,
+    TOTAL_EXCLUDE,
+    SERVICE_HEADERS,
+    SERVICE_INCLUDE,
+    COGS_HEADERS,
+    COGS_INCLUDE,
+    COGS_EXCLUDE,
+    DATE_HEADERS,
+    DATE_INCLUDE
+} from '../utils/salesData';
 
 Chart.register(...registerables);
 
@@ -12,173 +27,20 @@ interface DashboardProps {
     salesData: SalesData[];
 }
 
-// Helper to parse date strings from CSV
-const parseDate = (dateStr: string): Date | null => {
-    if (!dateStr) return null;
-    const trimmed = dateStr.trim();
-    if (!trimmed) return null;
-
-    const nativeParsed = new Date(trimmed);
-    if (!Number.isNaN(nativeParsed.getTime())) {
-        return nativeParsed;
-    }
-
-    const normalizeYear = (rawYear: number) => {
-        if (rawYear < 100) {
-            return rawYear + (rawYear >= 70 ? 1900 : 2000);
-        }
-        return rawYear;
-    };
-
-    const monthMap: Record<string, number> = {
-        jan: 0, january: 0,
-        feb: 1, february: 1,
-        mar: 2, march: 2,
-        apr: 3, april: 3,
-        may: 4,
-        jun: 5, june: 5,
-        jul: 6, july: 6,
-        aug: 7, august: 7,
-        sep: 8, sept: 8, september: 8,
-        oct: 9, october: 9,
-        nov: 10, november: 10,
-        dec: 11, december: 11
-    };
-
-    const cleaned = trimmed
-        .replace(/,/g, ' ')
-        .replace(/\./g, '/')
-        .replace(/-/g, '/')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-    const numericParts = cleaned.match(/^(\d{1,4})\/(\d{1,2})\/(\d{1,4})$/);
-    if (numericParts) {
-        let part1 = parseInt(numericParts[1], 10);
-        let part2 = parseInt(numericParts[2], 10);
-        let part3 = parseInt(numericParts[3], 10);
-
-        if (numericParts[1].length === 4) {
-            // yyyy/mm/dd
-            const year = normalizeYear(part1);
-            const month = part2 - 1;
-            const day = part3;
-            if (month >= 0 && month < 12 && day >= 1 && day <= 31) {
-                return new Date(year, month, day);
-            }
-        } else {
-            // assume mm/dd/yyyy or dd/mm/yyyy
-            let month = part1;
-            let day = part2;
-            const year = normalizeYear(part3);
-
-            if (month > 12 && day <= 12) {
-                [month, day] = [day, month];
-            } else if (day > 12 && month <= 12) {
-                // already month/day
-            }
-
-            if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-                return new Date(year, month - 1, day);
-            }
-        }
-    }
-
-    const tokens = cleaned.split(' ');
-    if (tokens.length >= 3) {
-        const first = tokens[0].toLowerCase();
-        const second = tokens[1].toLowerCase();
-        const third = tokens[2];
-
-        // Format: 07 Oct 2025 or Oct 07 2025
-        const tryParse = (dayToken: string, monthToken: string, yearToken: string) => {
-            const monthIndex = monthMap[monthToken.toLowerCase()];
-            const day = parseInt(dayToken, 10);
-            const year = normalizeYear(parseInt(yearToken, 10));
-            if (Number.isInteger(day) && !Number.isNaN(monthIndex) && !Number.isNaN(year)) {
-                return new Date(year, monthIndex, day);
-            }
-            return null;
-        };
-
-        if (!Number.isNaN(parseInt(first, 10)) && monthMap[second] !== undefined) {
-            const parsed = tryParse(first, second, third);
-            if (parsed) return parsed;
-        }
-
-        if (monthMap[first] !== undefined && !Number.isNaN(parseInt(second, 10))) {
-            const parsed = tryParse(second, first, third);
-            if (parsed) return parsed;
-        }
-    }
-
-    return null;
-};
-
-const formatPeso = (amount: number) => {
-    return '\u20B1' + amount.toLocaleString('en-PH', {
+const formatPeso = (amount?: number) => {
+    const safeAmount = typeof amount === 'number' && Number.isFinite(amount) ? amount : 0;
+    return '\u20B1' + safeAmount.toLocaleString('en-PH', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     });
 };
 
-const parseNumericValue = (value?: string): number => {
-    if (!value) return 0;
-    const cleaned = value.replace(/[^0-9.-]+/g, '');
-    const parsed = parseFloat(cleaned);
-    return Number.isFinite(parsed) ? parsed : 0;
+const formatDateForInput = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 };
-
-const getFieldValue = (
-    row: SalesData,
-    include: string[],
-    exclude: string[] = [],
-    exact: string[] = []
-): string | undefined => {
-    if (!row) return undefined;
-
-    const entries = Object.entries(row).map(([key, value]) => ({
-        keyOriginal: key,
-        key: key.trim().toLowerCase(),
-        value
-    }));
-
-    if (exact.length > 0) {
-        for (const candidate of exact) {
-            const normalizedCandidate = candidate.trim().toLowerCase();
-            const match = entries.find(entry => entry.key === normalizedCandidate);
-            if (match) return match.value;
-        }
-    }
-
-    const includeNorm = include.map(item => item.trim().toLowerCase());
-    const excludeNorm = exclude.map(item => item.trim().toLowerCase());
-
-    for (const entry of entries) {
-        if (includeNorm.some(fragment => entry.key.includes(fragment))) {
-            if (excludeNorm.some(fragment => entry.key.includes(fragment))) {
-                continue;
-            }
-            return entry.value;
-        }
-    }
-
-    return undefined;
-};
-
-const TOTAL_HEADERS = ['total'];
-const TOTAL_INCLUDE = ['total'];
-const TOTAL_EXCLUDE = ['service', 'profit', 'tax', 'vat', 'charge', 'discount', 'fee', 'cost'];
-
-const SERVICE_HEADERS = ['service amount'];
-const SERVICE_INCLUDE = ['service'];
-
-const COGS_HEADERS = ['cogs', 'cost of goods', 'cost'];
-const COGS_INCLUDE = ['cogs', 'cost'];
-const COGS_EXCLUDE = ['service', 'discount', 'charge'];
-
-const DATE_HEADERS = ['date', 'transaction date', 'sales date', 'order date'];
-const DATE_INCLUDE = ['date'];
 
 const formatDateForDisplay = (dateString: string) => {
     if (!dateString) return '';
@@ -191,8 +53,8 @@ const formatDateForDisplay = (dateString: string) => {
 };
 
 const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
-    const [filter, setFilter] = useState<'daily' | 'weekly' | 'monthly' | 'custom'>('monthly');
-    const [stats, setStats] = useState({ totalSales: 0, totalProfit: 0, totalCOGS: 0, serviceCharge: 0 });
+    const [filter, setFilter] = useState<'daily' | 'weekly' | 'monthly' | 'lastMonth' | 'custom'>('monthly');
+    const [stats, setStats] = useState({ netSales: 0, grossSales: 0, totalProfit: 0, totalCOGS: 0, serviceCharge: 0 });
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const chartRef = useRef<HTMLCanvasElement>(null);
@@ -208,7 +70,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
 
     const calculateStats = useCallback(() => {
         if (!startDate || !endDate) {
-            setStats({ totalSales: 0, totalProfit: 0, totalCOGS: 0, serviceCharge: 0 });
+            setStats({ netSales: 0, grossSales: 0, totalProfit: 0, totalCOGS: 0, serviceCharge: 0 });
             return [];
         }
 
@@ -216,32 +78,32 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
         const end = new Date(endDate + 'T23:59:59');
 
         const filteredData = salesData.filter(row => {
-            const dateValue = getFieldValue(row, DATE_INCLUDE, [], DATE_HEADERS);
-            const rowDate = parseDate(dateValue ?? row.Date);
+            const dateValue = getSalesFieldValue(row, DATE_INCLUDE, [], DATE_HEADERS);
+            const rowDate = parseSalesDate(dateValue ?? row.Date);
             return rowDate && rowDate >= start && rowDate <= end;
         });
 
         const totalGrossSales = filteredData.reduce((sum, row) => {
-            const raw = getFieldValue(row, TOTAL_INCLUDE, TOTAL_EXCLUDE, TOTAL_HEADERS);
+            const raw = getSalesFieldValue(row, TOTAL_INCLUDE, TOTAL_EXCLUDE, TOTAL_HEADERS);
             return sum + parseNumericValue(raw);
         }, 0);
         const totalProfit = filteredData.reduce((sum, row) => {
-            const gross = parseNumericValue(getFieldValue(row, TOTAL_INCLUDE, TOTAL_EXCLUDE, TOTAL_HEADERS));
-            const cost = parseNumericValue(getFieldValue(row, COGS_INCLUDE, COGS_EXCLUDE, COGS_HEADERS));
-            const service = parseNumericValue(getFieldValue(row, SERVICE_INCLUDE, [], SERVICE_HEADERS));
+            const gross = parseNumericValue(getSalesFieldValue(row, TOTAL_INCLUDE, TOTAL_EXCLUDE, TOTAL_HEADERS));
+            const cost = parseNumericValue(getSalesFieldValue(row, COGS_INCLUDE, COGS_EXCLUDE, COGS_HEADERS));
+            const service = parseNumericValue(getSalesFieldValue(row, SERVICE_INCLUDE, [], SERVICE_HEADERS));
             return sum + (gross - service - cost);
         }, 0);
         const totalCOGS = filteredData.reduce((sum, row) => {
-            const value = getFieldValue(row, COGS_INCLUDE, COGS_EXCLUDE, COGS_HEADERS);
+            const value = getSalesFieldValue(row, COGS_INCLUDE, COGS_EXCLUDE, COGS_HEADERS);
             return sum + parseNumericValue(value);
         }, 0);
         const totalServiceCharge = filteredData.reduce((sum, row) => {
-            const value = getFieldValue(row, SERVICE_INCLUDE, [], SERVICE_HEADERS);
+            const value = getSalesFieldValue(row, SERVICE_INCLUDE, [], SERVICE_HEADERS);
             return sum + parseNumericValue(value);
         }, 0);
         const netSales = Math.max(totalGrossSales - totalServiceCharge, 0);
 
-        setStats({ totalSales: netSales, totalProfit, totalCOGS, serviceCharge: totalServiceCharge });
+        setStats({ netSales, grossSales: totalGrossSales, totalProfit, totalCOGS, serviceCharge: totalServiceCharge });
         return filteredData;
     }, [salesData, startDate, endDate]);
 
@@ -255,19 +117,27 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
             chartInstanceRef.current.destroy();
         }
 
+        chartCtx.clearRect(0, 0, chartCtx.canvas.width, chartCtx.canvas.height);
+
         const groupedData = data.reduce((acc, row) => {
-            const dateValue = getFieldValue(row, DATE_INCLUDE, [], DATE_HEADERS);
-            const parsedDate = parseDate(dateValue ?? row.Date);
+            const dateValue = getSalesFieldValue(row, DATE_INCLUDE, [], DATE_HEADERS);
+            const parsedDate = parseSalesDate(dateValue ?? row.Date);
             const date = parsedDate?.toLocaleDateString('en-CA') || 'Unknown'; // YYYY-MM-DD for sorting
-            const totalValue = parseNumericValue(getFieldValue(row, TOTAL_INCLUDE, TOTAL_EXCLUDE, TOTAL_HEADERS));
-            const serviceChargeValue = parseNumericValue(getFieldValue(row, SERVICE_INCLUDE, [], SERVICE_HEADERS));
+            const totalValue = parseNumericValue(getSalesFieldValue(row, TOTAL_INCLUDE, TOTAL_EXCLUDE, TOTAL_HEADERS));
+            const serviceChargeValue = parseNumericValue(getSalesFieldValue(row, SERVICE_INCLUDE, [], SERVICE_HEADERS));
             const netValue = Math.max(totalValue - serviceChargeValue, 0);
             acc[date] = (acc[date] || 0) + netValue;
             return acc;
         }, {} as { [key: string]: number });
 
-        const labels = Object.keys(groupedData).sort((a,b) => new Date(a).getTime() - new Date(b).getTime()).map(d => new Date(d+'T00:00:00').toLocaleDateString());
-        const chartData = labels.map(label => groupedData[Object.keys(groupedData).find(d => new Date(d+'T00:00:00').toLocaleDateString() === label) || '']);
+        const sortedEntries = Object.entries(groupedData)
+            .filter(([date]) => date !== 'Unknown')
+            .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime());
+
+        const labels = sortedEntries.map(([date]) =>
+            new Date(date + 'T00:00:00').toLocaleDateString()
+        );
+        const chartData = sortedEntries.map(([, value]) => value);
 
         chartInstanceRef.current = new Chart(chartCtx, {
             type: 'line',
@@ -276,27 +146,109 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
                 datasets: [{
                     label: 'Sales',
                     data: chartData,
-                    borderColor: '#007aff',
-                    backgroundColor: 'rgba(0, 122, 255, 0.1)',
-                    fill: true,
-                    tension: 0.4,
-                    pointBackgroundColor: '#007aff',
-                    pointBorderColor: '#fff',
-                    pointHoverRadius: 6,
-                    pointHoverBackgroundColor: '#fff',
-                    pointHoverBorderColor: '#007aff',
+                    borderColor: '#2563eb',
+                    borderWidth: 2.5,
+                    backgroundColor: (ctx) => {
+                        const { chart } = ctx;
+                        const { ctx: canvasCtx, chartArea } = chart;
+                        if (!chartArea) {
+                            return 'rgba(37, 99, 235, 0.1)';
+                        }
+                        const gradient = canvasCtx.createLinearGradient(
+                            chartArea.left,
+                            chartArea.top,
+                            chartArea.left,
+                            chartArea.bottom
+                        );
+                        gradient.addColorStop(0, 'rgba(59, 130, 246, 0.22)');
+                        gradient.addColorStop(1, 'rgba(37, 99, 235, 0.06)');
+                        return gradient;
+                    },
+                    fill: 'origin',
+                    tension: 0.45,
+                    pointRadius: 4.5,
+                    pointHoverRadius: 7,
+                    pointBorderWidth: 2,
+                    pointHoverBorderWidth: 2.5,
+                    pointBackgroundColor: '#1f2937',
+                    pointBorderColor: '#60a5fa',
+                    pointHoverBackgroundColor: '#bfdbfe',
+                    pointHoverBorderColor: '#1d4ed8',
+                    pointHitRadius: 14,
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(12, 15, 22, 0.94)',
+                        borderColor: 'rgba(96, 165, 250, 0.35)',
+                        borderWidth: 1.2,
+                        padding: 12,
+                        titleColor: '#f4f4f5',
+                        titleFont: { weight: '600', size: 12, family: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+                        titleSpacing: 6,
+                        bodyColor: '#e2e8f0',
+                        bodyFont: { weight: '500', size: 12, family: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+                        bodySpacing: 8,
+                        footerColor: 'rgba(148, 163, 184, 0.85)',
+                        footerFont: { weight: '400', size: 10, family: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+                        footerSpacing: 4,
+                        displayColors: false,
+                        cornerRadius: 10,
+                        caretSize: 6,
+                        boxPadding: 6,
+                        callbacks: {
+                            title: () => [],
+                            label: (context) => {
+                                const value = context.raw as number;
+                                return formatPeso(value);
+                            },
+                            footer: (items) => {
+                                const first = items[0];
+                                if (!first?.label) return [];
+                                const date = new Date(first.label);
+                                if (Number.isNaN(date.getTime())) return [first.label];
+                                return [
+                                    date.toLocaleDateString('en-PH', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric'
+                                    })
+                                ];
+                            }
+                        }
+                    }
+                },
+                interaction: { intersect: false, mode: 'index' },
                 scales: {
                     y: { ticks: { color: '#a1a1a6' }, grid: { color: '#424245' } },
                     x: { ticks: { color: '#a1a1a6' }, grid: { color: 'transparent' } }
                 }
             }
         });
+
+        const srTooltip = chartInstanceRef.current.canvas.parentNode?.querySelector('.chartjs-tooltip');
+        if (srTooltip) {
+            srTooltip.remove();
+        }
+
+        const tooltip = (chartInstanceRef.current.tooltip ?? null) as unknown as {
+            draw?: (ctx: CanvasRenderingContext2D) => void;
+        };
+        if (tooltip && typeof tooltip.draw === 'function') {
+            const originalDraw = tooltip.draw.bind(tooltip);
+            tooltip.draw = (ctx: CanvasRenderingContext2D) => {
+                ctx.save();
+                ctx.shadowColor = 'rgba(10, 14, 25, 0.45)';
+                ctx.shadowBlur = 18;
+                ctx.shadowOffsetY = 10;
+                originalDraw(ctx);
+                ctx.restore();
+            };
+        }
     }, []);
 
     useEffect(() => {
@@ -304,7 +256,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
         updateChart(filteredData);
     }, [salesData, startDate, endDate, calculateStats, updateChart]);
     
-    const handleFilterChange = (newFilter: 'daily' | 'weekly' | 'monthly') => {
+    const handleFilterChange = (newFilter: 'daily' | 'weekly' | 'monthly' | 'lastMonth') => {
         setFilter(newFilter);
         const now = new Date();
         let start: Date, end: Date;
@@ -317,12 +269,15 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
             start = new Date(now.setDate(diff));
             end = new Date(start);
             end.setDate(start.getDate() + 6);
+        } else if (newFilter === 'lastMonth') {
+            start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            end = new Date(now.getFullYear(), now.getMonth(), 0);
         } else { // monthly
             start = new Date(now.getFullYear(), now.getMonth(), 1);
-            end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         }
-        setStartDate(start.toISOString().split('T')[0]);
-        setEndDate(end.toISOString().split('T')[0]);
+        setStartDate(formatDateForInput(start));
+        setEndDate(formatDateForInput(end));
     };
     
     const handleRangeComplete = (range: { start: string; end: string }) => {
@@ -344,7 +299,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
     }, []);
 
     const FilterButton: React.FC<{
-      period: 'daily' | 'weekly' | 'monthly' | 'custom';
+      period: 'daily' | 'weekly' | 'monthly' | 'lastMonth' | 'custom';
       label: string;
       activeFilter: string;
       onClick: () => void;
@@ -373,6 +328,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
                         <FilterButton period="daily" label="Today" activeFilter={filter} onClick={() => handleFilterChange('daily')} />
                         <FilterButton period="weekly" label="This Week" activeFilter={filter} onClick={() => handleFilterChange('weekly')} />
                         <FilterButton period="monthly" label="This Month" activeFilter={filter} onClick={() => handleFilterChange('monthly')} />
+                        <FilterButton period="lastMonth" label="Last Month" activeFilter={filter} onClick={() => handleFilterChange('lastMonth')} />
                     </div>
                     <div className="relative w-full sm:w-auto" ref={calendarRef}>
                         <button
@@ -398,8 +354,9 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <StatCard title="Total Sales" value={formatPeso(stats.totalSales)} icon={CurrencyPesoIcon} color="blue" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+                <StatCard title="Net Sales" value={formatPeso(stats.netSales)} icon={CurrencyPesoIcon} color="blue" />
+                <StatCard title="Gross Sales" value={formatPeso(stats.grossSales)} icon={CurrencyPesoIcon} color="purple" />
                 <StatCard title="Total Profit" value={formatPeso(stats.totalProfit)} icon={ArrowTrendingUpIcon} color="green" />
                 <StatCard title="COGS" value={formatPeso(stats.totalCOGS)} icon={BanknotesIcon} color="orange" />
                 <StatCard title="Service Charge" value={formatPeso(stats.serviceCharge)} icon={SparklesIcon} color="yellow" />

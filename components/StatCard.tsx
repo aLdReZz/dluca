@@ -18,15 +18,13 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, color }) 
     };
 
     return (
-        <div className="group bg-bg-secondary p-5 rounded-xl border border-border-color transition-colors duration-300 hover:border-border-color/70">
-            <div className="flex justify-between items-start">
-                <div className="flex-1">
-                    <div className="text-sm font-medium text-text-secondary">{title}</div>
-                    <div className="text-3xl font-semibold text-text-primary mt-2">{value}</div>
-                </div>
-                <div className={`p-3 rounded-lg bg-bg-tertiary`}>
-                    <Icon className={`w-6 h-6 ${colorClasses[color]}`} />
-                </div>
+        <div className="group relative bg-bg-secondary rounded-xl border border-border-color transition-colors duration-300 hover:border-border-color/60 px-5 pt-6 pb-5 overflow-hidden">
+            <div className="absolute right-5 top-4 h-10 w-10 rounded-lg bg-bg-tertiary/90 ring-1 ring-border-color/60 flex items-center justify-center group-hover:ring-border-color">
+                <Icon className={`w-6 h-6 ${colorClasses[color]}`} />
+            </div>
+            <div className="pr-16">
+                <div className="text-sm font-medium text-text-secondary">{title}</div>
+                <div className="text-3xl font-semibold text-text-primary mt-3">{value}</div>
             </div>
         </div>
     );

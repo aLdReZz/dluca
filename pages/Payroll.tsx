@@ -1,9 +1,10 @@
-
+﻿
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import type { PayrollRecord, Employee, AttendanceRecord } from '../types';
+import type { PayrollRecord, Employee, AttendanceRecord, SalesData } from '../types';
 import CalendarPopup from '../components/CalendarPopup';
 import { CalendarDaysIcon, CurrencyPesoIcon, ClockIcon, BanknotesIcon } from '../components/Icons';
 import PayslipModal from '../components/PayslipModal';
+import { extractDateKey, extractServiceCharge } from '../utils/salesData';
 
 
 interface PayrollProps {
@@ -11,6 +12,7 @@ interface PayrollProps {
     attendanceRecords: AttendanceRecord[];
     payrollRecords: PayrollRecord[];
     setPayrollRecords: React.Dispatch<React.SetStateAction<PayrollRecord[]>>;
+    salesData: SalesData[];
 }
 
 const timeStringToMinutes = (timeStr: string): number | null => {
@@ -67,7 +69,7 @@ const SummaryCard: React.FC<{title: string, value: string, icon: React.FC<{class
 
 const OVERTIME_RATE_MULTIPLIER = 1.5;
 
-const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payrollRecords, setPayrollRecords }) => {
+const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payrollRecords, setPayrollRecords, salesData }) => {
     const [payPeriod, setPayPeriod] = useState(() => {
         const today = new Date();
         const start = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -80,6 +82,18 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     const [selectedRecord, setSelectedRecord] = useState<PayrollRecord | null>(null);
     const calendarRef = useRef<HTMLDivElement>(null);
+
+    const dailyServiceCharges = useMemo(() => {
+        const map: Record<string, number> = {};
+        for (const row of salesData) {
+            const dateKey = extractDateKey(row);
+            if (!dateKey) continue;
+            const amount = extractServiceCharge(row);
+            if (!Number.isFinite(amount) || amount <= 0) continue;
+            map[dateKey] = (map[dateKey] || 0) + amount;
+        }
+        return map;
+    }, [salesData]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -100,7 +114,9 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
         const startDate = new Date(payPeriod.start + 'T00:00:00Z');
         const endDate = new Date(payPeriod.end + 'T00:00:00Z');
 
-        const newPayrollRecords = employees.map(employee => {
+        const dailyWorkMinutes: Record<string, { total: number; employees: Record<number, number> }> = {};
+
+        const baseRecords = employees.map(employee => {
             let totalRegularHours = 0;
             let totalOvertimeHours = 0;
             let daysPresent = 0;
@@ -113,6 +129,7 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
                 const record = attendanceRecords.find(r => r.employee.toLowerCase() === employee.name.toLowerCase() && r.date === dateKey);
 
                 const scheduledInMinutes = schedule?.timeIn ? timeStringToMinutes(schedule.timeIn) : null;
+                let workedMinutesForDay = 0;
 
                 if (schedule && !schedule.off && schedule.timeIn) {
                     if (record && record.timeIn) {
@@ -138,19 +155,30 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
                     if (actualInMinutes !== null && actualOutMinutes !== null && scheduledInMinutes !== null && scheduledOutMinutes !== null) {
                         const effectiveInMinutes = Math.max(actualInMinutes, scheduledInMinutes);
                         const baseWorkedMinutes = Math.max(0, Math.min(actualOutMinutes, scheduledOutMinutes) - effectiveInMinutes);
-                        
+
                         const totalDailyLoginDuration = actualOutMinutes - actualInMinutes;
-                        
+
                         let dailyPaidRegularMinutes = baseWorkedMinutes;
                         if (totalDailyLoginDuration > 4 * 60) { // More than 4 hours
                             dailyPaidRegularMinutes = Math.max(0, baseWorkedMinutes - 60); // Deduct 1 hour break
                         }
-                        
+
                         totalRegularHours += dailyPaidRegularMinutes / 60;
+                        workedMinutesForDay += dailyPaidRegularMinutes;
 
                         const approvedOTMinutes = employee.approvedOvertime?.[dateKey] || 0;
                         totalOvertimeHours += approvedOTMinutes / 60;
+                        workedMinutesForDay += approvedOTMinutes;
                     }
+                }
+
+                if (workedMinutesForDay > 0) {
+                    if (!dailyWorkMinutes[dateKey]) {
+                        dailyWorkMinutes[dateKey] = { total: 0, employees: {} };
+                    }
+                    dailyWorkMinutes[dateKey].total += workedMinutesForDay;
+                    const existing = dailyWorkMinutes[dateKey].employees[employee.id] || 0;
+                    dailyWorkMinutes[dateKey].employees[employee.id] = existing + workedMinutesForDay;
                 }
             }
 
@@ -187,8 +215,32 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
             };
         });
 
-        setPayrollRecords(newPayrollRecords);
-    }, [employees, attendanceRecords, payPeriod, setPayrollRecords]);
+        const serviceChargeAllocations: Record<number, number> = {};
+        for (const [dateKey, info] of Object.entries(dailyWorkMinutes)) {
+            const pool = dailyServiceCharges[dateKey];
+            if (!pool || info.total <= 0) continue;
+            for (const [employeeIdStr, minutes] of Object.entries(info.employees)) {
+                const portion = pool * (minutes / info.total);
+                const employeeId = Number(employeeIdStr);
+                serviceChargeAllocations[employeeId] = (serviceChargeAllocations[employeeId] || 0) + portion;
+            }
+        }
+
+        const finalRecords = baseRecords.map(record => {
+            const rawServiceChargeShare = serviceChargeAllocations[record.id] || 0;
+            const serviceChargeShare = Math.round(rawServiceChargeShare * 100) / 100;
+            const grossPayWithService = record.regularPay + record.overtimePay + serviceChargeShare;
+            const netPayWithService = grossPayWithService - record.deductions.total;
+            return {
+                ...record,
+                serviceCharge: serviceChargeShare,
+                grossPay: grossPayWithService,
+                netPay: netPayWithService
+            };
+        });
+
+        setPayrollRecords(finalRecords);
+    }, [employees, attendanceRecords, payPeriod, setPayrollRecords, dailyServiceCharges]);
 
     useEffect(() => {
         generatePayroll();

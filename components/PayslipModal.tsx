@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useMemo, useEffect } from 'react';
 import type { PayrollRecord } from '../types';
 import { XMarkIcon, PrinterIcon, InformationCircleIcon } from './Icons';
@@ -34,9 +34,10 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose,
     }, []);
 
     const { grossPay, netPay } = useMemo(() => {
-        const newGrossPay = record.regularPay + serviceCharge;
-        return { grossPay: newGrossPay, netPay: newGrossPay };
-    }, [serviceCharge, record.regularPay]);
+        const gross = record.regularPay + record.overtimePay + serviceCharge;
+        const net = gross - record.deductions.total;
+        return { grossPay: gross, netPay: net };
+    }, [serviceCharge, record.regularPay, record.overtimePay, record.deductions.total]);
     
     const handleServiceChargeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setServiceCharge(parseFloat(e.target.value) || 0);
@@ -45,19 +46,14 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose,
     const handleSave = () => {
         const updatedRecord = {
             ...record,
-            serviceCharge: serviceCharge,
-            grossPay: grossPay,
-            deductions: {
-                sss: 0,
-                philhealth: 0,
-                pagibig: 0,
-                total: 0
-            },
-            netPay: netPay
+            serviceCharge,
+            grossPay,
+            netPay,
+            deductions: record.deductions
         };
         onSave(updatedRecord);
     };
-    
+
     const handlePrint = () => {
         alert("Printing is disabled in this sandboxed environment. Please use your computer's screenshot functionality to save a copy of the payslip.");
     };
@@ -116,7 +112,8 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose,
                                 <h3 className="font-semibold text-text-primary mb-2 border-b border-border-color pb-2">Pay Calculation</h3>
                                 <DetailRow 
                                     label="Period Earnings" 
-                                    value={formatPeso(record.regularPay)} 
+                                    value={formatPeso(record.regularPay + record.overtimePay)} 
+                                    subValue={`Regular ${formatPeso(record.regularPay)} · OT ${formatPeso(record.overtimePay)}`} 
                                 />
                                 <DetailRow 
                                     label="Service Charge"
@@ -166,3 +163,5 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose,
 };
 
 export default PayslipModal;
+
+
