@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { SalesData } from '../types';
 import { Chart, registerables } from 'chart.js';
 import StatCard from '../components/StatCard';
-import { CurrencyPesoIcon, ArrowTrendingUpIcon, ChartPieIcon, BanknotesIcon } from '../components/Icons';
+import { CurrencyPesoIcon, ArrowTrendingUpIcon, ChartPieIcon, BanknotesIcon, CalendarDaysIcon } from '../components/Icons';
+import CalendarPopup from '../components/CalendarPopup';
 
 Chart.register(...registerables);
 
@@ -19,9 +20,26 @@ const parseDate = (dateStr: string): Date | null => {
 };
 
 const formatPeso = (amount: number) => {
-    return '₱' + amount.toLocaleString('en-PH', {
+    return '\u20B1' + amount.toLocaleString('en-PH', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
+    });
+};
+
+const parseNumericValue = (value?: string): number => {
+    if (!value) return 0;
+    const cleaned = value.replace(/[^0-9.-]+/g, '');
+    const parsed = parseFloat(cleaned);
+    return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const formatDateForDisplay = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString + 'T00:00:00');
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
     });
 };
 
@@ -32,6 +50,8 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
     const [endDate, setEndDate] = useState('');
     const chartRef = useRef<HTMLCanvasElement>(null);
     const chartInstanceRef = useRef<Chart | null>(null);
+    const calendarRef = useRef<HTMLDivElement>(null);
+    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     
     useEffect(() => {
         // Set initial date range to "This Month" on component mount
@@ -53,9 +73,9 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
             return rowDate && rowDate >= start && rowDate <= end;
         });
 
-        const totalSales = filteredData.reduce((sum, row) => sum + parseFloat(row.Total || '0'), 0);
-        const totalProfit = filteredData.reduce((sum, row) => sum + parseFloat(row.Profit || '0'), 0);
-        const totalCOGS = filteredData.reduce((sum, row) => sum + parseFloat(row.Cost || '0'), 0);
+        const totalSales = filteredData.reduce((sum, row) => sum + parseNumericValue(row.Total), 0);
+        const totalProfit = filteredData.reduce((sum, row) => sum + parseNumericValue(row.Profit), 0);
+        const totalCOGS = filteredData.reduce((sum, row) => sum + parseNumericValue(row.Cost), 0);
         const profitMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
 
         setStats({ totalSales, totalProfit, totalCOGS, profitMargin });
@@ -74,7 +94,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
 
         const groupedData = data.reduce((acc, row) => {
             const date = parseDate(row.Date)?.toLocaleDateString('en-CA') || 'Unknown'; // YYYY-MM-DD for sorting
-            acc[date] = (acc[date] || 0) + parseFloat(row.Total || '0');
+            acc[date] = (acc[date] || 0) + parseNumericValue(row.Total);
             return acc;
         }, {} as { [key: string]: number });
 
@@ -137,15 +157,23 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
         setEndDate(end.toISOString().split('T')[0]);
     };
     
-    const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setStartDate(e.target.value);
+    const handleRangeComplete = (range: { start: string; end: string }) => {
+        setStartDate(range.start);
+        setEndDate(range.end);
         setFilter('custom');
+        setIsCalendarOpen(false);
     };
-    
-    const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setEndDate(e.target.value);
-        setFilter('custom');
-    };
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
+                setIsCalendarOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const FilterButton: React.FC<{
       period: 'daily' | 'weekly' | 'monthly' | 'custom';
@@ -178,22 +206,26 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
                         <FilterButton period="weekly" label="This Week" activeFilter={filter} onClick={() => handleFilterChange('weekly')} />
                         <FilterButton period="monthly" label="This Month" activeFilter={filter} onClick={() => handleFilterChange('monthly')} />
                     </div>
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <input 
-                            type="date"
-                            value={startDate}
-                            onChange={handleStartDateChange}
-                            className="bg-bg-tertiary border border-border-color rounded-lg p-2 text-sm focus:ring-accent-blue focus:border-accent-blue w-full"
-                            aria-label="Start Date"
-                        />
-                         <span className="text-text-secondary">-</span>
-                        <input 
-                            type="date"
-                            value={endDate}
-                            onChange={handleEndDateChange}
-                            className="bg-bg-tertiary border border-border-color rounded-lg p-2 text-sm focus:ring-accent-blue focus:border-accent-blue w-full"
-                            aria-label="End Date"
-                        />
+                    <div className="relative w-full sm:w-auto" ref={calendarRef}>
+                        <button
+                            onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+                            className="w-full sm:w-auto bg-bg-tertiary border border-border-color rounded-lg px-3 py-2 text-sm font-medium flex items-center justify-between sm:justify-start gap-2 hover:bg-hover-bg transition"
+                            aria-label="Select date range"
+                        >
+                            <CalendarDaysIcon className="w-5 h-5 text-text-secondary" />
+                            <span className="text-text-primary">
+                                {startDate && endDate
+                                    ? `${formatDateForDisplay(startDate)} - ${formatDateForDisplay(endDate)}`
+                                    : 'Select range'}
+                            </span>
+                        </button>
+                        {isCalendarOpen && (
+                            <CalendarPopup
+                                initialRange={{ start: startDate || endDate, end: endDate || startDate }}
+                                onRangeComplete={handleRangeComplete}
+                                onClose={() => setIsCalendarOpen(false)}
+                            />
+                        )}
                     </div>
                 </div>
             </div>
@@ -218,3 +250,8 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
 };
 
 export default Dashboard;
+
+
+
+
+
