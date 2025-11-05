@@ -50,18 +50,60 @@ const Sales: React.FC<SalesProps> = ({ salesData, setSalesData }) => {
     };
 
     const parseSalesCSV = (text: string) => {
-        const lines = text.split('\n');
-        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-        const data: SalesData[] = [];
-        for (let i = 1; i < lines.length; i++) {
-            if (!lines[i].trim()) continue;
-            const values = lines[i].split(',');
-            const row: SalesData = {};
-            headers.forEach((header, index) => {
-                row[header] = values[index] ? values[index].trim().replace(/"/g, '') : '';
-            });
-            data.push(row);
+        const rows: string[][] = [];
+        let current = '';
+        let row: string[] = [];
+        let inQuotes = false;
+        const input = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+        for (let i = 0; i < input.length; i++) {
+            const char = input[i];
+            const nextChar = input[i + 1];
+
+            if (char === '"') {
+                if (inQuotes && nextChar === '"') {
+                    current += '"';
+                    i++;
+                } else {
+                    inQuotes = !inQuotes;
+                }
+            } else if (char === ',' && !inQuotes) {
+                row.push(current);
+                current = '';
+            } else if (char === '\n' && !inQuotes) {
+                row.push(current);
+                rows.push(row);
+                row = [];
+                current = '';
+            } else {
+                current += char;
+            }
         }
+
+        if (current.length > 0 || row.length > 0) {
+            row.push(current);
+            rows.push(row);
+        }
+
+        if (rows.length === 0) {
+            setSalesData([]);
+            return;
+        }
+
+        const headers = rows[0].map(header => header.trim().replace(/^\uFEFF/, '').replace(/"/g, ''));
+        const data: SalesData[] = [];
+
+        for (let i = 1; i < rows.length; i++) {
+            const values = rows[i];
+            if (values.every(value => !value || !value.trim())) continue;
+            const rowData: SalesData = {};
+            headers.forEach((header, index) => {
+                const raw = values[index] ?? '';
+                rowData[header] = raw.trim().replace(/^\uFEFF/, '').replace(/"/g, '');
+            });
+            data.push(rowData);
+        }
+
         setSalesData(data);
     };
     
