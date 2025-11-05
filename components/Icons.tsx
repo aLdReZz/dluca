@@ -73,9 +73,18 @@ export const MenuIcon: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 export const CurrencyPesoIcon: React.FC<{ className?: string }> = ({ className }) => (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.5 4v16m0-12h4a4 4 0 1 1 0 8h-4" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 10h9" />
+    <svg
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+    >
+        <g stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <ellipse cx="12" cy="6.5" rx="6.5" ry="2.5" />
+            <path d="M5.5 6.5v3.6c0 1.9 2.9 3.5 6.5 3.5s6.5-1.6 6.5-3.5V6.5" />
+            <path d="M5.5 10.1v3.6c0 1.9 2.9 3.5 6.5 3.5s6.5-1.6 6.5-3.5v-3.6" />
+            <path d="M5.5 13.7v3.8c0 1.9 2.9 3.5 6.5 3.5s6.5-1.6 6.5-3.5v-3.8" />
+        </g>
     </svg>
 );
 

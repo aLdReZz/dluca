@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { SalesData } from '../types';
 import { Chart, registerables } from 'chart.js';
 import StatCard from '../components/StatCard';
-import { CurrencyPesoIcon, ArrowTrendingUpIcon, ChartPieIcon, BanknotesIcon, CalendarDaysIcon } from '../components/Icons';
+import { CurrencyPesoIcon, ArrowTrendingUpIcon, BanknotesIcon, CalendarDaysIcon, SparklesIcon } from '../components/Icons';
 import CalendarPopup from '../components/CalendarPopup';
 
 Chart.register(...registerables);
@@ -15,8 +15,104 @@ interface DashboardProps {
 // Helper to parse date strings from CSV
 const parseDate = (dateStr: string): Date | null => {
     if (!dateStr) return null;
-    const date = new Date(dateStr.trim());
-    return isNaN(date.getTime()) ? null : date;
+    const trimmed = dateStr.trim();
+    if (!trimmed) return null;
+
+    const nativeParsed = new Date(trimmed);
+    if (!Number.isNaN(nativeParsed.getTime())) {
+        return nativeParsed;
+    }
+
+    const normalizeYear = (rawYear: number) => {
+        if (rawYear < 100) {
+            return rawYear + (rawYear >= 70 ? 1900 : 2000);
+        }
+        return rawYear;
+    };
+
+    const monthMap: Record<string, number> = {
+        jan: 0, january: 0,
+        feb: 1, february: 1,
+        mar: 2, march: 2,
+        apr: 3, april: 3,
+        may: 4,
+        jun: 5, june: 5,
+        jul: 6, july: 6,
+        aug: 7, august: 7,
+        sep: 8, sept: 8, september: 8,
+        oct: 9, october: 9,
+        nov: 10, november: 10,
+        dec: 11, december: 11
+    };
+
+    const cleaned = trimmed
+        .replace(/,/g, ' ')
+        .replace(/\./g, '/')
+        .replace(/-/g, '/')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const numericParts = cleaned.match(/^(\d{1,4})\/(\d{1,2})\/(\d{1,4})$/);
+    if (numericParts) {
+        let part1 = parseInt(numericParts[1], 10);
+        let part2 = parseInt(numericParts[2], 10);
+        let part3 = parseInt(numericParts[3], 10);
+
+        if (numericParts[1].length === 4) {
+            // yyyy/mm/dd
+            const year = normalizeYear(part1);
+            const month = part2 - 1;
+            const day = part3;
+            if (month >= 0 && month < 12 && day >= 1 && day <= 31) {
+                return new Date(year, month, day);
+            }
+        } else {
+            // assume mm/dd/yyyy or dd/mm/yyyy
+            let month = part1;
+            let day = part2;
+            const year = normalizeYear(part3);
+
+            if (month > 12 && day <= 12) {
+                [month, day] = [day, month];
+            } else if (day > 12 && month <= 12) {
+                // already month/day
+            }
+
+            if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+                return new Date(year, month - 1, day);
+            }
+        }
+    }
+
+    const tokens = cleaned.split(' ');
+    if (tokens.length >= 3) {
+        const first = tokens[0].toLowerCase();
+        const second = tokens[1].toLowerCase();
+        const third = tokens[2];
+
+        // Format: 07 Oct 2025 or Oct 07 2025
+        const tryParse = (dayToken: string, monthToken: string, yearToken: string) => {
+            const monthIndex = monthMap[monthToken.toLowerCase()];
+            const day = parseInt(dayToken, 10);
+            const year = normalizeYear(parseInt(yearToken, 10));
+            if (Number.isInteger(day) && !Number.isNaN(monthIndex) && !Number.isNaN(year)) {
+                return new Date(year, monthIndex, day);
+            }
+            return null;
+        };
+
+        if (!Number.isNaN(parseInt(first, 10)) && monthMap[second] !== undefined) {
+            const parsed = tryParse(first, second, third);
+            if (parsed) return parsed;
+        }
+
+        if (monthMap[first] !== undefined && !Number.isNaN(parseInt(second, 10))) {
+            const parsed = tryParse(second, first, third);
+            if (parsed) return parsed;
+        }
+    }
+
+    return null;
 };
 
 const formatPeso = (amount: number) => {
@@ -33,6 +129,57 @@ const parseNumericValue = (value?: string): number => {
     return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const getFieldValue = (
+    row: SalesData,
+    include: string[],
+    exclude: string[] = [],
+    exact: string[] = []
+): string | undefined => {
+    if (!row) return undefined;
+
+    const entries = Object.entries(row).map(([key, value]) => ({
+        keyOriginal: key,
+        key: key.trim().toLowerCase(),
+        value
+    }));
+
+    if (exact.length > 0) {
+        for (const candidate of exact) {
+            const normalizedCandidate = candidate.trim().toLowerCase();
+            const match = entries.find(entry => entry.key === normalizedCandidate);
+            if (match) return match.value;
+        }
+    }
+
+    const includeNorm = include.map(item => item.trim().toLowerCase());
+    const excludeNorm = exclude.map(item => item.trim().toLowerCase());
+
+    for (const entry of entries) {
+        if (includeNorm.some(fragment => entry.key.includes(fragment))) {
+            if (excludeNorm.some(fragment => entry.key.includes(fragment))) {
+                continue;
+            }
+            return entry.value;
+        }
+    }
+
+    return undefined;
+};
+
+const TOTAL_HEADERS = ['total'];
+const TOTAL_INCLUDE = ['total'];
+const TOTAL_EXCLUDE = ['service', 'profit', 'tax', 'vat', 'charge', 'discount', 'fee', 'cost'];
+
+const SERVICE_HEADERS = ['service amount'];
+const SERVICE_INCLUDE = ['service'];
+
+const COGS_HEADERS = ['cogs', 'cost of goods', 'cost'];
+const COGS_INCLUDE = ['cogs', 'cost'];
+const COGS_EXCLUDE = ['service', 'discount', 'charge'];
+
+const DATE_HEADERS = ['date', 'transaction date', 'sales date', 'order date'];
+const DATE_INCLUDE = ['date'];
+
 const formatDateForDisplay = (dateString: string) => {
     if (!dateString) return '';
     const date = new Date(dateString + 'T00:00:00');
@@ -45,7 +192,7 @@ const formatDateForDisplay = (dateString: string) => {
 
 const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
     const [filter, setFilter] = useState<'daily' | 'weekly' | 'monthly' | 'custom'>('monthly');
-    const [stats, setStats] = useState({ totalSales: 0, totalProfit: 0, totalCOGS: 0, profitMargin: 0 });
+    const [stats, setStats] = useState({ totalSales: 0, totalProfit: 0, totalCOGS: 0, serviceCharge: 0 });
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const chartRef = useRef<HTMLCanvasElement>(null);
@@ -61,7 +208,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
 
     const calculateStats = useCallback(() => {
         if (!startDate || !endDate) {
-            setStats({ totalSales: 0, totalProfit: 0, totalCOGS: 0, profitMargin: 0 });
+            setStats({ totalSales: 0, totalProfit: 0, totalCOGS: 0, serviceCharge: 0 });
             return [];
         }
 
@@ -69,16 +216,32 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
         const end = new Date(endDate + 'T23:59:59');
 
         const filteredData = salesData.filter(row => {
-            const rowDate = parseDate(row.Date);
+            const dateValue = getFieldValue(row, DATE_INCLUDE, [], DATE_HEADERS);
+            const rowDate = parseDate(dateValue ?? row.Date);
             return rowDate && rowDate >= start && rowDate <= end;
         });
 
-        const totalSales = filteredData.reduce((sum, row) => sum + parseNumericValue(row.Total), 0);
-        const totalProfit = filteredData.reduce((sum, row) => sum + parseNumericValue(row.Profit), 0);
-        const totalCOGS = filteredData.reduce((sum, row) => sum + parseNumericValue(row.Cost), 0);
-        const profitMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
+        const totalGrossSales = filteredData.reduce((sum, row) => {
+            const raw = getFieldValue(row, TOTAL_INCLUDE, TOTAL_EXCLUDE, TOTAL_HEADERS);
+            return sum + parseNumericValue(raw);
+        }, 0);
+        const totalProfit = filteredData.reduce((sum, row) => {
+            const gross = parseNumericValue(getFieldValue(row, TOTAL_INCLUDE, TOTAL_EXCLUDE, TOTAL_HEADERS));
+            const cost = parseNumericValue(getFieldValue(row, COGS_INCLUDE, COGS_EXCLUDE, COGS_HEADERS));
+            const service = parseNumericValue(getFieldValue(row, SERVICE_INCLUDE, [], SERVICE_HEADERS));
+            return sum + (gross - service - cost);
+        }, 0);
+        const totalCOGS = filteredData.reduce((sum, row) => {
+            const value = getFieldValue(row, COGS_INCLUDE, COGS_EXCLUDE, COGS_HEADERS);
+            return sum + parseNumericValue(value);
+        }, 0);
+        const totalServiceCharge = filteredData.reduce((sum, row) => {
+            const value = getFieldValue(row, SERVICE_INCLUDE, [], SERVICE_HEADERS);
+            return sum + parseNumericValue(value);
+        }, 0);
+        const netSales = Math.max(totalGrossSales - totalServiceCharge, 0);
 
-        setStats({ totalSales, totalProfit, totalCOGS, profitMargin });
+        setStats({ totalSales: netSales, totalProfit, totalCOGS, serviceCharge: totalServiceCharge });
         return filteredData;
     }, [salesData, startDate, endDate]);
 
@@ -93,8 +256,13 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
         }
 
         const groupedData = data.reduce((acc, row) => {
-            const date = parseDate(row.Date)?.toLocaleDateString('en-CA') || 'Unknown'; // YYYY-MM-DD for sorting
-            acc[date] = (acc[date] || 0) + parseNumericValue(row.Total);
+            const dateValue = getFieldValue(row, DATE_INCLUDE, [], DATE_HEADERS);
+            const parsedDate = parseDate(dateValue ?? row.Date);
+            const date = parsedDate?.toLocaleDateString('en-CA') || 'Unknown'; // YYYY-MM-DD for sorting
+            const totalValue = parseNumericValue(getFieldValue(row, TOTAL_INCLUDE, TOTAL_EXCLUDE, TOTAL_HEADERS));
+            const serviceChargeValue = parseNumericValue(getFieldValue(row, SERVICE_INCLUDE, [], SERVICE_HEADERS));
+            const netValue = Math.max(totalValue - serviceChargeValue, 0);
+            acc[date] = (acc[date] || 0) + netValue;
             return acc;
         }, {} as { [key: string]: number });
 
@@ -234,7 +402,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
                 <StatCard title="Total Sales" value={formatPeso(stats.totalSales)} icon={CurrencyPesoIcon} color="blue" />
                 <StatCard title="Total Profit" value={formatPeso(stats.totalProfit)} icon={ArrowTrendingUpIcon} color="green" />
                 <StatCard title="COGS" value={formatPeso(stats.totalCOGS)} icon={BanknotesIcon} color="orange" />
-                <StatCard title="Profit Margin" value={`${stats.profitMargin.toFixed(1)}%`} icon={ChartPieIcon} color="purple" />
+                <StatCard title="Service Charge" value={formatPeso(stats.serviceCharge)} icon={SparklesIcon} color="yellow" />
             </div>
 
             <div className="bg-bg-secondary p-6 rounded-xl border border-border-color">

@@ -5,7 +5,7 @@ interface StatCardProps {
     title: string;
     value: string;
     icon: React.FC<{ className?: string }>;
-    color: 'blue' | 'green' | 'orange' | 'purple';
+    color: 'blue' | 'green' | 'orange' | 'purple' | 'yellow';
 }
 
 const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, color }) => {
@@ -14,6 +14,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, color }) 
         green: 'text-accent-green',
         orange: 'text-accent-orange',
         purple: 'text-accent-purple',
+        yellow: 'text-accent-yellow',
     };
 
     return (
