@@ -93,6 +93,8 @@ export interface PayrollRecord {
     daysPresent: number;
     daysAbsent: number;
     daysLate: number;
+    deductionNotes?: string;
+    customDeduction?: number;
 }
 
 export interface RecipeIngredient {

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import type { Employee, AttendanceRecord, PayrollRecord, Schedule } from '../types';
+import type { Employee, AttendanceRecord, PayrollRecord, Schedule, SalesData } from '../types';
 import { UploadIcon, CalendarDaysIcon, PencilSquareIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon, PlusIcon, CheckIcon } from '../components/Icons';
 import EmployeeProfile from '../components/EmployeeProfile';
 import ScheduleEditModal from '../components/ScheduleEditModal';
@@ -107,7 +107,7 @@ const DatePickerPopup: React.FC<{
 };
 
 
-const Attendance: React.FC<AttendanceProps> = ({ employees, setEmployees, attendanceRecords, setAttendanceRecords, setPayrollRecords }) => {
+const Attendance: React.FC<AttendanceProps> = ({ employees, setEmployees, attendanceRecords, setAttendanceRecords, setPayrollRecords, salesData }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalType, setModalType] = useState<'add' | 'edit'>('add');
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -1094,7 +1094,9 @@ const Attendance: React.FC<AttendanceProps> = ({ employees, setEmployees, attend
             {viewedEmployee && (
                 <EmployeeProfile
                     employee={viewedEmployee}
+                    employees={employees}
                     attendanceRecords={attendanceRecords}
+                    salesData={salesData}
                     onClose={() => setViewedEmployee(null)}
                     onEdit={() => {
                         openEditModal(viewedEmployee);

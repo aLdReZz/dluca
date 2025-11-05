@@ -211,7 +211,9 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
                 netPay,
                 daysPresent,
                 daysAbsent,
-                daysLate
+                daysLate,
+                deductionNotes: '',
+                customDeduction: 0
             };
         });
 
@@ -230,7 +232,8 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
             const rawServiceChargeShare = serviceChargeAllocations[record.id] || 0;
             const serviceChargeShare = Math.round(rawServiceChargeShare * 100) / 100;
             const grossPayWithService = record.regularPay + record.overtimePay + serviceChargeShare;
-            const netPayWithService = grossPayWithService - record.deductions.total;
+            const appliedCustomDeduction = Math.max(0, record.customDeduction ?? 0);
+            const netPayWithService = grossPayWithService - record.deductions.total - appliedCustomDeduction;
             return {
                 ...record,
                 serviceCharge: serviceChargeShare,

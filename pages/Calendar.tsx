@@ -94,52 +94,52 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, onSave, onDele
     
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={onClose}>
-            <div className="bg-bg-secondary w-full max-w-lg rounded-2xl border border-border-color shadow-2xl flex flex-col animate-pop-in" onClick={e => e.stopPropagation()}>
+            <div className="bg-bg-secondary w-full max-w-lg rounded-3xl border border-border-color shadow-2xl flex flex-col animate-pop-in" onClick={e => e.stopPropagation()}>
                 <div className="p-6 border-b border-border-color flex justify-between items-center">
-                    <h2 className="text-xl font-semibold">{eventToEdit ? 'Edit Event' : 'Add New Event'}</h2>
+                    <h2 className="text-xl font-semibold text-text-primary">{eventToEdit ? 'Edit Event' : 'Add New Event'}</h2>
                     <button onClick={onClose} className="p-2 rounded-full text-text-secondary hover:bg-hover-bg transition-colors">
                         <XMarkIcon className="w-6 h-6" />
                     </button>
                 </div>
                 <div className="p-6 space-y-4">
                      <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-1">Title</label>
-                        <input type="text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue" />
+                        <label className="block text-sm font-semibold text-text-secondary mb-1">Title</label>
+                        <input type="text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full bg-bg-primary border border-border-color rounded-xl p-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-blue focus:border-accent-blue" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-1">Description</label>
-                        <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} rows={4} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue" />
+                        <label className="block text-sm font-semibold text-text-secondary mb-1">Description</label>
+                        <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} rows={4} className="w-full bg-bg-primary border border-border-color rounded-xl p-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-blue focus:border-accent-blue" />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-text-secondary mb-1">Date</label>
-                            <input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue" />
+                            <label className="block text-sm font-semibold text-text-secondary mb-1">Date</label>
+                            <input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full bg-bg-primary border border-border-color rounded-xl p-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-blue focus:border-accent-blue" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-text-secondary mb-1">Type</label>
-                            <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as ContentType})} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue">
+                            <label className="block text-sm font-semibold text-text-secondary mb-1">Type</label>
+                            <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as ContentType})} className="w-full bg-bg-primary border border-border-color rounded-xl p-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-blue focus:border-accent-blue">
                                 {contentTypes.map(type => <option key={type} value={type}>{type}</option>)}
                             </select>
                         </div>
                          <div>
-                            <label className="block text-sm font-medium text-text-secondary mb-1">Status</label>
-                            <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as ContentStatus})} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue">
+                            <label className="block text-sm font-semibold text-text-secondary mb-1">Status</label>
+                            <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as ContentStatus})} className="w-full bg-bg-primary border border-border-color rounded-xl p-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-blue focus:border-accent-blue">
                                 {contentStatuses.map(status => <option key={status} value={status}>{status}</option>)}
                             </select>
                         </div>
                     </div>
                 </div>
-                <div className="p-4 bg-bg-tertiary/50 border-t border-border-color flex justify-between items-center gap-4 rounded-b-2xl">
+                <div className="p-5 bg-bg-tertiary/60 border-t border-border-color flex justify-between items-center gap-4 rounded-b-3xl">
                     <div>
                          {eventToEdit && (
-                            <button onClick={handleDelete} className="px-4 py-2 rounded-lg font-medium text-sm bg-accent-red/20 text-accent-red hover:bg-accent-red/30 transition-colors flex items-center gap-2">
+                            <button onClick={handleDelete} className="px-4 py-2 rounded-xl font-medium text-sm bg-accent-red/20 text-accent-red hover:bg-accent-red/30 transition-colors flex items-center gap-2">
                                 <TrashIcon className="w-5 h-5"/> Delete
                             </button>
                         )}
                     </div>
                     <div className="flex gap-4">
-                        <button onClick={onClose} className="px-4 py-2 rounded-lg font-semibold bg-bg-secondary hover:bg-hover-bg transition">Cancel</button>
-                        <button onClick={handleSave} className="px-4 py-2 rounded-lg font-semibold bg-accent-blue text-white hover:bg-opacity-80 transition">Save Event</button>
+                        <button onClick={onClose} className="px-4 py-2 rounded-xl font-semibold bg-bg-secondary border border-border-color text-text-primary hover:bg-hover-bg transition">Cancel</button>
+                        <button onClick={handleSave} className="px-4 py-2 rounded-xl font-semibold text-white bg-accent-blue shadow-md hover:bg-accent-blue/80 transition">Save Event</button>
                     </div>
                 </div>
             </div>
@@ -182,7 +182,7 @@ const Calendar: React.FC<CalendarProps> = ({ events, setEvents }) => {
         const days = [];
         // Fill empty cells before the first day of the month
         for (let i = 0; i < firstDayOfMonth; i++) {
-            days.push(<div key={`empty-${i}`} className="border-r border-b border-border-color bg-bg-primary rounded-lg"></div>);
+            days.push(<div key={`empty-${i}`} className="rounded-2xl bg-bg-secondary/60 border border-border-color/60 shadow-sm min-h-[140px]"></div>);
         }
         
         // Fill days of the month
@@ -193,19 +193,27 @@ const Calendar: React.FC<CalendarProps> = ({ events, setEvents }) => {
             const dayEvents = eventsByDate[dateKey] || [];
 
             days.push(
-                <div key={day} onClick={() => handleDayClick(dateKey)} className={`border-r border-b border-border-color bg-bg-secondary p-2 min-h-[120px] flex flex-col hover:bg-hover-bg/50 transition-colors cursor-pointer relative rounded-lg`}>
-                    <span className={`font-medium text-sm mb-2 self-start flex items-center justify-center ${isToday ? 'bg-accent-blue text-white rounded-full w-7 h-7' : 'text-text-secondary w-7 h-7'}`}>{day}</span>
-                    <div className="flex-1 space-y-1 overflow-hidden">
+                <div
+                    key={day}
+                    onClick={() => handleDayClick(dateKey)}
+                    className={`rounded-2xl border border-border-color bg-bg-secondary p-3 min-h-[140px] flex flex-col transition-all duration-200 cursor-pointer relative shadow-sm hover:shadow-lg hover:border-accent-blue/40 hover:bg-hover-bg/60`}
+                >
+                    <span className={`font-semibold text-sm mb-3 self-start flex items-center justify-center w-9 h-9 ${isToday ? 'bg-accent-blue text-white rounded-full shadow' : 'text-text-secondary'}`}>{day}</span>
+                    <div className="flex-1 space-y-2 overflow-hidden">
                         {dayEvents.slice(0, 2).map((event) => {
                             const StatusIcon = statusConfig[event.status].icon;
                             const statusColor = statusConfig[event.status].color;
                             const typeColor = typeColors[event.type];
 
                             return (
-                                <div key={event.id} onClick={(e) => {e.stopPropagation(); handleEventClick(event)}} className={`p-1.5 rounded-md text-xs truncate leading-tight transition-transform hover:scale-105 ${typeColor.bg}`}>
-                                    <div className="flex items-center gap-1.5">
+                                <div
+                                    key={event.id}
+                                    onClick={(e) => {e.stopPropagation(); handleEventClick(event)}}
+                                    className={`${typeColor.bg} p-2 rounded-lg text-xs truncate leading-tight transition-transform hover:scale-[1.03] hover:shadow-sm ring-1 ring-border-color/60`}
+                                >
+                                    <div className="flex items-center gap-1.5 text-text-primary">
                                          <StatusIcon className={`w-3.5 h-3.5 flex-shrink-0 ${statusColor}`} />
-                                        <span className={`font-medium ${typeColor.text}`}>{event.title}</span>
+                                        <span className={`font-semibold ${typeColor.text}`}>{event.title}</span>
                                     </div>
                                 </div>
                             )
@@ -256,43 +264,45 @@ const Calendar: React.FC<CalendarProps> = ({ events, setEvents }) => {
     };
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-                <div>
-                    <h2 className="text-3xl font-semibold">Content Calendar</h2>
-                    <p className="text-text-secondary mt-1">Plan and schedule your social media content.</p>
-                </div>
-                <button onClick={() => handleDayClick(new Date().toISOString().split('T')[0])} className="bg-accent-blue text-white px-4 py-2 rounded-lg font-medium text-sm shadow-md hover:bg-opacity-80 transition flex items-center gap-2">
-                    <PlusIcon className="w-5 h-5"/>
-                    Add Event
-                </button>
-            </div>
-            <div className="bg-bg-secondary p-4 sm:p-6 rounded-2xl border border-border-color">
-                <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-                    <div className="flex items-center gap-2">
-                         <button onClick={() => changeMonth(-1)} className="p-2 rounded-full hover:bg-hover-bg transition"><ChevronLeftIcon className="w-6 h-6" /></button>
-                         <button onClick={() => changeMonth(1)} className="p-2 rounded-full hover:bg-hover-bg transition"><ChevronRightIcon className="w-6 h-6" /></button>
-                         <h3 className="text-xl font-semibold ml-2">{monthName}</h3>
+        <div className="min-h-screen w-full bg-bg-primary">
+            <div className="p-4 sm:p-8 lg:p-12 max-w-7xl mx-auto w-full space-y-8">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h2 className="text-3xl font-semibold text-text-primary">Content Calendar</h2>
+                        <p className="text-text-secondary mt-1">Plan and schedule your social media content.</p>
                     </div>
-                    <button onClick={goToToday} className="px-4 py-2 text-sm font-medium rounded-lg bg-bg-tertiary text-text-primary hover:bg-hover-bg transition">
-                        Today
+                    <button onClick={() => handleDayClick(new Date().toISOString().split('T')[0])} className="bg-accent-blue text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg hover:bg-accent-blue/80 transition flex items-center gap-2">
+                        <PlusIcon className="w-5 h-5"/>
+                        Add Event
                     </button>
                 </div>
-                <div className="grid grid-cols-7 border-t border-l border-border-color bg-border-color gap-px">
-                     {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
-                        <div key={day} className="p-3 text-center text-sm font-semibold text-text-secondary bg-bg-tertiary/60">{day}</div>
-                    ))}
-                    {calendarGrid}
+                <div className="bg-bg-secondary p-6 sm:p-8 rounded-3xl border border-border-color shadow-2xl">
+                    <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+                        <div className="flex items-center gap-3">
+                             <button onClick={() => changeMonth(-1)} className="p-2 rounded-full border border-border-color text-text-secondary hover:bg-hover-bg transition"><ChevronLeftIcon className="w-6 h-6" /></button>
+                             <button onClick={() => changeMonth(1)} className="p-2 rounded-full border border-border-color text-text-secondary hover:bg-hover-bg transition"><ChevronRightIcon className="w-6 h-6" /></button>
+                             <h3 className="text-xl font-semibold text-text-primary ml-2">{monthName}</h3>
+                        </div>
+                        <button onClick={goToToday} className="px-4 py-2 text-sm font-medium rounded-xl bg-bg-primary border border-border-color text-text-primary hover:bg-hover-bg transition">
+                            Today
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-7 gap-4">
+                         {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
+                            <div key={day} className="p-3 text-center text-xs font-semibold uppercase tracking-wide text-text-secondary">{day}</div>
+                        ))}
+                        {calendarGrid}
+                    </div>
                 </div>
+                <EventModal 
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    onSave={handleSaveEvent}
+                    onDelete={handleDeleteEvent}
+                    eventToEdit={eventToEdit}
+                    selectedDate={selectedDate}
+                />
             </div>
-            <EventModal 
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSave={handleSaveEvent}
-                onDelete={handleDeleteEvent}
-                eventToEdit={eventToEdit}
-                selectedDate={selectedDate}
-            />
         </div>
     );
 };

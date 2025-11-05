@@ -457,7 +457,9 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             netPay: netWithService,
             daysPresent,
             daysAbsent,
-            daysLate
+            daysLate,
+            deductionNotes: '',
+            customDeduction: 0
         };
         
         setPayslipRecord(newRecord);

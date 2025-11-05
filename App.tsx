@@ -402,7 +402,7 @@ const App: React.FC = () => {
             case 'costing':
                 return <Costing recipeCostings={recipeCostings} setRecipeCostings={setRecipeCostings} productInventoryItems={productInventoryItems} />;
             case 'attendance':
-                return <Attendance employees={employees} setEmployees={setEmployees} attendanceRecords={attendanceRecords} setAttendanceRecords={setAttendanceRecords} setPayrollRecords={setPayrollRecords} />;
+                return <Attendance employees={employees} setEmployees={setEmployees} attendanceRecords={attendanceRecords} setAttendanceRecords={setAttendanceRecords} setPayrollRecords={setPayrollRecords} salesData={salesData} />;
             case 'payroll':
                 return <Payroll 
                             employees={employees}
