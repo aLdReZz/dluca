@@ -61,11 +61,23 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
     const chartInstanceRef = useRef<Chart | null>(null);
     const calendarRef = useRef<HTMLDivElement>(null);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+    const [isSalesContainerVisible, setIsSalesContainerVisible] = useState(false);
+    const [isSalesChartVisible, setIsSalesChartVisible] = useState(false);
     
     useEffect(() => {
         // Set initial date range to "This Month" on component mount
         handleFilterChange('monthly');
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        const containerTimer = window.setTimeout(() => setIsSalesContainerVisible(true), 80);
+        const chartTimer = window.setTimeout(() => setIsSalesChartVisible(true), 260);
+
+        return () => {
+            window.clearTimeout(containerTimer);
+            window.clearTimeout(chartTimer);
+        };
     }, []);
 
     const calculateStats = useCallback(() => {
@@ -362,11 +374,19 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
                 <StatCard title="Service Charge" value={formatPeso(stats.serviceCharge)} icon={SparklesIcon} color="yellow" />
             </div>
 
-            <div className="bg-bg-secondary p-6 rounded-xl border border-border-color">
+            <div
+                className={`bg-bg-secondary p-6 rounded-xl border border-border-color transition-all duration-500 ease-out transform ${
+                    isSalesContainerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+                }`}
+            >
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold">Sales Overview</h3>
                 </div>
-                <div className="h-80">
+                <div
+                    className={`h-80 transition-all duration-500 ease-out transform ${
+                        isSalesChartVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                    }`}
+                >
                     <canvas ref={chartRef}></canvas>
                 </div>
             </div>
