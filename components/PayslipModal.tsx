@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { PayrollRecord } from '../types';
 import { XMarkIcon, PrinterIcon, InformationCircleIcon } from './Icons';
 
@@ -27,6 +27,29 @@ const formatDateForDisplay = (dateString: string) => {
     });
 };
 
+const formatDateLong = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString + 'T00:00:00Z');
+    if (Number.isNaN(date.getTime())) return 'N/A';
+    return date.toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: 'UTC',
+    });
+};
+
+const formatDateMonthYear = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString + 'T00:00:00Z');
+    if (Number.isNaN(date.getTime())) return 'N/A';
+    return date.toLocaleDateString('en-US', {
+        month: 'long',
+        year: 'numeric',
+        timeZone: 'UTC',
+    });
+};
+
 const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose, onSave }) => {
     const [serviceCharge, setServiceCharge] = useState(record.serviceCharge || 0);
     const [deductionNotes, setDeductionNotes] = useState(record.deductionNotes || '');
@@ -35,11 +58,23 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose,
     const [isCustomDeductionEditorOpen, setIsCustomDeductionEditorOpen] = useState(
         (record.customDeduction ?? 0) > 0,
     );
+    const [isPrinting, setIsPrinting] = useState(false);
+    const afterPrintHandlerRef = useRef<(() => void) | null>(null);
+    const trimmedDeductionNotes = deductionNotes.trim();
 
     useEffect(() => {
         document.body.style.overflow = 'hidden';
         return () => {
             document.body.style.overflow = 'unset';
+        };
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (afterPrintHandlerRef.current) {
+                window.removeEventListener('afterprint', afterPrintHandlerRef.current);
+                afterPrintHandlerRef.current = null;
+            }
         };
     }, []);
 
@@ -81,8 +116,105 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose,
     };
 
     const handlePrint = () => {
-        alert("Printing is disabled in this sandboxed environment. Please use your computer's screenshot functionality to save a copy of the payslip.");
+        if (typeof window === 'undefined' || typeof document === 'undefined') {
+            return;
+        }
+
+        if (typeof window.print !== 'function') {
+            alert('Printing is not supported in this browser.');
+            return;
+        }
+
+        const payslipElement = document.querySelector('.payslip-print-area');
+        if (!payslipElement) {
+            console.error('Unable to locate payslip content for printing.');
+            return;
+        }
+
+        const originalTitle = document.title;
+        const printTitle = `Payslip - ${record.employee}`;
+
+        const finalizePrint = () => {
+            document.title = originalTitle;
+            setIsPrinting(false);
+        };
+
+        const handleAfterPrint = () => {
+            finalizePrint();
+            if (afterPrintHandlerRef.current) {
+                window.removeEventListener('afterprint', afterPrintHandlerRef.current);
+                afterPrintHandlerRef.current = null;
+            }
+        };
+
+        if (afterPrintHandlerRef.current) {
+            window.removeEventListener('afterprint', afterPrintHandlerRef.current);
+        }
+
+        afterPrintHandlerRef.current = handleAfterPrint;
+        window.addEventListener('afterprint', handleAfterPrint);
+
+        setIsPrinting(true);
+        document.title = printTitle;
+
+        window.setTimeout(() => {
+            try {
+                window.print();
+            } catch (error) {
+                console.error('Failed to trigger the print dialog.', error);
+                if (afterPrintHandlerRef.current) {
+                    window.removeEventListener('afterprint', afterPrintHandlerRef.current);
+                    afterPrintHandlerRef.current = null;
+                }
+                finalizePrint();
+            }
+        }, 50);
     };
+
+    const coverageLabel = formatDateMonthYear(payPeriod.end);
+    const payDateLabel = formatDateLong(payPeriod.end);
+    const payPeriodRangeLabel = `${formatDateLong(payPeriod.start)} - ${formatDateLong(payPeriod.end)}`;
+    const printableCoverageLabel = coverageLabel !== 'N/A' ? coverageLabel : payPeriodRangeLabel;
+    const customDeductionValue = Math.max(0, customDeduction);
+
+    const earningsRows = useMemo(
+        () =>
+            [
+                { label: 'Basic Salary', amount: record.regularPay },
+                { label: 'Overtime Pay', amount: record.overtimePay },
+                { label: 'Service Charge', amount: serviceCharge },
+            ].filter(row => Math.abs(row.amount) > 0.009),
+        [record.regularPay, record.overtimePay, serviceCharge],
+    );
+
+    const deductionRows = useMemo(
+        () =>
+            [
+                { label: 'SSS Contribution', amount: record.deductions.sss },
+                { label: 'PhilHealth Contribution', amount: record.deductions.philhealth },
+                { label: 'Pag-IBIG Contribution', amount: record.deductions.pagibig },
+                ...(customDeductionValue > 0
+                    ? [{ label: 'Custom Deduction', amount: customDeductionValue }] as { label: string; amount: number }[]
+                    : []),
+            ].filter(row => Math.abs(row.amount) > 0.009),
+        [
+            record.deductions.pagibig,
+            record.deductions.philhealth,
+            record.deductions.sss,
+            customDeductionValue,
+        ],
+    );
+
+    const mandatoryDeductionsTotal = record.deductions.total;
+    const combinedDeductions = mandatoryDeductionsTotal + customDeductionValue;
+    const formattedGrossPay = formatPeso(grossPay);
+    const formattedNetPay = formatPeso(netPay);
+    const formattedMandatoryDeductions = formatPeso(mandatoryDeductionsTotal);
+    const formattedCombinedDeductions = formatPeso(combinedDeductions);
+    const bankAccountLabel = 'N/A';
+    const paymentModeLabel = 'N/A';
+    const departmentLabel = 'N/A';
+    const designationLabel = record.position || 'N/A';
 
     const DetailRow: React.FC<{
         label: string;
@@ -94,12 +226,26 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose,
         inputValue?: number;
         onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
         inputVariant?: 'default' | 'minimal';
-    }> = ({ label, value, subValue, isBold, isInput, name, inputValue, onChange, inputVariant = 'default' }) => {
+        inputDisplayValue?: string;
+    }> = ({
+        label,
+        value,
+        subValue,
+        isBold,
+        isInput,
+        name,
+        inputValue,
+        onChange,
+        inputVariant = 'default',
+        inputDisplayValue,
+    }) => {
         const baseInputClasses = 'w-28 text-right rounded-lg p-1.5 text-sm font-medium transition-colors';
         const variantClasses =
             inputVariant === 'minimal'
                 ? 'bg-transparent border border-border-color/80 text-text-secondary focus:outline-none focus:ring-0 focus:border-accent-blue/60'
                 : 'bg-bg-primary border border-border-color text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-blue focus:border-accent-blue';
+        const shouldRenderInput = Boolean(isInput && !isPrinting);
+        const displayValue = isInput ? inputDisplayValue ?? value : value;
 
         return (
             <div className="flex justify-between items-center py-2.5">
@@ -107,7 +253,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose,
                     <span className="text-sm text-text-secondary">{label}</span>
                     {subValue && <span className="block text-xs text-text-secondary/60">{subValue}</span>}
                 </div>
-                {isInput ? (
+                {shouldRenderInput ? (
                     <input
                         type="number"
                         name={name}
@@ -117,148 +263,312 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose,
                     />
                 ) : (
                     <span className={`text-sm text-right ${isBold ? 'font-semibold text-text-primary' : 'text-text-secondary'}`}>
-                        {value}
+                        {displayValue}
                     </span>
                 )}
             </div>
         );
     };
 
-    const trimmedDeductionNotes = deductionNotes.trim();
     const shouldShowDeductionNotes = isDeductionEditorOpen || trimmedDeductionNotes.length > 0;
-    const shouldShowCustomDeduction = isCustomDeductionEditorOpen || customDeduction > 0;
+    const shouldShowCustomDeduction = isCustomDeductionEditorOpen || customDeductionValue > 0;
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={onClose}>
             <div className="bg-bg-secondary w-full max-w-lg rounded-2xl border border-border-color shadow-2xl flex flex-col animate-pop-in" onClick={e => e.stopPropagation()}>
                 <div className="payslip-print-area">
-                    <div className="p-6 border-b border-border-color">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <h2 className="text-2xl font-semibold">Payslip</h2>
-                                <p className="text-sm text-text-secondary">
-                                    For period {formatDateForDisplay(payPeriod.start)} to {formatDateForDisplay(payPeriod.end)}
-                                </p>
+                    <div className="payslip-export-view">
+                        <div className="payslip-export-card">
+                            <div className="payslip-export-header">
+                                <div className="payslip-export-brand">
+                                    <div className="payslip-export-logo">dlc</div>
+                                    <div>
+                                        <h1 className="payslip-export-brand-name">D'Luca Bistro X Cafe</h1>
+                                        <p className="payslip-export-brand-address">123 Anywhere St., Any City, ST 12345</p>
+                                    </div>
+                                </div>
+                                <div className="payslip-export-period">
+                                    <span>Pay Period</span>
+                                    <strong>{payPeriodRangeLabel}</strong>
+                                </div>
                             </div>
-                            <button
-                                onClick={onClose}
-                                className="p-2 -mt-2 -mr-2 rounded-full text-text-secondary hover:bg-hover-bg transition-colors no-print"
-                            >
-                                <XMarkIcon className="w-6 h-6" />
-                            </button>
-                        </div>
-                        <div className="mt-4">
-                            <p className="font-semibold text-lg">{record.employee}</p>
-                            <p className="text-sm text-text-secondary">{record.position}</p>
+
+                            <div className="payslip-export-title">
+                                <h2>Employee Payslip</h2>
+                                <p>Official Salary Statement</p>
+                            </div>
+
+                            <div className="payslip-export-info">
+                                <div>
+                                    <div className="payslip-export-info-row">
+                                        <span>Employee Name</span>
+                                        <strong>{record.employee}</strong>
+                                    </div>
+                                    <div className="payslip-export-info-row">
+                                        <span>Department</span>
+                                        <strong>{departmentLabel}</strong>
+                                    </div>
+                                    <div className="payslip-export-info-row">
+                                        <span>Designation</span>
+                                        <strong>{designationLabel}</strong>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="payslip-export-info-row">
+                                        <span>Pay Coverage</span>
+                                        <strong>{printableCoverageLabel}</strong>
+                                    </div>
+                                    <div className="payslip-export-info-row">
+                                        <span>Pay Date</span>
+                                        <strong>{payDateLabel}</strong>
+                                    </div>
+                                    <div className="payslip-export-info-row">
+                                        <span>Bank Account</span>
+                                        <strong>{bankAccountLabel}</strong>
+                                    </div>
+                                    <div className="payslip-export-info-row">
+                                        <span>Payment Mode</span>
+                                        <strong>{paymentModeLabel}</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="payslip-export-section">
+                                <h3>Earnings</h3>
+                                <table className="payslip-export-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Description</th>
+                                            <th>Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {earningsRows.length > 0 ? (
+                                            earningsRows.map(row => (
+                                                <tr key={row.label}>
+                                                    <td>{row.label}</td>
+                                                    <td className="text-right">{formatPeso(row.amount)}</td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={2} className="text-center text-sm text-text-secondary py-4">
+                                                    No earnings recorded.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <th>Total Earnings</th>
+                                            <th className="text-right">{formattedGrossPay}</th>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+
+                            <div className="payslip-export-section">
+                                <h3>Deductions</h3>
+                                <table className="payslip-export-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Description</th>
+                                            <th>Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {deductionRows.length > 0 ? (
+                                            deductionRows.map(row => (
+                                                <tr key={row.label}>
+                                                    <td>{row.label}</td>
+                                                    <td className="text-right">{formatPeso(row.amount)}</td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={2} className="text-center text-sm text-text-secondary py-4">
+                                                    No deductions recorded.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <th>{customDeductionValue > 0 ? 'Mandatory Deductions' : 'Total Deductions'}</th>
+                                            <th className="text-right">
+                                                {customDeductionValue > 0 ? formattedMandatoryDeductions : formattedCombinedDeductions}
+                                            </th>
+                                        </tr>
+                                        {customDeductionValue > 0 && (
+                                            <tr>
+                                                <th>Total Deductions</th>
+                                                <th className="text-right">{formattedCombinedDeductions}</th>
+                                            </tr>
+                                        )}
+                                    </tfoot>
+                                </table>
+                            </div>
+
+                            <div className="payslip-export-net">
+                                <span>Net Salary</span>
+                                <strong>{formattedNetPay}</strong>
+                            </div>
+
+                            <div className="payslip-export-summary">
+                                <div>
+                                    <span>Days Present</span>
+                                    <strong>{record.daysPresent}</strong>
+                                </div>
+                                <div>
+                                    <span>Days Absent</span>
+                                    <strong>{record.daysAbsent}</strong>
+                                </div>
+                                <div>
+                                    <span>Total Hours</span>
+                                    <strong>{record.totalHours.toFixed(2)} hrs</strong>
+                                </div>
+                            </div>
+
+                            {trimmedDeductionNotes && (
+                                <div className="payslip-export-notes">
+                                    <span>Notes</span>
+                                    <p>{trimmedDeductionNotes}</p>
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    <div className="p-6 max-h-[50vh] overflow-y-auto">
-                        <div className="space-y-6">
-                            <div>
-                                <h3 className="font-semibold text-text-primary mb-2 border-b border-border-color pb-2">Pay Calculation</h3>
-                                <DetailRow
-                                    label="Period Earnings"
-                                    value={formatPeso(record.regularPay + record.overtimePay)}
-                                    subValue={`Regular ${formatPeso(record.regularPay)} | OT ${formatPeso(record.overtimePay)}`}
-                                />
-                                <DetailRow
-                                    label="Service Charge"
-                                    value=""
-                                    isInput
-                                    name="serviceCharge"
-                                    inputValue={serviceCharge}
-                                    onChange={handleServiceChargeChange}
-                                    inputVariant="minimal"
-                                />
-                                {isCustomDeductionEditorOpen ? (
-                                    <DetailRow
-                                        label="Custom Deduction"
-                                        value=""
-                                        isInput
-                                        name="customDeduction"
-                                        inputValue={customDeduction}
-                                        onChange={handleCustomDeductionChange}
-                                    />
-                                ) : (
-                                    <DetailRow label="Custom Deduction" value={formatPeso(customDeduction)} />
-                                )}
-                                <div className="border-t border-border-color mt-2 pt-2">
-                                    <DetailRow label="Gross Pay" value={formatPeso(grossPay)} isBold />
-                                </div>
-                                <div className="mt-3 flex flex-col gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={handleCustomDeductionToggle}
-                                        className="inline-flex items-center gap-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
-                                        aria-expanded={isCustomDeductionEditorOpen}
-                                    >
-                                        <InformationCircleIcon className="w-4 h-4" />
-                                        {customDeduction > 0 ? 'Edit deduction amount' : 'Add deduction amount'}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleDeductionToggle}
-                                        className="inline-flex items-center gap-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
-                                        aria-expanded={isDeductionEditorOpen}
-                                    >
-                                        <InformationCircleIcon className="w-4 h-4" />
-                                        {trimmedDeductionNotes ? 'Edit deduction details' : 'Add deduction details'}
-                                    </button>
-                                </div>
-                                {shouldShowCustomDeduction && !isCustomDeductionEditorOpen && customDeduction > 0 && (
-                                    <p className="mt-1 text-xs text-text-secondary">
-                                        Deducting {formatPeso(customDeduction)} from net pay.
+                    <div className="payslip-screen-view">
+                        <div className="p-6 border-b border-border-color">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h2 className="text-2xl font-semibold">Payslip</h2>
+                                    <p className="text-sm text-text-secondary">
+                                        For period {formatDateForDisplay(payPeriod.start)} to {formatDateForDisplay(payPeriod.end)}
                                     </p>
-                                )}
-                                {shouldShowDeductionNotes && (
-                                    <div className="mt-3 space-y-2">
-                                        <label htmlFor="deduction-notes" className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                                            Deduction Notes
-                                        </label>
-                                        {isDeductionEditorOpen ? (
-                                            <textarea
-                                                id="deduction-notes"
-                                                value={deductionNotes}
-                                                onChange={handleDeductionNotesChange}
-                                                rows={4}
-                                                className="w-full rounded-lg border border-border-color bg-bg-primary px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
-                                                placeholder="Provide details about salary deductions (e.g., cash advance, penalties, allowances)."
-                                            />
-                                        ) : (
-                                            <p className="rounded-lg border border-border-color bg-bg-tertiary px-3 py-2 text-sm text-text-secondary whitespace-pre-wrap">
-                                                {trimmedDeductionNotes}
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="mt-6 bg-bg-tertiary p-4 rounded-xl">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-lg font-semibold">Net Pay</span>
-                                    <span className="text-lg font-bold text-accent-green">{formatPeso(netPay)}</span>
                                 </div>
+                                <button
+                                    onClick={onClose}
+                                    className="p-2 -mt-2 -mr-2 rounded-full text-text-secondary hover:bg-hover-bg transition-colors no-print"
+                                >
+                                    <XMarkIcon className="w-6 h-6" />
+                                </button>
                             </div>
+                            <div className="mt-4">
+                                <p className="font-semibold text-lg">{record.employee}</p>
+                                <p className="text-sm text-text-secondary">{record.position}</p>
+                            </div>
+                        </div>
 
-                            <div className="mt-6">
-                                <h3 className="font-semibold text-text-primary mb-2 border-b border-border-color pb-2">Summary</h3>
-                                <div className="grid grid-cols-3 text-center mt-4">
-                                    <div>
-                                        <div className="text-xl font-bold">{record.daysPresent}</div>
-                                        <div className="text-xs text-text-secondary">Present</div>
+                        <div className="p-6 max-h-[50vh] overflow-y-auto">
+                            <div className="space-y-6">
+                                <div>
+                                    <h3 className="font-semibold text-text-primary mb-2 border-b border-border-color pb-2">Pay Calculation</h3>
+                                    <DetailRow
+                                        label="Period Earnings"
+                                        value={formatPeso(record.regularPay + record.overtimePay)}
+                                        subValue={`Regular ${formatPeso(record.regularPay)} | OT ${formatPeso(record.overtimePay)}`}
+                                    />
+                                    <DetailRow
+                                        label="Service Charge"
+                                        value={formatPeso(serviceCharge)}
+                                        isInput
+                                        name="serviceCharge"
+                                        inputValue={serviceCharge}
+                                        onChange={handleServiceChargeChange}
+                                        inputVariant="minimal"
+                                        inputDisplayValue={formatPeso(serviceCharge)}
+                                    />
+                                    {isCustomDeductionEditorOpen ? (
+                                        <DetailRow
+                                            label="Custom Deduction"
+                                            value={formatPeso(customDeductionValue)}
+                                            isInput
+                                            name="customDeduction"
+                                            inputValue={customDeduction}
+                                            onChange={handleCustomDeductionChange}
+                                            inputDisplayValue={formatPeso(customDeductionValue)}
+                                        />
+                                    ) : (
+                                        <DetailRow label="Custom Deduction" value={formatPeso(customDeductionValue)} />
+                                    )}
+                                    <div className="border-t border-border-color mt-2 pt-2">
+                                        <DetailRow label="Gross Pay" value={formattedGrossPay} isBold />
                                     </div>
-                                    <div>
-                                        <div className="text-xl font-bold">{record.daysAbsent}</div>
-                                        <div className="text-xs text-text-secondary">Absent</div>
+                                    <div className="mt-3 flex flex-col gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={handleCustomDeductionToggle}
+                                            className="inline-flex items-center gap-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+                                            aria-expanded={isCustomDeductionEditorOpen}
+                                        >
+                                            <InformationCircleIcon className="w-4 h-4" />
+                                            {customDeductionValue > 0 ? 'Edit deduction amount' : 'Add deduction amount'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleDeductionToggle}
+                                            className="inline-flex items-center gap-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+                                            aria-expanded={isDeductionEditorOpen}
+                                        >
+                                            <InformationCircleIcon className="w-4 h-4" />
+                                            {trimmedDeductionNotes ? 'Edit deduction details' : 'Add deduction details'}
+                                        </button>
                                     </div>
-                                    <div>
-                                        <div className="text-xl font-bold">{record.daysLate}</div>
-                                        <div className="text-xs text-text-secondary">Late</div>
+                                    {shouldShowCustomDeduction && !isCustomDeductionEditorOpen && customDeductionValue > 0 && (
+                                        <p className="mt-1 text-xs text-text-secondary">
+                                            Deducting {formatPeso(customDeductionValue)} from net pay.
+                                        </p>
+                                    )}
+                                    {shouldShowDeductionNotes && (
+                                        <div className="mt-3 space-y-2">
+                                            <label htmlFor="deduction-notes" className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                                                Deduction Notes
+                                            </label>
+                                            {isDeductionEditorOpen ? (
+                                                <textarea
+                                                    id="deduction-notes"
+                                                    value={deductionNotes}
+                                                    onChange={handleDeductionNotesChange}
+                                                    rows={4}
+                                                    className="w-full rounded-lg border border-border-color bg-bg-primary px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
+                                                    placeholder="Provide details about salary deductions (e.g., cash advance, penalties, allowances)."
+                                                />
+                                            ) : (
+                                                <p className="rounded-lg border border-border-color bg-bg-tertiary px-3 py-2 text-sm text-text-secondary whitespace-pre-wrap">
+                                                    {trimmedDeductionNotes}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="mt-6 bg-bg-tertiary p-4 rounded-xl">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-lg font-semibold">Net Pay</span>
+                                        <span className="text-lg font-bold text-accent-green">{formattedNetPay}</span>
                                     </div>
                                 </div>
-                                <div className="border-t border-border-color mt-4 pt-2">
-                                    <DetailRow label="Total Hours" value={`${record.totalHours.toFixed(2)} hrs`} isBold />
+
+                                <div className="mt-6">
+                                    <h3 className="font-semibold text-text-primary mb-2 border-b border-border-color pb-2">Summary</h3>
+                                    <div className="grid grid-cols-3 text-center mt-4">
+                                        <div>
+                                            <div className="text-xl font-bold">{record.daysPresent}</div>
+                                            <div className="text-xs text-text-secondary">Present</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xl font-bold">{record.daysAbsent}</div>
+                                            <div className="text-xs text-text-secondary">Absent</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xl font-bold">{record.daysLate}</div>
+                                            <div className="text-xs text-text-secondary">Late</div>
+                                        </div>
+                                    </div>
+                                    <div className="border-t border-border-color mt-4 pt-2">
+                                        <DetailRow label="Total Hours" value={`${record.totalHours.toFixed(2)} hrs`} isBold />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -267,10 +577,13 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose,
                 <div className="p-4 bg-bg-tertiary/50 border-t border-border-color flex justify-end items-center gap-4 rounded-b-2xl no-print">
                     <div className="relative group flex items-center gap-2">
                         <button
+                            type="button"
                             onClick={handlePrint}
-                            className="px-4 py-2 rounded-lg font-medium text-sm bg-bg-tertiary hover:bg-hover-bg transition flex items-center gap-2"
+                            disabled={isPrinting}
+                            className="px-4 py-2 rounded-lg font-medium text-sm bg-bg-tertiary hover:bg-hover-bg transition flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                            aria-busy={isPrinting}
                         >
-                            <PrinterIcon className="w-5 h-5" /> Save as Image
+                            <PrinterIcon className="w-5 h-5" /> Print / Export
                         </button>
                     </div>
                     <button

@@ -169,6 +169,255 @@ body {
   animation: dashboardContentSlide 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.payslip-export-view {
+  display: none;
+}
+
+.payslip-export-card {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2.5rem;
+  background: #ffffff;
+  color: #1f2937;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.payslip-export-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.75rem;
+}
+
+.payslip-export-brand {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.payslip-export-logo {
+  width: 82px;
+  height: 82px;
+  border-radius: 999px;
+  background: #111827;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.6rem;
+  color: #f9fafb;
+  text-transform: lowercase;
+  letter-spacing: 0.12em;
+}
+
+.payslip-export-brand-name {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+.payslip-export-brand-address {
+  margin: 0.35rem 0 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.payslip-export-period {
+  text-align: right;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.payslip-export-period span {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.payslip-export-period strong {
+  font-size: 1rem;
+  color: #111827;
+}
+
+.payslip-export-title {
+  text-align: center;
+  margin: 2.2rem 0 1.8rem;
+}
+
+.payslip-export-title h2 {
+  font-size: 2.35rem;
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin: 0;
+}
+
+.payslip-export-title p {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.32em;
+  color: #6b7280;
+}
+
+.payslip-export-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.75rem;
+  margin-bottom: 2.2rem;
+}
+
+.payslip-export-info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.95rem;
+  margin-bottom: 0.55rem;
+}
+
+.payslip-export-info-row span {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.payslip-export-info-row strong {
+  font-weight: 600;
+  color: #111827;
+}
+
+.payslip-export-section {
+  margin-top: 1.75rem;
+}
+
+.payslip-export-section h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 0.8rem;
+  color: #111827;
+}
+
+.payslip-export-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.payslip-export-table thead th {
+  background: #9ca3af;
+  color: #111827;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #d1d5db;
+}
+
+.payslip-export-table tbody td {
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #d1d5db;
+  background: #f1f8fb;
+  color: #1f2937;
+}
+
+.payslip-export-table tbody tr:nth-child(even) td {
+  background: #e6f2f8;
+}
+
+.payslip-export-table tbody td.text-right,
+.payslip-export-table tfoot th.text-right {
+  text-align: right;
+}
+
+.payslip-export-table tbody td.text-right {
+  font-weight: 600;
+}
+
+.payslip-export-table tfoot th {
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #d1d5db;
+  background: #f8fafc;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.95rem;
+  color: #111827;
+}
+
+.payslip-export-net {
+  margin-top: 2.4rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1.25rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #111827;
+}
+
+.payslip-export-net strong {
+  font-size: 1.35rem;
+}
+
+.payslip-export-summary {
+  margin-top: 1.6rem;
+  display: flex;
+  gap: 1rem;
+}
+
+.payslip-export-summary > div {
+  flex: 1;
+  text-align: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  padding: 0.9rem 0.75rem;
+  background: #f8fafc;
+}
+
+.payslip-export-summary span {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+}
+
+.payslip-export-summary strong {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 1.05rem;
+  color: #111827;
+}
+
+.payslip-export-notes {
+  margin-top: 1.9rem;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  padding: 1rem;
+  border-radius: 0.75rem;
+}
+
+.payslip-export-notes span {
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+}
+
+.payslip-export-notes p {
+  margin: 0.8rem 0 0;
+  white-space: pre-wrap;
+  color: #1f2937;
+  font-size: 0.95rem;
+}
+
 .chartjs-tooltip {
   display: none !important;
   opacity: 0 !important;
@@ -250,26 +499,43 @@ input[type="number"] {
   }
 
   .payslip-print-area {
-    position: absolute;
-    left: 0;
-    top: 0;
+    position: static;
     width: 100%;
     height: auto;
     border: none;
     box-shadow: none;
-    background-color: white !important;
-    color: black !important;
-    padding: 2rem;
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    padding: 0;
+    margin: 0;
   }
 
-  .payslip-print-area .text-text-primary,
-  .payslip-print-area .text-text-secondary,
-  .payslip-print-area .font-bold {
-    color: black !important;
+  .payslip-screen-view {
+    display: none !important;
   }
 
-  .payslip-print-area .bg-bg-tertiary {
-    background-color: #f3f4f6 !important;
+  .payslip-export-view {
+    display: block !important;
+    padding: 1in 0.75in;
+  }
+
+  .payslip-export-card {
+    box-shadow: none;
+    border: none;
+    max-width: 100%;
+    padding: 0;
+  }
+
+  .payslip-export-card,
+  .payslip-export-card * {
+    color: #111827 !important;
+  }
+
+  .payslip-export-table thead th,
+  .payslip-export-table tbody td,
+  .payslip-export-table tfoot th {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   .no-print {
