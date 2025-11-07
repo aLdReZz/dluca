@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { PayrollRecord } from '../types';
 import { XMarkIcon, PrinterIcon, InformationCircleIcon } from './Icons';
+import { SERVICE_CHARGE_DEDUCTION_RATE } from '../utils/salesData';
 
 interface PayslipModalProps {
     record: PayrollRecord;
@@ -100,6 +101,14 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose,
 
     const handleSave = () => {
         const cleanedNotes = deductionNotes.trim();
+        const breakdown =
+            serviceCharge > 0
+                ? {
+                      totalPool: serviceCharge,
+                      coveredDays: record.serviceChargeBreakdown?.coveredDays ?? 0,
+                      deductionRate: record.serviceChargeBreakdown?.deductionRate ?? SERVICE_CHARGE_DEDUCTION_RATE,
+                  }
+                : undefined;
         const updatedRecord = {
             ...record,
             serviceCharge,
@@ -108,6 +117,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose,
             deductions: record.deductions,
             deductionNotes: cleanedNotes || undefined,
             customDeduction: Math.max(0, customDeduction),
+            serviceChargeBreakdown: breakdown,
         };
         onSave(updatedRecord);
         setDeductionNotes(cleanedNotes);
@@ -176,6 +186,18 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose,
     const payPeriodRangeLabel = `${formatDateLong(payPeriod.start)} - ${formatDateLong(payPeriod.end)}`;
     const printableCoverageLabel = coverageLabel !== 'N/A' ? coverageLabel : payPeriodRangeLabel;
     const customDeductionValue = Math.max(0, customDeduction);
+    const serviceChargeFormulaLabel = useMemo(() => {
+        const breakdown = record.serviceChargeBreakdown;
+        const referenceAmount = breakdown?.totalPool ?? serviceCharge;
+        if (!referenceAmount || referenceAmount <= 0) return undefined;
+        const daySuffix =
+            breakdown && breakdown.coveredDays > 0
+                ? ` · ${breakdown.coveredDays} day${breakdown.coveredDays === 1 ? '' : 's'}`
+                : '';
+        const deductionRate = breakdown?.deductionRate ?? SERVICE_CHARGE_DEDUCTION_RATE;
+        const deductionSuffix = deductionRate > 0 ? ` · after ${(deductionRate * 100).toFixed(0)}% deduction` : '';
+        return `Service Amount ${formatPeso(referenceAmount)} (${payPeriodRangeLabel}${daySuffix}${deductionSuffix})`;
+    }, [record.serviceChargeBreakdown, serviceCharge, payPeriodRangeLabel]);
 
     const earningsRows = useMemo(
         () =>
@@ -472,6 +494,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose,
                                     <DetailRow
                                         label="Service Charge"
                                         value={formatPeso(serviceCharge)}
+                                        subValue={serviceChargeFormulaLabel}
                                         isInput
                                         name="serviceCharge"
                                         inputValue={serviceCharge}

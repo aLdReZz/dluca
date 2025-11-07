@@ -1,13 +1,19 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { Employee, AttendanceRecord, PayrollRecord, SalesData } from '../types';
+import type { Employee, AttendanceRecord, PayrollRecord, SalesData, ServiceChargeBreakdown } from '../types';
 import { 
     XMarkIcon, CreditCardIcon, PencilIcon, TrashIcon, 
     CalendarDaysIcon, CheckIcon
 } from './Icons';
 import CalendarPopup from './CalendarPopup';
 import PayslipModal from './PayslipModal';
-import { extractDateKey, extractServiceCharge } from '../utils/salesData';
+import {
+    extractDateKey,
+    extractServiceCharge,
+    SERVICE_CHARGE_DEDUCTION_RATE,
+    SERVICE_CHARGE_DISTRIBUTION_RATE,
+    SERVICE_CHARGE_VIRTUAL_MINUTES,
+} from '../utils/salesData';
 
 interface EmployeeProfileProps {
     employee: Employee;
@@ -258,52 +264,6 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         return Math.max(0, paidRegular) + Math.max(0, approvedOTMinutes);
     };
 
-    const serviceChargeAllocations = useMemo(() => {
-        if (!committedRange.start || !committedRange.end) return {};
-        const start = new Date(committedRange.start + 'T00:00:00Z');
-        const end = new Date(committedRange.end + 'T00:00:00Z');
-
-        const attendanceByEmployee = attendanceRecords.reduce<Record<string, AttendanceRecord[]>>((acc, record) => {
-            const key = record.employee.trim().toLowerCase();
-            (acc[key] ||= []).push(record);
-            return acc;
-        }, {});
-
-        const workMap: Record<string, { total: number; employees: Record<number, number> }> = {};
-
-        for (const emp of employees) {
-            const empKey = emp.name.trim().toLowerCase();
-            const records = attendanceByEmployee[empKey] || [];
-
-            for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
-                const currentDate = new Date(d);
-                const dateKey = currentDate.toISOString().split('T')[0];
-                const recordForDay = records.find(r => r.date === dateKey);
-                const minutes = computePaidMinutes(emp, recordForDay, dateKey);
-                if (minutes > 0) {
-                    if (!workMap[dateKey]) {
-                        workMap[dateKey] = { total: 0, employees: {} };
-                    }
-                    workMap[dateKey].total += minutes;
-                    workMap[dateKey].employees[emp.id] = (workMap[dateKey].employees[emp.id] || 0) + minutes;
-                }
-            }
-        }
-
-        const allocations: Record<number, number> = {};
-        for (const [dateKey, info] of Object.entries(workMap)) {
-            const pool = serviceChargesByDate[dateKey];
-            if (!pool || info.total <= 0) continue;
-            for (const [empIdStr, minutes] of Object.entries(info.employees)) {
-                const share = pool * (minutes / info.total);
-                const empId = Number(empIdStr);
-                allocations[empId] = (allocations[empId] || 0) + share;
-            }
-        }
-
-        return allocations;
-    }, [employees, attendanceRecords, committedRange, serviceChargesByDate]);
-
     const summary = useMemo(() => {
         let scheduled = 0, worked = 0, totalDelay = 0, absence = 0, approvedOT = 0, paidMinutes = 0, totalLoginMinutes = 0;
         let lateCount = 0;
@@ -431,10 +391,17 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             }
         });
 
+        let creditedDays = 0;
         const serviceChargeShare = Object.entries(dailyWorkMinutes).reduce((sum, [dateKey, info]) => {
             const pool = serviceChargesByDate[dateKey];
-            if (!pool || info.total <= 0) return sum;
-            return sum + (pool * (info.employee / info.total));
+            if (!pool || info.total <= 0 || info.employee <= 0) {
+                return sum;
+            }
+            const distributable = Math.max(0, pool * SERVICE_CHARGE_DISTRIBUTION_RATE);
+            const denominator = info.total + SERVICE_CHARGE_VIRTUAL_MINUTES;
+            if (denominator <= 0) return sum;
+            creditedDays += 1;
+            return sum + (distributable * info.employee) / denominator;
         }, 0);
 
         const roundedServiceCharge = Math.round(serviceChargeShare * 100) / 100;
@@ -459,7 +426,15 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             daysAbsent,
             daysLate,
             deductionNotes: '',
-            customDeduction: 0
+            customDeduction: 0,
+            serviceChargeBreakdown:
+                roundedServiceCharge > 0
+                    ? {
+                          totalPool: roundedServiceCharge,
+                          coveredDays: creditedDays,
+                          deductionRate: SERVICE_CHARGE_DEDUCTION_RATE || undefined,
+                      }
+                    : undefined,
         };
         
         setPayslipRecord(newRecord);

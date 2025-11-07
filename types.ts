@@ -76,6 +76,12 @@ export interface Deductions {
     total: number;
 }
 
+export interface ServiceChargeBreakdown {
+    totalPool: number;
+    coveredDays: number;
+    deductionRate?: number;
+}
+
 export interface PayrollRecord {
     id: number;
     employee: string;
@@ -95,6 +101,7 @@ export interface PayrollRecord {
     daysLate: number;
     deductionNotes?: string;
     customDeduction?: number;
+    serviceChargeBreakdown?: ServiceChargeBreakdown;
 }
 
 export interface RecipeIngredient {

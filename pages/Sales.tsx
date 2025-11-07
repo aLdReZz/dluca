@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { SalesData } from '../types';
 import { UploadIcon } from '../components/Icons';
 
@@ -8,8 +8,63 @@ interface SalesProps {
     setSalesData: React.Dispatch<React.SetStateAction<SalesData[]>>;
 }
 
+const PLACEHOLDER_SALES: SalesData[] = [
+    {
+        Date: '16 Oct 25',
+        Time: '6:20pm',
+        'Transaction ID': '17606010007',
+        'Receipt No.': '5521',
+        Source: 'In-Store',
+        Cashier: '',
+        'Payment Type': 'Cash',
+        Total: '125.27',
+        'Service Rate': '10',
+        'Service Amount': '10.27',
+        Cost: '20.45',
+        Profit: '104.82',
+        'Email Recipient': '',
+        Customer: '',
+        'Email Address': '',
+        'Mobile Number': '',
+        Notes: '',
+        'Delivery Address': '',
+        'Park Tag': '',
+        __column1: '16 Oct 25',
+        __column10: '10.27',
+    },
+    {
+        Date: '16 Oct 25',
+        Time: '6:09pm',
+        'Transaction ID': '1760609395',
+        'Receipt No.': '5520',
+        Source: 'In-Store',
+        Cashier: '',
+        'Payment Type': 'GCash',
+        Total: '392.14',
+        'Service Rate': '10',
+        'Service Amount': '32.14',
+        Cost: '90.45',
+        Profit: '301.69',
+        'Email Recipient': '',
+        Customer: '',
+        'Email Address': '',
+        'Mobile Number': '',
+        Notes: '',
+        'Delivery Address': '',
+        'Park Tag': '',
+        __column1: '16 Oct 25',
+        __column10: '32.14',
+    },
+];
+
 const Sales: React.FC<SalesProps> = ({ salesData, setSalesData }) => {
     const [dragActive, setDragActive] = useState(false);
+
+    useEffect(() => {
+        if (salesData.length === 0) {
+            setSalesData(PLACEHOLDER_SALES);
+        }
+    }, [salesData.length, setSalesData]);
 
     const handleFile = (file: File) => {
         if (file && file.type === 'text/csv') {
@@ -101,6 +156,8 @@ const Sales: React.FC<SalesProps> = ({ salesData, setSalesData }) => {
                 const raw = values[index] ?? '';
                 rowData[header] = raw.trim().replace(/^\uFEFF/, '').replace(/"/g, '');
             });
+            rowData.__column1 = (values[0] ?? '').trim().replace(/^\uFEFF/, '').replace(/"/g, '');
+            rowData.__column10 = (values[9] ?? '').trim().replace(/^\uFEFF/, '').replace(/"/g, '');
             data.push(rowData);
         }
 

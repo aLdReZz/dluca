@@ -138,6 +138,55 @@ const initialRecipeCostings: RecipeCosting[] = [
 ];
 
 
+const placeholderSalesData: SalesData[] = [
+    {
+        Date: '16 Oct 25',
+        Time: '6:20pm',
+        'Transaction ID': '17606010007',
+        'Receipt No.': '5521',
+        Source: 'In-Store',
+        Cashier: '',
+        'Payment Type': 'Cash',
+        Total: '125.27',
+        'Service Rate': '10',
+        'Service Amount': '10.27',
+        Cost: '20.45',
+        Profit: '104.82',
+        'Email Recipient': '',
+        Customer: '',
+        'Email Address': '',
+        'Mobile Number': '',
+        Notes: '',
+        'Delivery Address': '',
+        'Park Tag': '',
+        __column1: '16 Oct 25',
+        __column10: '10.27',
+    },
+    {
+        Date: '16 Oct 25',
+        Time: '6:09pm',
+        'Transaction ID': '1760609395',
+        'Receipt No.': '5520',
+        Source: 'In-Store',
+        Cashier: '',
+        'Payment Type': 'gcash',
+        Total: '392.14',
+        'Service Rate': '10',
+        'Service Amount': '32.14',
+        Cost: '90.45',
+        Profit: '301.69',
+        'Email Recipient': '',
+        Customer: '',
+        'Email Address': '',
+        'Mobile Number': '',
+        Notes: '',
+        'Delivery Address': '',
+        'Park Tag': '',
+        __column1: '16 Oct 25',
+        __column10: '32.14',
+    },
+];
+
 const App: React.FC = () => {
     const [role, setRole] = useState<Role | null>('admin');
     const [isPinModalOpen, setPinModalOpen] = useState<boolean>(false);
@@ -147,7 +196,7 @@ const App: React.FC = () => {
     const dashboardIntroTimeout = useRef<number | null>(null);
 
     // App Data State
-    const [salesData, setSalesData] = useState<SalesData[]>([]);
+    const [salesData, setSalesData] = useState<SalesData[]>(placeholderSalesData);
     const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([
         { id: 1, name: 'Tomatoes', category: 'Vegetable', department: 'Kitchen', stock: 120, unit: 'kg', minStock: 20, lastUpdated: '2024-08-15T14:30:00Z', storageLocation: 'Freezer', expirationDate: '2024-09-15T00:00:00Z', image: 'https://img.icons8.com/plasticine/100/tomato.png' },
         { id: 2, name: 'Chicken Breast', category: 'Meat', department: 'Kitchen', stock: 40, unit: 'kg', minStock: 50, lastUpdated: '2024-08-15T14:30:00Z', storageLocation: 'Freezer', expirationDate: '2024-08-25T00:00:00Z', image: 'https://img.icons8.com/plasticine/100/chicken.png' },
@@ -230,7 +279,8 @@ const App: React.FC = () => {
         const savedData = localStorage.getItem('cafeManagementData');
         if (savedData) {
             const data = JSON.parse(savedData);
-            setSalesData(data.salesData || []);
+            const storedSales = Array.isArray(data.salesData) && data.salesData.length > 0 ? data.salesData : placeholderSalesData;
+            setSalesData(storedSales);
             // setInventoryItems(data.inventoryItems || []); // Use hardcoded data for demo
             setProductInventoryItems(data.productInventoryItems || initialProductInventory);
             // setPurchaseOrders(data.purchaseOrders || []); // Use hardcoded data for demo
@@ -239,6 +289,8 @@ const App: React.FC = () => {
             setPayrollRecords(data.payrollRecords || []);
             setRecipeCostings(data.recipeCostings || initialRecipeCostings);
             setCalendarEvents(data.calendarEvents || []);
+        } else {
+            setSalesData(placeholderSalesData);
         }
     }, []);
 

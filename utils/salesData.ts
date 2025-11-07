@@ -1,5 +1,10 @@
 import type { SalesData } from '../types';
 
+export const SERVICE_CHARGE_DEDUCTION_RATE = 0;
+export const SERVICE_CHARGE_DISTRIBUTION_RATE = 1;
+export const SERVICE_CHARGE_VIRTUAL_EMPLOYEES = 2;
+export const SERVICE_CHARGE_VIRTUAL_MINUTES = SERVICE_CHARGE_VIRTUAL_EMPLOYEES * 12 * 60;
+
 const monthMap: Record<string, number> = {
     jan: 0, january: 0,
     feb: 1, february: 1,
@@ -155,12 +160,19 @@ export const COGS_EXCLUDE = ['service', 'discount', 'charge'];
 export const DATE_HEADERS = ['date', 'transaction date', 'sales date', 'order date'];
 export const DATE_INCLUDE = ['date'];
 
+const formatDateKey = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 export const extractDateKey = (row: SalesData): string | null => {
     const dateValue = getSalesFieldValue(row, DATE_INCLUDE, [], DATE_HEADERS) ?? row.Date;
     if (!dateValue) return null;
     const parsed = parseSalesDate(dateValue);
     if (!parsed) return null;
-    return parsed.toISOString().split('T')[0];
+    return formatDateKey(parsed);
 };
 
 export const extractServiceCharge = (row: SalesData): number => {

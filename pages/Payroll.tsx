@@ -1,10 +1,16 @@
 ﻿
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import type { PayrollRecord, Employee, AttendanceRecord, SalesData } from '../types';
+import type { PayrollRecord, Employee, AttendanceRecord, SalesData, ServiceChargeBreakdown } from '../types';
 import CalendarPopup from '../components/CalendarPopup';
 import { CalendarDaysIcon, CurrencyPesoIcon, ClockIcon, BanknotesIcon } from '../components/Icons';
 import PayslipModal from '../components/PayslipModal';
-import { extractDateKey, extractServiceCharge } from '../utils/salesData';
+import {
+    extractDateKey,
+    extractServiceCharge,
+    SERVICE_CHARGE_DEDUCTION_RATE,
+    SERVICE_CHARGE_DISTRIBUTION_RATE,
+    SERVICE_CHARGE_VIRTUAL_MINUTES,
+} from '../utils/salesData';
 
 
 interface PayrollProps {
@@ -217,28 +223,44 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
             };
         });
 
-        const serviceChargeAllocations: Record<number, number> = {};
+        const serviceChargeAllocations: Record<number, { amount: number; days: number }> = {};
         for (const [dateKey, info] of Object.entries(dailyWorkMinutes)) {
             const pool = dailyServiceCharges[dateKey];
             if (!pool || info.total <= 0) continue;
+            const distributable = Math.max(0, pool * SERVICE_CHARGE_DISTRIBUTION_RATE);
+            if (distributable <= 0) continue;
+            const denominator = info.total + SERVICE_CHARGE_VIRTUAL_MINUTES;
+            if (denominator <= 0) continue;
             for (const [employeeIdStr, minutes] of Object.entries(info.employees)) {
-                const portion = pool * (minutes / info.total);
+                if (minutes <= 0) continue;
+                const share = (distributable * minutes) / denominator;
                 const employeeId = Number(employeeIdStr);
-                serviceChargeAllocations[employeeId] = (serviceChargeAllocations[employeeId] || 0) + portion;
+                const allocation = (serviceChargeAllocations[employeeId] ||= { amount: 0, days: 0 });
+                allocation.amount += share;
+                allocation.days += 1;
             }
         }
 
         const finalRecords = baseRecords.map(record => {
-            const rawServiceChargeShare = serviceChargeAllocations[record.id] || 0;
-            const serviceChargeShare = Math.round(rawServiceChargeShare * 100) / 100;
+            const allocation = serviceChargeAllocations[record.id];
+            const serviceChargeShare = allocation ? Math.round(allocation.amount * 100) / 100 : 0;
             const grossPayWithService = record.regularPay + record.overtimePay + serviceChargeShare;
             const appliedCustomDeduction = Math.max(0, record.customDeduction ?? 0);
             const netPayWithService = grossPayWithService - record.deductions.total - appliedCustomDeduction;
+            const breakdown: ServiceChargeBreakdown | undefined =
+                allocation && serviceChargeShare > 0
+                    ? {
+                          totalPool: serviceChargeShare,
+                          coveredDays: allocation.days,
+                          deductionRate: SERVICE_CHARGE_DEDUCTION_RATE || undefined,
+                      }
+                    : undefined;
             return {
                 ...record,
                 serviceCharge: serviceChargeShare,
                 grossPay: grossPayWithService,
-                netPay: netPayWithService
+                netPay: netPayWithService,
+                serviceChargeBreakdown: breakdown,
             };
         });
 
@@ -263,13 +285,32 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
     };
 
     const summaryStats = useMemo(() => {
-        return payrollRecords.reduce((acc, record) => {
-            acc.totalGross += record.grossPay;
-            acc.totalNet += record.netPay;
-            acc.totalHours += record.totalHours;
-            return acc;
-        }, { totalGross: 0, totalNet: 0, totalHours: 0 });
+        return payrollRecords.reduce(
+            (acc, record) => {
+                acc.totalGross += record.grossPay;
+                acc.totalNet += record.netPay;
+                acc.totalHours += record.totalHours;
+                acc.totalServiceCharge += record.serviceCharge;
+                return acc;
+            },
+            { totalGross: 0, totalNet: 0, totalHours: 0, totalServiceCharge: 0 },
+        );
     }, [payrollRecords]);
+
+    const serviceChargePoolTotal = useMemo(() => {
+        if (!payPeriod.start || !payPeriod.end) return 0;
+        let total = 0;
+        const start = new Date(payPeriod.start + 'T00:00:00Z');
+        const end = new Date(payPeriod.end + 'T23:59:59Z');
+        for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+            const key = d.toISOString().split('T')[0];
+            const pool = dailyServiceCharges[key];
+            if (pool && pool > 0) {
+                total += pool;
+            }
+        }
+        return Math.round(total * 100) / 100;
+    }, [dailyServiceCharges, payPeriod.start, payPeriod.end]);
 
     const tableHeaders = ['Staff', 'Rate', 'Regular Hrs', 'OT Hrs', 'Gross Pay', 'Net Pay', 'Present', 'Absent', 'Late', 'Actions'];
 
@@ -300,10 +341,15 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <SummaryCard title="Total Gross Pay" value={formatPeso(summaryStats.totalGross)} icon={BanknotesIcon} />
                 <SummaryCard title="Total Hours" value={`${summaryStats.totalHours.toFixed(2)} hrs`} icon={ClockIcon} />
                 <SummaryCard title="Total Net Pay" value={formatPeso(summaryStats.totalNet)} icon={CurrencyPesoIcon} />
+                <SummaryCard
+                    title="Service Charge Pool"
+                    value={formatPeso(serviceChargePoolTotal)}
+                    icon={CurrencyPesoIcon}
+                />
             </div>
 
             <div className="bg-bg-secondary rounded-xl border border-border-color overflow-hidden">
