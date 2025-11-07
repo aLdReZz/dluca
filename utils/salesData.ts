@@ -1,10 +1,5 @@
 import type { SalesData } from '../types';
 
-export const SERVICE_CHARGE_DEDUCTION_RATE = 0;
-export const SERVICE_CHARGE_DISTRIBUTION_RATE = 1;
-export const SERVICE_CHARGE_VIRTUAL_EMPLOYEES = 2;
-export const SERVICE_CHARGE_VIRTUAL_MINUTES = SERVICE_CHARGE_VIRTUAL_EMPLOYEES * 12 * 60;
-
 const monthMap: Record<string, number> = {
     jan: 0, january: 0,
     feb: 1, february: 1,

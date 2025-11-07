@@ -1,16 +1,15 @@
 ﻿
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import type { PayrollRecord, Employee, AttendanceRecord, SalesData, ServiceChargeBreakdown } from '../types';
+import type { PayrollRecord, Employee, AttendanceRecord, SalesData } from '../types';
 import CalendarPopup from '../components/CalendarPopup';
 import { CalendarDaysIcon, CurrencyPesoIcon, ClockIcon, BanknotesIcon } from '../components/Icons';
 import PayslipModal from '../components/PayslipModal';
 import {
     extractDateKey,
     extractServiceCharge,
-    SERVICE_CHARGE_DEDUCTION_RATE,
-    SERVICE_CHARGE_DISTRIBUTION_RATE,
-    SERVICE_CHARGE_VIRTUAL_MINUTES,
+    parseSalesDate,
 } from '../utils/salesData';
+import { calculateServiceChargeDistribution } from '../utils/serviceChargeAllocation';
 
 
 interface PayrollProps {
@@ -58,6 +57,38 @@ const formatDateForDisplay = (dateString: string) => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 };
 
+const formatDateKeyLocal = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const normalizeAttendanceDate = (value?: string): string | null => {
+    if (!value) return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    if (trimmed.includes('T')) {
+        const isoDate = new Date(trimmed);
+        if (!Number.isNaN(isoDate.getTime())) {
+            return formatDateKeyLocal(isoDate);
+        }
+    }
+
+    const parsed = parseSalesDate(trimmed);
+    if (parsed) {
+        return formatDateKeyLocal(parsed);
+    }
+
+    const fallback = new Date(trimmed);
+    if (!Number.isNaN(fallback.getTime())) {
+        return formatDateKeyLocal(fallback);
+    }
+
+    return trimmed;
+};
+
 const SummaryCard: React.FC<{title: string, value: string, icon: React.FC<{className?:string}>}> = ({title, value, icon: Icon}) => (
     <div className="bg-bg-secondary p-5 rounded-xl border border-border-color">
          <div className="flex justify-between items-start">
@@ -101,6 +132,20 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
         return map;
     }, [salesData]);
 
+    const dailyAttendanceTotals = useMemo(() => {
+        const totals: Record<string, number> = {};
+        for (const record of attendanceRecords) {
+            if (!record.timeIn || !record.timeOut) continue;
+            const normalizedDate = normalizeAttendanceDate(record.date);
+            if (!normalizedDate) continue;
+            const inMinutes = timeStringToMinutes(record.timeIn);
+            const outMinutes = timeStringToMinutes(record.timeOut);
+            if (inMinutes === null || outMinutes === null || outMinutes <= inMinutes) continue;
+            totals[normalizedDate] = (totals[normalizedDate] || 0) + (outMinutes - inMinutes);
+        }
+        return totals;
+    }, [attendanceRecords]);
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
@@ -119,8 +164,6 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
 
         const startDate = new Date(payPeriod.start + 'T00:00:00Z');
         const endDate = new Date(payPeriod.end + 'T00:00:00Z');
-
-        const dailyWorkMinutes: Record<string, { total: number; employees: Record<number, number> }> = {};
 
         const baseRecords = employees.map(employee => {
             let totalRegularHours = 0;
@@ -178,14 +221,6 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
                     }
                 }
 
-                if (workedMinutesForDay > 0) {
-                    if (!dailyWorkMinutes[dateKey]) {
-                        dailyWorkMinutes[dateKey] = { total: 0, employees: {} };
-                    }
-                    dailyWorkMinutes[dateKey].total += workedMinutesForDay;
-                    const existing = dailyWorkMinutes[dateKey].employees[employee.id] || 0;
-                    dailyWorkMinutes[dateKey].employees[employee.id] = existing + workedMinutesForDay;
-                }
             }
 
             const regularPay = totalRegularHours * employee.rate;
@@ -223,49 +258,48 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
             };
         });
 
-        const serviceChargeAllocations: Record<number, { amount: number; days: number }> = {};
-        for (const [dateKey, info] of Object.entries(dailyWorkMinutes)) {
-            const pool = dailyServiceCharges[dateKey];
-            if (!pool || info.total <= 0) continue;
-            const distributable = Math.max(0, pool * SERVICE_CHARGE_DISTRIBUTION_RATE);
-            if (distributable <= 0) continue;
-            const denominator = info.total + SERVICE_CHARGE_VIRTUAL_MINUTES;
-            if (denominator <= 0) continue;
-            for (const [employeeIdStr, minutes] of Object.entries(info.employees)) {
-                if (minutes <= 0) continue;
-                const share = (distributable * minutes) / denominator;
-                const employeeId = Number(employeeIdStr);
-                const allocation = (serviceChargeAllocations[employeeId] ||= { amount: 0, days: 0 });
-                allocation.amount += share;
-                allocation.days += 1;
-            }
-        }
+        const { allocations } = calculateServiceChargeDistribution({
+            employees,
+            attendanceRecords,
+            salesData,
+            start: payPeriod.start,
+            end: payPeriod.end,
+            dailyServiceChargeTotals: dailyServiceCharges,
+        });
+
+        const roundCurrency = (value: number) => Math.round(value * 100) / 100;
 
         const finalRecords = baseRecords.map(record => {
-            const allocation = serviceChargeAllocations[record.id];
-            const serviceChargeShare = allocation ? Math.round(allocation.amount * 100) / 100 : 0;
+            const allocation = allocations[record.id];
+            const serviceChargeShare = allocation ? roundCurrency(allocation.totalShare) : 0;
             const grossPayWithService = record.regularPay + record.overtimePay + serviceChargeShare;
             const appliedCustomDeduction = Math.max(0, record.customDeduction ?? 0);
             const netPayWithService = grossPayWithService - record.deductions.total - appliedCustomDeduction;
-            const breakdown: ServiceChargeBreakdown | undefined =
-                allocation && serviceChargeShare > 0
-                    ? {
-                          totalPool: serviceChargeShare,
-                          coveredDays: allocation.days,
-                          deductionRate: SERVICE_CHARGE_DEDUCTION_RATE || undefined,
-                      }
-                    : undefined;
+            const normalizedBreakdown = allocation
+                ? {
+                      ...allocation,
+                      totalShare: serviceChargeShare,
+                      details: allocation.details.map(detail => {
+                    return {
+                        ...detail,
+                        share: roundCurrency(detail.share),
+                        attendanceMinutes: dailyAttendanceTotals[detail.dateKey],
+                    };
+                }),
+            }
+                : undefined;
+
             return {
                 ...record,
                 serviceCharge: serviceChargeShare,
                 grossPay: grossPayWithService,
                 netPay: netPayWithService,
-                serviceChargeBreakdown: breakdown,
+                serviceChargeBreakdown: normalizedBreakdown,
             };
         });
 
         setPayrollRecords(finalRecords);
-    }, [employees, attendanceRecords, payPeriod, setPayrollRecords, dailyServiceCharges]);
+    }, [employees, attendanceRecords, payPeriod, setPayrollRecords, dailyServiceCharges, dailyAttendanceTotals]);
 
     useEffect(() => {
         generatePayroll();
@@ -290,27 +324,25 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
                 acc.totalGross += record.grossPay;
                 acc.totalNet += record.netPay;
                 acc.totalHours += record.totalHours;
-                acc.totalServiceCharge += record.serviceCharge;
                 return acc;
             },
-            { totalGross: 0, totalNet: 0, totalHours: 0, totalServiceCharge: 0 },
+            { totalGross: 0, totalNet: 0, totalHours: 0 },
         );
     }, [payrollRecords]);
 
-    const serviceChargePoolTotal = useMemo(() => {
-        if (!payPeriod.start || !payPeriod.end) return 0;
-        let total = 0;
-        const start = new Date(payPeriod.start + 'T00:00:00Z');
-        const end = new Date(payPeriod.end + 'T23:59:59Z');
-        for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
-            const key = d.toISOString().split('T')[0];
-            const pool = dailyServiceCharges[key];
-            if (pool && pool > 0) {
-                total += pool;
-            }
-        }
-        return Math.round(total * 100) / 100;
+    const serviceChargeEntries = useMemo(() => {
+        if (!payPeriod.start || !payPeriod.end) return [];
+        return Object.entries(dailyServiceCharges)
+            .filter(([dateKey]) => dateKey >= payPeriod.start && dateKey <= payPeriod.end)
+            .map(([dateKey, amount]) => ({ dateKey, amount }))
+            .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
     }, [dailyServiceCharges, payPeriod.start, payPeriod.end]);
+
+    const serviceChargePoolTotal = useMemo(() => {
+        return Math.round(
+            serviceChargeEntries.reduce((sum, entry) => sum + (entry.amount > 0 ? entry.amount : 0), 0) * 100,
+        ) / 100;
+    }, [serviceChargeEntries]);
 
     const tableHeaders = ['Staff', 'Rate', 'Regular Hrs', 'OT Hrs', 'Gross Pay', 'Net Pay', 'Present', 'Absent', 'Late', 'Actions'];
 
@@ -350,6 +382,46 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
                     value={formatPeso(serviceChargePoolTotal)}
                     icon={CurrencyPesoIcon}
                 />
+            </div>
+
+            <div className="bg-bg-secondary border border-border-color rounded-xl p-6 mb-8">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h3 className="text-xl font-semibold text-text-primary">Service Charge Data</h3>
+                        <p className="text-sm text-text-secondary">
+                            Raw sales amounts for {formatDateForDisplay(payPeriod.start)} - {formatDateForDisplay(payPeriod.end)}
+                        </p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-sm text-text-secondary">Total for period</p>
+                        <p className="text-2xl font-bold text-text-primary">{formatPeso(serviceChargePoolTotal)}</p>
+                    </div>
+                </div>
+                {serviceChargeEntries.length > 0 ? (
+                    <div className="mt-4 border border-border-color rounded-lg overflow-hidden">
+                        <table className="w-full">
+                            <thead className="bg-bg-tertiary/40 text-sm text-text-secondary">
+                                <tr>
+                                    <th className="p-3 text-left">Date</th>
+                                    <th className="p-3 text-right">Service Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border-color/60 text-sm">
+                                {serviceChargeEntries.map(entry => (
+                                    <tr key={`${entry.dateKey}-${entry.amount}`} className="hover:bg-hover-bg/30 transition-colors">
+                                        <td className="p-3">{formatDateForDisplay(entry.dateKey)}</td>
+                                        <td className="p-3 text-right font-medium">{formatPeso(entry.amount)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <p className="mt-4 text-sm text-text-secondary">No service charge data found for this period.</p>
+                )}
+                <p className="text-xs text-text-secondary mt-3">
+                    These figures are reference-only. They are not automatically applied to employee pay.
+                </p>
             </div>
 
             <div className="bg-bg-secondary rounded-xl border border-border-color overflow-hidden">

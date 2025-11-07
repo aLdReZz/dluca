@@ -54,7 +54,15 @@ const formatDateForDisplay = (dateString: string) => {
 
 const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
     const [filter, setFilter] = useState<'daily' | 'weekly' | 'monthly' | 'lastMonth' | 'custom'>('monthly');
-    const [stats, setStats] = useState({ netSales: 0, grossSales: 0, totalProfit: 0, totalCOGS: 0, serviceCharge: 0 });
+    const [stats, setStats] = useState({
+        netSales: 0,
+        grossSales: 0,
+        totalProfit: 0,
+        totalCOGS: 0,
+        serviceCharge: 0,
+        serviceChargeEmployee: 0,
+        serviceChargeGhost: 0,
+    });
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const chartRef = useRef<HTMLCanvasElement>(null);
@@ -82,7 +90,15 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
 
     const calculateStats = useCallback(() => {
         if (!startDate || !endDate) {
-            setStats({ netSales: 0, grossSales: 0, totalProfit: 0, totalCOGS: 0, serviceCharge: 0 });
+            setStats({
+                netSales: 0,
+                grossSales: 0,
+                totalProfit: 0,
+                totalCOGS: 0,
+                serviceCharge: 0,
+                serviceChargeEmployee: 0,
+                serviceChargeGhost: 0,
+            });
             return [];
         }
 
@@ -113,9 +129,20 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
             const value = getSalesFieldValue(row, SERVICE_INCLUDE, [], SERVICE_HEADERS);
             return sum + parseNumericValue(value);
         }, 0);
+
+        const employeeShare = totalServiceCharge * 0.8;
+        const ghostShare = totalServiceCharge * 0.2;
         const netSales = Math.max(totalGrossSales - totalServiceCharge, 0);
 
-        setStats({ netSales, grossSales: totalGrossSales, totalProfit, totalCOGS, serviceCharge: totalServiceCharge });
+        setStats({
+            netSales,
+            grossSales: totalGrossSales,
+            totalProfit,
+            totalCOGS,
+            serviceCharge: totalServiceCharge,
+            serviceChargeEmployee: employeeShare,
+            serviceChargeGhost: ghostShare,
+        });
         return filteredData;
     }, [salesData, startDate, endDate]);
 
@@ -371,7 +398,24 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
                 <StatCard title="Gross Sales" value={formatPeso(stats.grossSales)} icon={CurrencyPesoIcon} color="purple" />
                 <StatCard title="Total Profit" value={formatPeso(stats.totalProfit)} icon={ArrowTrendingUpIcon} color="green" />
                 <StatCard title="COGS" value={formatPeso(stats.totalCOGS)} icon={BanknotesIcon} color="orange" />
-                <StatCard title="Service Charge" value={formatPeso(stats.serviceCharge)} icon={SparklesIcon} color="yellow" />
+                <StatCard
+                    title="Service Charge"
+                    value={formatPeso(stats.serviceCharge)}
+                    icon={SparklesIcon}
+                    color="yellow"
+                    tooltip={
+                        <div className="text-left text-[11px] leading-snug mt-1">
+                            <div>
+                                <span className="text-text-secondary">Employee:</span>{' '}
+                                <span className="font-semibold text-text-primary">{formatPeso(stats.serviceChargeEmployee)}</span>
+                            </div>
+                            <div>
+                                <span className="text-text-secondary">Ghost:</span>{' '}
+                                <span className="font-semibold text-text-primary">{formatPeso(stats.serviceChargeGhost)}</span>
+                            </div>
+                        </div>
+                    }
+                />
             </div>
 
             <div

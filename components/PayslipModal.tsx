@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { PayrollRecord } from '../types';
 import { XMarkIcon, PrinterIcon, InformationCircleIcon } from './Icons';
-import { SERVICE_CHARGE_DEDUCTION_RATE } from '../utils/salesData';
 
 interface PayslipModalProps {
     record: PayrollRecord;
@@ -51,8 +50,17 @@ const formatDateMonthYear = (dateString?: string) => {
     });
 };
 
-const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose, onSave }) => {
-    const [serviceCharge, setServiceCharge] = useState(record.serviceCharge || 0);
+const formatHours = (minutes: number) => {
+    if (!Number.isFinite(minutes)) return '--';
+    return `${(minutes / 60).toFixed(2)} hrs`;
+};
+
+const PayslipModal: React.FC<PayslipModalProps> = ({
+    record,
+    payPeriod,
+    onClose,
+    onSave,
+}) => {
     const [deductionNotes, setDeductionNotes] = useState(record.deductionNotes || '');
     const [isDeductionEditorOpen, setIsDeductionEditorOpen] = useState(Boolean(record.deductionNotes));
     const [customDeduction, setCustomDeduction] = useState(record.customDeduction ?? 0);
@@ -80,15 +88,11 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose,
     }, []);
 
     const { grossPay, netPay } = useMemo(() => {
-        const gross = record.regularPay + record.overtimePay + serviceCharge;
+        const gross = record.regularPay + record.overtimePay + (record.serviceCharge || 0);
         const appliedCustomDeduction = Math.max(0, customDeduction);
         const net = gross - record.deductions.total - appliedCustomDeduction;
         return { grossPay: gross, netPay: net };
-    }, [serviceCharge, record.regularPay, record.overtimePay, record.deductions.total, customDeduction]);
-
-    const handleServiceChargeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setServiceCharge(parseFloat(e.target.value) || 0);
-    };
+    }, [record.regularPay, record.overtimePay, record.serviceCharge, record.deductions.total, customDeduction]);
 
     const handleDeductionToggle = () => setIsDeductionEditorOpen(prev => !prev);
     const handleDeductionNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) =>
@@ -101,23 +105,13 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose,
 
     const handleSave = () => {
         const cleanedNotes = deductionNotes.trim();
-        const breakdown =
-            serviceCharge > 0
-                ? {
-                      totalPool: serviceCharge,
-                      coveredDays: record.serviceChargeBreakdown?.coveredDays ?? 0,
-                      deductionRate: record.serviceChargeBreakdown?.deductionRate ?? SERVICE_CHARGE_DEDUCTION_RATE,
-                  }
-                : undefined;
         const updatedRecord = {
             ...record,
-            serviceCharge,
             grossPay,
             netPay,
             deductions: record.deductions,
             deductionNotes: cleanedNotes || undefined,
             customDeduction: Math.max(0, customDeduction),
-            serviceChargeBreakdown: breakdown,
         };
         onSave(updatedRecord);
         setDeductionNotes(cleanedNotes);
@@ -186,27 +180,26 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose,
     const payPeriodRangeLabel = `${formatDateLong(payPeriod.start)} - ${formatDateLong(payPeriod.end)}`;
     const printableCoverageLabel = coverageLabel !== 'N/A' ? coverageLabel : payPeriodRangeLabel;
     const customDeductionValue = Math.max(0, customDeduction);
-    const serviceChargeFormulaLabel = useMemo(() => {
-        const breakdown = record.serviceChargeBreakdown;
-        const referenceAmount = breakdown?.totalPool ?? serviceCharge;
-        if (!referenceAmount || referenceAmount <= 0) return undefined;
-        const daySuffix =
-            breakdown && breakdown.coveredDays > 0
-                ? ` · ${breakdown.coveredDays} day${breakdown.coveredDays === 1 ? '' : 's'}`
-                : '';
-        const deductionRate = breakdown?.deductionRate ?? SERVICE_CHARGE_DEDUCTION_RATE;
-        const deductionSuffix = deductionRate > 0 ? ` · after ${(deductionRate * 100).toFixed(0)}% deduction` : '';
-        return `Service Amount ${formatPeso(referenceAmount)} (${payPeriodRangeLabel}${daySuffix}${deductionSuffix})`;
-    }, [record.serviceChargeBreakdown, serviceCharge, payPeriodRangeLabel]);
+    const serviceChargeDetails = useMemo(() => {
+        const details = record.serviceChargeBreakdown?.details ?? [];
+        return details
+            .map(detail => ({
+                ...detail,
+                share: Math.round(detail.share * 100) / 100,
+                ghostMinutes: detail.ghostMinutes ?? 0,
+            }))
+            .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+    }, [record.serviceChargeBreakdown]);
+    const formattedServiceChargeTotal = formatPeso(record.serviceCharge || 0);
 
     const earningsRows = useMemo(
         () =>
             [
                 { label: 'Basic Salary', amount: record.regularPay },
                 { label: 'Overtime Pay', amount: record.overtimePay },
-                { label: 'Service Charge', amount: serviceCharge },
+                { label: 'Service Charge', amount: record.serviceCharge || 0 },
             ].filter(row => Math.abs(row.amount) > 0.009),
-        [record.regularPay, record.overtimePay, serviceCharge],
+        [record.regularPay, record.overtimePay, record.serviceCharge],
     );
 
     const deductionRows = useMemo(
@@ -390,6 +383,55 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose,
                             </div>
 
                             <div className="payslip-export-section">
+                                <h3>Service Charge Allocation</h3>
+                                {serviceChargeDetails.length > 0 ? (
+                                    <table className="payslip-export-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Paid Hrs</th>
+                                                <th>Ghost Hrs</th>
+                                                <th>Attendance Hrs</th>
+                                                <th>Pool</th>
+                                                <th>Share</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {serviceChargeDetails.map(detail => {
+                                                const ghostMinutes = detail.ghostMinutes ?? 0;
+                                                const attendanceMinutes =
+                                                    detail.attendanceMinutes ??
+                                                    Math.max(0, detail.totalMinutes - ghostMinutes);
+                                                return (
+                                                    <tr key={`${detail.dateKey}-${detail.share}`}>
+                                                        <td>{formatDateForDisplay(detail.dateKey)}</td>
+                                                        <td>{formatHours(detail.employeeMinutes)}</td>
+                                                        <td>{formatHours(ghostMinutes)}</td>
+                                                        <td>{formatHours(attendanceMinutes)}</td>
+                                                        <td className="text-right">{formatPeso(detail.pool)}</td>
+                                                        <td className="text-right">{formatPeso(detail.share)}</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr>
+                                                <th colSpan={5}>Total Service Charge</th>
+                                                <th className="text-right">{formattedServiceChargeTotal}</th>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                ) : (
+                                    <p className="text-sm text-text-secondary">
+                                        No service charge was allocated for this pay period.
+                                    </p>
+                                )}
+                                <p className="text-xs text-text-secondary mt-2">
+                                    Two ghost employees (12h each) are included in the total hours every day to smooth allocations.
+                                </p>
+                            </div>
+
+                            <div className="payslip-export-section">
                                 <h3>Deductions</h3>
                                 <table className="payslip-export-table">
                                     <thead>
@@ -493,15 +535,57 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, payPeriod, onClose,
                                     />
                                     <DetailRow
                                         label="Service Charge"
-                                        value={formatPeso(serviceCharge)}
-                                        subValue={serviceChargeFormulaLabel}
-                                        isInput
-                                        name="serviceCharge"
-                                        inputValue={serviceCharge}
-                                        onChange={handleServiceChargeChange}
-                                        inputVariant="minimal"
-                                        inputDisplayValue={formatPeso(serviceCharge)}
+                                        value={formattedServiceChargeTotal}
+                                        subValue={
+                                            record.serviceChargeBreakdown
+                                                ? `${record.serviceChargeBreakdown.coveredDays} day${
+                                                      record.serviceChargeBreakdown.coveredDays === 1 ? '' : 's'
+                                                  } of service pools`
+                                                : 'No allocation this period'
+                                        }
+                                        isBold
                                     />
+                                    <div className="mt-3 rounded-lg border border-dashed border-border-color/70 bg-bg-tertiary/40 p-3">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <p className="text-sm font-semibold text-text-primary">Daily Allocation Details</p>
+                                                <p className="text-[11px] text-text-secondary">
+                                                    Paid hrs ÷ (team hrs + 2 ghost employees @ 12h) × service pool
+                                                </p>
+                                            </div>
+                                            <span className="text-sm font-semibold">{formattedServiceChargeTotal}</span>
+                                        </div>
+                                        {serviceChargeDetails.length > 0 ? (
+                                            <div className="mt-2 space-y-1 text-xs text-text-secondary">
+                                                <div className="grid grid-cols-6 gap-2 font-semibold text-[11px] uppercase tracking-wide text-text-secondary/70">
+                                                    <span>Date</span>
+                                                    <span className="text-right">Paid</span>
+                                                    <span className="text-right">Ghost</span>
+                                                    <span className="text-right">Attendance</span>
+                                                    <span className="text-right">Pool</span>
+                                                    <span className="text-right">Share</span>
+                                                </div>
+                                                {serviceChargeDetails.map(detail => {
+                                                    const ghostMinutes = detail.ghostMinutes ?? 0;
+                                                    const attendanceMinutes =
+                                                        detail.attendanceMinutes ??
+                                                        Math.max(0, detail.totalMinutes - ghostMinutes);
+                                                    return (
+                                                        <div key={`${detail.dateKey}-${detail.share}`} className="grid grid-cols-6 gap-2">
+                                                            <span>{formatDateForDisplay(detail.dateKey)}</span>
+                                                            <span className="text-right">{formatHours(detail.employeeMinutes)}</span>
+                                                            <span className="text-right">{formatHours(ghostMinutes)}</span>
+                                                            <span className="text-right">{formatHours(attendanceMinutes)}</span>
+                                                            <span className="text-right">{formatPeso(detail.pool)}</span>
+                                                            <span className="text-right text-accent-green font-semibold">{formatPeso(detail.share)}</span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <p className="mt-2 text-xs text-text-secondary">No service charge earned during this period.</p>
+                                        )}
+                                    </div>
                                     {isCustomDeductionEditorOpen ? (
                                         <DetailRow
                                             label="Custom Deduction"

@@ -173,6 +173,65 @@ const Attendance: React.FC<AttendanceProps> = ({ employees, setEmployees, attend
     }, [scheduleWeekStart]);
 
     const dateToKey = (date: Date) => date.toISOString().split('T')[0];
+
+    const attendanceRecordsByDate = useMemo(() => {
+        const map: Record<string, AttendanceRecord[]> = {};
+        for (const record of attendanceRecords) {
+            (map[record.date] ||= []).push(record);
+        }
+        return map;
+    }, [attendanceRecords]);
+
+    const dailyScheduleTotals = useMemo(() => {
+        const totals: Record<string, number> = {};
+        for (const dateInfo of weekDates) {
+            const dateKey = dateToKey(dateInfo.date);
+            let minutes = 0;
+            for (const emp of employees) {
+                const schedule = emp.schedule[dateKey];
+                if (schedule && !schedule.off && schedule.timeIn && schedule.timeOut) {
+                    const inMinutes = timeStringToMinutes(schedule.timeIn);
+                    const outMinutes = timeStringToMinutes(schedule.timeOut);
+                    if (inMinutes !== null && outMinutes !== null && outMinutes > inMinutes) {
+                        minutes += outMinutes - inMinutes;
+                    }
+                }
+            }
+            totals[dateKey] = minutes / 60;
+        }
+        return totals;
+    }, [weekDates, employees]);
+
+    const weeklyScheduleTotalHours = useMemo(() => {
+        return Object.values(dailyScheduleTotals).reduce((sum, hours) => {
+            return sum + (Number.isFinite(hours) ? hours : 0);
+        }, 0);
+    }, [dailyScheduleTotals]);
+
+    const dailyAttendanceTotals = useMemo(() => {
+        const totals: Record<string, number> = {};
+        for (const dateInfo of weekDates) {
+            const dateKey = dateToKey(dateInfo.date);
+            const recordsForDay = attendanceRecordsByDate[dateKey] || [];
+            let minutes = 0;
+            for (const record of recordsForDay) {
+                if (!record.timeIn || !record.timeOut) continue;
+                const timeInMinutes = timeStringToMinutes(record.timeIn);
+                const timeOutMinutes = timeStringToMinutes(record.timeOut);
+                if (timeInMinutes !== null && timeOutMinutes !== null && timeOutMinutes > timeInMinutes) {
+                    minutes += timeOutMinutes - timeInMinutes;
+                }
+            }
+            totals[dateKey] = minutes / 60;
+        }
+        return totals;
+    }, [weekDates, attendanceRecordsByDate]);
+
+    const weeklyAttendanceTotalHours = useMemo(() => {
+        return Object.values(dailyAttendanceTotals).reduce((sum, hours) => {
+            return sum + (Number.isFinite(hours) ? hours : 0);
+        }, 0);
+    }, [dailyAttendanceTotals]);
     
     const handleDateSelect = (dateStr: string) => {
         const selectedDate = new Date(dateStr + 'T00:00:00Z');
@@ -516,7 +575,7 @@ const Attendance: React.FC<AttendanceProps> = ({ employees, setEmployees, attend
         return timeStr;
     };
     
-    const timeStringToMinutes = (timeStr: string): number | null => {
+    function timeStringToMinutes(timeStr: string): number | null {
         if (!timeStr) return null;
         const normalizedTime = timeStr.trim().toUpperCase();
 
@@ -529,16 +588,16 @@ const Attendance: React.FC<AttendanceProps> = ({ employees, setEmployees, attend
             if (period === 'AM' && hours === 12) hours = 0;
             return hours * 60 + minutes;
         }
-        
+
         const twentyFourHourMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})$/);
-            if (twentyFourHourMatch) {
+        if (twentyFourHourMatch) {
             const hours = parseInt(twentyFourHourMatch[1], 10);
             const minutes = parseInt(twentyFourHourMatch[2], 10);
             return hours * 60 + minutes;
         }
-        
+
         return null;
-    };
+    }
 
     const handleUpdateEmployee = (updatedEmployee: Employee) => {
         setEmployees(prev => prev.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp));
@@ -683,7 +742,7 @@ const Attendance: React.FC<AttendanceProps> = ({ employees, setEmployees, attend
 
                                                         if (isScheduleLocked) {
                                                             return (
-                                                                <td key={currentDayKey} className={`${cellClasses} p-0 align-middle`}>
+                                                    <td key={`${emp.id}-${currentDayKey}`} className={`${cellClasses} p-0 align-middle`}>
                                                                     <div className="flex items-center justify-center p-2 h-full">
                                                                         {renderCellContent()}
                                                                     </div>
@@ -693,7 +752,7 @@ const Attendance: React.FC<AttendanceProps> = ({ employees, setEmployees, attend
 
                                                         // Edit mode
                                                         return (
-                                                            <td key={currentDayKey} className={`${cellClasses} p-1 align-middle`}>
+                                                    <td key={`${emp.id}-${currentDayKey}`} className={`${cellClasses} p-1 align-middle`}>
                                                                 <button
                                                                     onClick={() => handleOpenScheduleModal(emp, currentDayKey, dateInfo.date)}
                                                                     className="w-full h-full text-center bg-bg-primary/50 border border-border-color rounded-lg hover:bg-hover-bg/50 transition-colors p-2 flex items-center justify-center"
@@ -719,6 +778,37 @@ const Attendance: React.FC<AttendanceProps> = ({ employees, setEmployees, attend
                                     </tr>
                                    )}
                                 </tbody>
+                                <tfoot>
+                                    <tr className="bg-bg-tertiary/30 border-t border-border-color">
+                                        <td className="p-3 font-semibold text-sm uppercase text-text-secondary sticky left-0 bg-bg-tertiary/30 z-10">
+                                            Total Hours
+                                        </td>
+                                        {weekDates.map(dateInfo => {
+                                            const totalHours = dailyScheduleTotals[dateToKey(dateInfo.date)];
+                                            return (
+                                                <td
+                                                    key={`schedule-total-${dateInfo.key}`}
+                                                    className="p-2 text-center text-sm font-semibold text-text-primary border-l border-border-color"
+                                                >
+                                                    {totalHours && totalHours > 0 ? `${totalHours.toFixed(2)} hrs` : '--'}
+                                                </td>
+                                            );
+                                        })}
+                                        <td
+                                            className={`text-center text-sm font-semibold border-l border-border-color transition-all duration-300 ${
+                                                isAttendanceTotalHrsVisible ? 'p-3' : 'p-0 w-0'
+                                            }`}
+                                        >
+                                            <div
+                                                className={`whitespace-nowrap overflow-hidden ${
+                                                    isAttendanceTotalHrsVisible ? 'opacity-100' : 'opacity-0'
+                                                }`}
+                                            >
+                                                {weeklyScheduleTotalHours > 0 ? `${weeklyScheduleTotalHours.toFixed(2)} hrs` : '--'}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tfoot>
                             </table>
                         </div>
                          {/* Mobile/Tablet Card View */}
@@ -778,7 +868,7 @@ const Attendance: React.FC<AttendanceProps> = ({ employees, setEmployees, attend
                                                     );
                                                     
                                                     return (
-                                                        <div key={currentDayKey} className={dayClasses}>
+                                                <div key={`${emp.id}-${currentDayKey}`} className={dayClasses}>
                                                             <div className={`text-sm font-medium ${dateInfo.isToday ? 'text-text-primary' : 'text-text-secondary'}`}>
                                                                 {dateInfo.date.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })}
                                                                 <span className="ml-2 text-text-secondary/70">{dateInfo.date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', timeZone: 'UTC' })}</span>
@@ -904,14 +994,14 @@ const Attendance: React.FC<AttendanceProps> = ({ employees, setEmployees, attend
                                                         
                                                         if (isAttendanceLocked) {
                                                             return (
-                                                                <td key={currentDayKey} className={`${cellClasses} p-2`}>
+                                                            <td key={`${emp.id}-${currentDayKey}`} className={`${cellClasses} p-2`}>
                                                                     {cellContent}
                                                                 </td>
                                                             );
                                                         }
 
                                                         return (
-                                                            <td key={currentDayKey} className={`${cellClasses} p-1 align-middle`}>
+                                                            <td key={`${emp.id}-${currentDayKey}`} className={`${cellClasses} p-1 align-middle`}>
                                                                 <button onClick={() => handleOpenAttendanceModal(emp, currentDayKey, dateInfo.date)} className="w-full h-full text-center bg-bg-primary/50 border border-border-color rounded-lg hover:bg-hover-bg/50 transition-colors p-2 flex items-center justify-center">
                                                                     {cellContent}
                                                                 </button>
@@ -934,6 +1024,37 @@ const Attendance: React.FC<AttendanceProps> = ({ employees, setEmployees, attend
                                     </tr>
                                    )}
                                 </tbody>
+                                <tfoot>
+                                    <tr className="bg-bg-tertiary/30 border-t border-border-color">
+                                        <td className="p-3 font-semibold text-sm uppercase text-text-secondary sticky left-0 bg-bg-tertiary/30 z-10">
+                                            Total Hours
+                                        </td>
+                                        {weekDates.map(dateInfo => {
+                                            const totalHours = dailyAttendanceTotals[dateToKey(dateInfo.date)];
+                                            return (
+                                                <td
+                                                    key={`attendance-total-${dateInfo.key}`}
+                                                    className="p-2 text-center text-sm font-semibold text-text-primary border-l border-border-color"
+                                                >
+                                                    {totalHours && totalHours > 0 ? `${totalHours.toFixed(2)} hrs` : '--'}
+                                                </td>
+                                            );
+                                        })}
+                                        <td
+                                            className={`text-center text-sm font-semibold border-l border-border-color transition-all duration-300 ${
+                                                isAttendanceTotalHrsVisible ? 'p-3' : 'p-0 w-0'
+                                            }`}
+                                        >
+                                            <div
+                                                className={`whitespace-nowrap overflow-hidden ${
+                                                    isAttendanceTotalHrsVisible ? 'opacity-100' : 'opacity-0'
+                                                }`}
+                                            >
+                                                {weeklyAttendanceTotalHours > 0 ? `${weeklyAttendanceTotalHours.toFixed(2)} hrs` : '--'}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tfoot>
                             </table>
                         </div>
                          {/* Mobile/Tablet Card View */}
@@ -1006,7 +1127,7 @@ const Attendance: React.FC<AttendanceProps> = ({ employees, setEmployees, attend
 
 
                                                     return (
-                                                        <div key={currentDayKey} className={dayClasses}>
+                                                <div key={`${emp.id}-${currentDayKey}`} className={dayClasses}>
                                                             <div className={`text-sm font-medium ${dateInfo.isToday ? 'text-text-primary' : 'text-text-secondary'}`}>
                                                                 {dateInfo.date.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })}
                                                                 <span className="ml-2 text-text-secondary/70">{dateInfo.date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', timeZone: 'UTC' })}</span>

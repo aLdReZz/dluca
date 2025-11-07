@@ -76,10 +76,22 @@ export interface Deductions {
     total: number;
 }
 
+export interface ServiceChargeDayDetail {
+    dateKey: string;
+    pool: number;
+    totalMinutes: number;
+    teamMinutes: number;
+    attendanceMinutes: number;
+    employeeMinutes: number;
+    share: number;
+    ghostMinutes: number;
+}
+
 export interface ServiceChargeBreakdown {
+    totalShare: number;
     totalPool: number;
     coveredDays: number;
-    deductionRate?: number;
+    details: ServiceChargeDayDetail[];
 }
 
 export interface PayrollRecord {

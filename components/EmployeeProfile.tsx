@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { Employee, AttendanceRecord, PayrollRecord, SalesData, ServiceChargeBreakdown } from '../types';
+import type { Employee, AttendanceRecord, PayrollRecord, SalesData } from '../types';
 import { 
     XMarkIcon, CreditCardIcon, PencilIcon, TrashIcon, 
     CalendarDaysIcon, CheckIcon
@@ -10,10 +10,8 @@ import PayslipModal from './PayslipModal';
 import {
     extractDateKey,
     extractServiceCharge,
-    SERVICE_CHARGE_DEDUCTION_RATE,
-    SERVICE_CHARGE_DISTRIBUTION_RATE,
-    SERVICE_CHARGE_VIRTUAL_MINUTES,
 } from '../utils/salesData';
+import { calculateServiceChargeDistribution } from '../utils/serviceChargeAllocation';
 
 interface EmployeeProfileProps {
     employee: Employee;
@@ -94,6 +92,18 @@ const formatTime12Hour = (timeStr: string): string => {
         return `${hours}:${minutesStr} ${ampm}`;
     }
     return timeStr;
+};
+
+const formatHoursLabel = (minutes: number) => {
+    if (!Number.isFinite(minutes)) return '--';
+    return `${(minutes / 60).toFixed(2)} hrs`;
+};
+
+const formatPeso = (amount: number) => {
+    return '₱' + (Number.isFinite(amount) ? amount : 0).toLocaleString('en-PH', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
 };
 
 const OVERTIME_RATE_MULTIPLIER = 1.5;
@@ -239,30 +249,43 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         return map;
     }, [salesData, committedRange]);
 
-    const computePaidMinutes = (emp: Employee, record: AttendanceRecord | undefined, dateKey: string) => {
-        const schedule = emp.schedule[dateKey];
-        if (!schedule || schedule.off || !schedule.timeIn || !schedule.timeOut) return 0;
-        if (!record || !record.timeIn || !record.timeOut) return 0;
+    const serviceChargeTotal = useMemo(
+        () => Object.values(serviceChargesByDate).reduce((sum, amount) => sum + amount, 0),
+        [serviceChargesByDate],
+    );
 
-        const actualIn = timeStringToMinutes(record.timeIn);
-        const actualOut = timeStringToMinutes(record.timeOut);
-        const scheduledIn = timeStringToMinutes(schedule.timeIn);
-        const scheduledOut = timeStringToMinutes(schedule.timeOut);
-
-        if (actualIn === null || actualOut === null || scheduledIn === null || scheduledOut === null) return 0;
-
-        const effectiveIn = Math.max(actualIn, scheduledIn);
-        const baseWorked = Math.max(0, Math.min(actualOut, scheduledOut) - effectiveIn);
-        const totalLogin = actualOut - actualIn;
-
-        let paidRegular = baseWorked;
-        if (totalLogin > 4 * 60) {
-            paidRegular = Math.max(0, baseWorked - 60);
+    const serviceChargeDistribution = useMemo(() => {
+        if (!committedRange.start || !committedRange.end) {
+            return { allocations: {}, dailyServiceChargeTotals: {}, dailyMinutes: {} };
         }
+        return calculateServiceChargeDistribution({
+            employees,
+            attendanceRecords,
+            salesData,
+            start: committedRange.start,
+            end: committedRange.end,
+            dailyServiceChargeTotals: serviceChargesByDate,
+        });
+    }, [employees, attendanceRecords, salesData, committedRange.start, committedRange.end, serviceChargesByDate]);
 
-        const approvedOTMinutes = emp.approvedOvertime?.[dateKey] || 0;
-        return Math.max(0, paidRegular) + Math.max(0, approvedOTMinutes);
-    };
+    const employeeServiceChargeBreakdown = useMemo(() => {
+        const allocation = serviceChargeDistribution.allocations[employee.id];
+        if (!allocation) return undefined;
+        const details = allocation.details
+            .map(detail => ({
+                ...detail,
+                share: Math.round(detail.share * 100) / 100,
+            }))
+            .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+        return {
+            ...allocation,
+            totalShare: Math.round(allocation.totalShare * 100) / 100,
+            details,
+        };
+    }, [serviceChargeDistribution, employee.id]);
+
+    const employeeServiceChargeShare = employeeServiceChargeBreakdown?.totalShare ?? 0;
+    const employeeServiceChargeDetails = employeeServiceChargeBreakdown?.details ?? [];
 
     const summary = useMemo(() => {
         let scheduled = 0, worked = 0, totalDelay = 0, absence = 0, approvedOT = 0, paidMinutes = 0, totalLoginMinutes = 0;
@@ -361,52 +384,11 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         
         const regularPay = totalRegularHours * employee.rate;
         const overtimePay = totalOvertimeHours * employee.rate * OVERTIME_RATE_MULTIPLIER;
-        const grossPay = regularPay + overtimePay;
+        const serviceChargeShare = employeeServiceChargeBreakdown?.totalShare ?? 0;
+        const grossPay = regularPay + overtimePay + serviceChargeShare;
         
         const deductions = { sss: 0, philhealth: 0, pagibig: 0, total: 0 };
         const netPay = grossPay - deductions.total;
-
-        const dailyWorkMinutes: Record<string, { total: number; employee: number }> = {};
-        dailyLog.forEach(log => {
-            const dateKey = log.date.toISOString().split('T')[0];
-            let minutes = 0;
-            if (log.worked > 0) {
-                minutes += log.worked;
-            }
-            if (log.overtime > 0) {
-                const approved = employee.approvedOvertime?.[dateKey];
-                if (typeof approved === 'number' && approved > 0) {
-                    minutes += approved;
-                } else if (!approved) {
-                    minutes += log.overtime;
-                }
-            }
-            if (minutes > 0) {
-                if (!dailyWorkMinutes[dateKey]) {
-                    dailyWorkMinutes[dateKey] = { total: minutes, employee: minutes };
-                } else {
-                    dailyWorkMinutes[dateKey].total += minutes;
-                    dailyWorkMinutes[dateKey].employee += minutes;
-                }
-            }
-        });
-
-        let creditedDays = 0;
-        const serviceChargeShare = Object.entries(dailyWorkMinutes).reduce((sum, [dateKey, info]) => {
-            const pool = serviceChargesByDate[dateKey];
-            if (!pool || info.total <= 0 || info.employee <= 0) {
-                return sum;
-            }
-            const distributable = Math.max(0, pool * SERVICE_CHARGE_DISTRIBUTION_RATE);
-            const denominator = info.total + SERVICE_CHARGE_VIRTUAL_MINUTES;
-            if (denominator <= 0) return sum;
-            creditedDays += 1;
-            return sum + (distributable * info.employee) / denominator;
-        }, 0);
-
-        const roundedServiceCharge = Math.round(serviceChargeShare * 100) / 100;
-        const grossWithService = grossPay + roundedServiceCharge;
-        const netWithService = grossWithService - deductions.total;
 
         const newRecord: PayrollRecord = {
             id: employee.id,
@@ -418,23 +400,16 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             totalHours: totalRegularHours + totalOvertimeHours,
             regularPay,
             overtimePay,
-            serviceCharge: roundedServiceCharge,
-            grossPay: grossWithService,
+            serviceCharge: serviceChargeShare,
+            grossPay,
             deductions,
-            netPay: netWithService,
+            netPay,
             daysPresent,
             daysAbsent,
             daysLate,
             deductionNotes: '',
             customDeduction: 0,
-            serviceChargeBreakdown:
-                roundedServiceCharge > 0
-                    ? {
-                          totalPool: roundedServiceCharge,
-                          coveredDays: creditedDays,
-                          deductionRate: SERVICE_CHARGE_DEDUCTION_RATE || undefined,
-                      }
-                    : undefined,
+            serviceChargeBreakdown: employeeServiceChargeBreakdown,
         };
         
         setPayslipRecord(newRecord);
@@ -514,7 +489,58 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                             </div>
                         </div>
 
-                        <div className="flex-1 p-4">
+                        <div className="flex-1 p-4 space-y-4">
+                            <div className="bg-bg-secondary border border-border-color rounded-xl p-4">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <h4 className="text-lg font-semibold text-text-primary">Service Charge Allocation</h4>
+                                        <p className="text-xs text-text-secondary">
+                                            {formatDateForDisplay(committedRange.start)} - {formatDateForDisplay(committedRange.end)}
+                                        </p>
+                                    </div>
+                                    <div className="flex flex-col text-right">
+                                        <p className="text-xs text-text-secondary uppercase tracking-wide">Pool Total</p>
+                                        <p className="text-xl font-bold text-text-primary">{formatPeso(serviceChargeTotal)}</p>
+                                    </div>
+                                    <div className="flex flex-col text-right">
+                                        <p className="text-xs text-text-secondary uppercase tracking-wide">Your Share</p>
+                                        <p className="text-xl font-bold text-accent-green">{formatPeso(employeeServiceChargeShare)}</p>
+                                    </div>
+                                </div>
+                                {employeeServiceChargeDetails.length > 0 ? (
+                                    <div className="mt-3 border border-border-color rounded-lg overflow-hidden">
+                                        <table className="w-full text-sm">
+                                            <thead className="bg-bg-tertiary/40 text-text-secondary text-xs uppercase tracking-wide">
+                                                <tr>
+                                                    <th className="p-2 text-left">Date</th>
+                                                    <th className="p-2 text-right">Paid Hrs</th>
+                                                    <th className="p-2 text-right">Ghost Hrs</th>
+                                                    <th className="p-2 text-right">Pool</th>
+                                                    <th className="p-2 text-right">Your Share</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-border-color/50">
+                                                {employeeServiceChargeDetails.map(detail => (
+                                                    <tr key={`${detail.dateKey}-${detail.share}`}>
+                                                        <td className="p-2">{formatDateForDisplay(detail.dateKey)}</td>
+                                                        <td className="p-2 text-right">{formatHoursLabel(detail.employeeMinutes)}</td>
+                                                        <td className="p-2 text-right">{formatHoursLabel(detail.ghostMinutes)}</td>
+                                                        <td className="p-2 text-right">{formatPeso(detail.pool)}</td>
+                                                        <td className="p-2 text-right font-semibold text-accent-green">
+                                                            {formatPeso(detail.share)}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <p className="mt-3 text-sm text-text-secondary">No service charge recorded for this employee in the selected range.</p>
+                                )}
+                                <p className="text-xs text-text-secondary mt-3">
+                                    Two ghost employees (12h each) are included in the team total each day to smooth allocations.
+                                </p>
+                            </div>
                             <div className="animate-fade-in-up">
                                 <div className="overflow-x-auto hidden md:block">
                                     <table className="w-full text-sm">
