@@ -85,6 +85,12 @@ export interface ServiceChargeDayDetail {
     employeeMinutes: number;
     share: number;
     ghostMinutes: number;
+    grossShare?: number;
+    deductionAmount?: number;
+    deductionRate?: number;
+    ghostShareTotal?: number;
+    ghostSharePerGhost?: number;
+    ghostCount?: number;
 }
 
 export interface ServiceChargeBreakdown {

@@ -427,7 +427,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                     </p>
                                 )}
                                 <p className="text-xs text-text-secondary mt-2">
-                                    Two ghost employees (12h each) are included in the total hours every day to smooth allocations.
+                                    Two ghost employees (12h each) are included in the total hours every day to smooth allocations. A 40% daily deduction is automatically applied before computing the share shown here.
                                 </p>
                             </div>
 
@@ -550,7 +550,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                             <div>
                                                 <p className="text-sm font-semibold text-text-primary">Daily Allocation Details</p>
                                                 <p className="text-[11px] text-text-secondary">
-                                                    Paid hrs ÷ (team hrs + 2 ghost employees @ 12h) × service pool
+                                                    Paid hrs ÷ (team hrs + 2 ghost employees @ 12h) × service pool × 60% (40% daily deduction)
                                                 </p>
                                             </div>
                                             <span className="text-sm font-semibold">{formattedServiceChargeTotal}</span>

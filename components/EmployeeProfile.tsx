@@ -538,7 +538,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                     <p className="mt-3 text-sm text-text-secondary">No service charge recorded for this employee in the selected range.</p>
                                 )}
                                 <p className="text-xs text-text-secondary mt-3">
-                                    Two ghost employees (12h each) are included in the team total each day to smooth allocations.
+                                    Two ghost employees (12h each) are included in the team total each day to smooth allocations. A 40% daily deduction is applied before the share shown here is credited.
                                 </p>
                             </div>
                             <div className="animate-fade-in-up">

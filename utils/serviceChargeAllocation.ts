@@ -6,6 +6,9 @@ const DEDUCTED_BREAK_MINUTES = 60;
 const GHOST_EMPLOYEE_COUNT = 2;
 const GHOST_EMPLOYEE_MINUTES = 12 * 60;
 const DAILY_GHOST_MINUTES = GHOST_EMPLOYEE_COUNT * GHOST_EMPLOYEE_MINUTES;
+const SERVICE_CHARGE_EMPLOYEE_DEDUCTION_MINUTES = 60;
+const SERVICE_CHARGE_DEDUCTION_RATE = 0.4;
+const SERVICE_CHARGE_PAYOUT_RATE = 1 - SERVICE_CHARGE_DEDUCTION_RATE;
 
 const timeStringToMinutes = (timeStr?: string): number | null => {
     if (!timeStr) return null;
@@ -189,10 +192,33 @@ export const calculateServiceChargeDistribution = ({
         for (const employee of employees) {
             const records = attendanceByEmployee[employee.name.trim().toLowerCase()] || [];
             const attendance = records.find(r => r.date === dateKey);
-            const minutes = computePaidMinutes(employee, attendance, dateKey);
-            if (minutes > 0) {
-                perDay.teamMinutes += minutes;
-                perDay.employeeMinutes[employee.id] = minutes;
+            let adjustedMinutes = 0;
+
+            if (attendance && attendance.timeIn && attendance.timeOut) {
+                let paidMinutes = computePaidMinutes(employee, attendance, dateKey);
+
+                const schedule = employee.schedule?.[dateKey];
+                if (schedule && schedule.timeIn) {
+                    const scheduledIn = timeStringToMinutes(schedule.timeIn);
+                    const actualIn = timeStringToMinutes(attendance.timeIn);
+                    if (
+                        scheduledIn !== null &&
+                        actualIn !== null &&
+                        actualIn > scheduledIn
+                    ) {
+                        paidMinutes = 0;
+                    }
+                }
+
+                adjustedMinutes = Math.max(
+                    0,
+                    paidMinutes - SERVICE_CHARGE_EMPLOYEE_DEDUCTION_MINUTES
+                );
+            }
+
+            if (adjustedMinutes > 0) {
+                perDay.teamMinutes += adjustedMinutes;
+                perDay.employeeMinutes[employee.id] = adjustedMinutes;
             }
 
             if (attendance && attendance.timeIn && attendance.timeOut) {
@@ -212,14 +238,28 @@ export const calculateServiceChargeDistribution = ({
             dailyMinutes[dateKey] = { ...perDay };
         }
 
-        if (!pool || pool <= 0 || Object.keys(perDay.employeeMinutes).length === 0) continue;
+        const employeeMinuteEntries = Object.entries(perDay.employeeMinutes);
+        if (
+            !pool ||
+            pool <= 0 ||
+            employeeMinuteEntries.length === 0 ||
+            perDay.teamMinutes <= 0
+        ) {
+            continue;
+        }
 
         rangeTotals[dateKey] = pool;
+        const employeeSharePool = pool * SERVICE_CHARGE_PAYOUT_RATE;
+        const ghostShareTotal = pool * SERVICE_CHARGE_DEDUCTION_RATE;
+        const ghostSharePerGhost =
+            GHOST_EMPLOYEE_COUNT > 0 ? ghostShareTotal / GHOST_EMPLOYEE_COUNT : 0;
 
-        for (const [employeeIdStr, minutes] of Object.entries(perDay.employeeMinutes)) {
+        for (const [employeeIdStr, minutes] of employeeMinuteEntries) {
             const employeeId = Number(employeeIdStr);
             if (minutes <= 0) continue;
-            const share = pool * (minutes / perDay.totalMinutes);
+            const rawShare = pool * (minutes / perDay.teamMinutes);
+            const share = employeeSharePool * (minutes / perDay.teamMinutes);
+            const deductionAmount = rawShare - share;
             const entry: ServiceChargeDayDetail = {
                 dateKey,
                 pool,
@@ -229,6 +269,12 @@ export const calculateServiceChargeDistribution = ({
                 employeeMinutes: minutes,
                 share,
                 ghostMinutes: perDay.ghostMinutes,
+                grossShare: rawShare,
+                deductionAmount,
+                deductionRate: SERVICE_CHARGE_DEDUCTION_RATE,
+                ghostShareTotal,
+                ghostSharePerGhost,
+                ghostCount: GHOST_EMPLOYEE_COUNT,
             };
             if (!allocations[employeeId]) {
                 allocations[employeeId] = {
