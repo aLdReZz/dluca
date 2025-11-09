@@ -18,6 +18,8 @@ interface PayrollProps {
     payrollRecords: PayrollRecord[];
     setPayrollRecords: React.Dispatch<React.SetStateAction<PayrollRecord[]>>;
     salesData: SalesData[];
+    manualPaidMinutes: Record<string, Record<number, number>>;
+    manualGhostMinutes: Record<string, number>;
 }
 
 const timeStringToMinutes = (timeStr: string): number | null => {
@@ -106,7 +108,7 @@ const SummaryCard: React.FC<{title: string, value: string, icon: React.FC<{class
 
 const OVERTIME_RATE_MULTIPLIER = 1.5;
 
-const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payrollRecords, setPayrollRecords, salesData }) => {
+const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payrollRecords, setPayrollRecords, salesData, manualPaidMinutes, manualGhostMinutes }) => {
     const [payPeriod, setPayPeriod] = useState(() => {
         const today = new Date();
         const start = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -265,6 +267,8 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
             start: payPeriod.start,
             end: payPeriod.end,
             dailyServiceChargeTotals: dailyServiceCharges,
+            manualPaidMinutes,
+            manualGhostMinutes,
         });
 
         const roundCurrency = (value: number) => Math.round(value * 100) / 100;

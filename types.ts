@@ -60,6 +60,7 @@ export interface Employee {
     phone?: string;
     email?: string;
     approvedOvertime?: { [dateKey: string]: number }; // in minutes
+    paidHoursOverride?: { [dateKey: string]: number };
 }
 
 export interface AttendanceRecord {

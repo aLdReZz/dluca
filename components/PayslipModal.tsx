@@ -393,6 +393,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                                 <th>Ghost Hrs</th>
                                                 <th>Attendance Hrs</th>
                                                 <th>Pool</th>
+                                                <th>Ghost Share</th>
                                                 <th>Share</th>
                                             </tr>
                                         </thead>
@@ -402,6 +403,11 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                                 const attendanceMinutes =
                                                     detail.attendanceMinutes ??
                                                     Math.max(0, detail.totalMinutes - ghostMinutes);
+                                                const ghostShareEach =
+                                                    detail.ghostSharePerGhost ??
+                                                    (detail.ghostShareTotal && detail.ghostCount
+                                                        ? detail.ghostShareTotal / detail.ghostCount
+                                                        : detail.ghostShareTotal ?? detail.deductionAmount ?? 0);
                                                 return (
                                                     <tr key={`${detail.dateKey}-${detail.share}`}>
                                                         <td>{formatDateForDisplay(detail.dateKey)}</td>
@@ -409,6 +415,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                                         <td>{formatHours(ghostMinutes)}</td>
                                                         <td>{formatHours(attendanceMinutes)}</td>
                                                         <td className="text-right">{formatPeso(detail.pool)}</td>
+                                                        <td className="text-right">{formatPeso(ghostShareEach)}</td>
                                                         <td className="text-right">{formatPeso(detail.share)}</td>
                                                     </tr>
                                                 );
@@ -416,7 +423,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                         </tbody>
                                         <tfoot>
                                             <tr>
-                                                <th colSpan={5}>Total Service Charge</th>
+                                                <th colSpan={6}>Total Service Charge</th>
                                                 <th className="text-right">{formattedServiceChargeTotal}</th>
                                             </tr>
                                         </tfoot>
@@ -427,7 +434,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                     </p>
                                 )}
                                 <p className="text-xs text-text-secondary mt-2">
-                                    Two ghost employees (12h each) are included in the total hours every day to smooth allocations. A 40% daily deduction is automatically applied before computing the share shown here.
+                                    Two ghost employees (12h each) are included each day to smooth allocations. Staff split 40% of the pool based on adjusted paid hours, and the remaining 60% is divided equally between the two ghost employees (shown in the Ghost Share column).
                                 </p>
                             </div>
 
@@ -550,19 +557,20 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                             <div>
                                                 <p className="text-sm font-semibold text-text-primary">Daily Allocation Details</p>
                                                 <p className="text-[11px] text-text-secondary">
-                                                    Paid hrs Ã· (team hrs + 2 ghost employees @ 12h) Ã— service pool Ã— 60% (40% daily deduction)
+                                                    Paid hrs ÷ adjusted team hrs × (service pool × 60%). The other 40% is split equally between 2 ghost employees (12h each).
                                                 </p>
                                             </div>
                                             <span className="text-sm font-semibold">{formattedServiceChargeTotal}</span>
                                         </div>
                                         {serviceChargeDetails.length > 0 ? (
                                             <div className="mt-2 space-y-1 text-xs text-text-secondary">
-                                                <div className="grid grid-cols-6 gap-2 font-semibold text-[11px] uppercase tracking-wide text-text-secondary/70">
+                                                <div className="grid grid-cols-7 gap-2 font-semibold text-[11px] uppercase tracking-wide text-text-secondary/70">
                                                     <span>Date</span>
                                                     <span className="text-right">Paid</span>
                                                     <span className="text-right">Ghost</span>
                                                     <span className="text-right">Attendance</span>
                                                     <span className="text-right">Pool</span>
+                                                    <span className="text-right">Ghost Share</span>
                                                     <span className="text-right">Share</span>
                                                 </div>
                                                 {serviceChargeDetails.map(detail => {
@@ -570,13 +578,19 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                                     const attendanceMinutes =
                                                         detail.attendanceMinutes ??
                                                         Math.max(0, detail.totalMinutes - ghostMinutes);
+                                                    const ghostShareEach =
+                                                        detail.ghostSharePerGhost ??
+                                                        (detail.ghostShareTotal && detail.ghostCount
+                                                            ? detail.ghostShareTotal / detail.ghostCount
+                                                            : detail.ghostShareTotal ?? detail.deductionAmount ?? 0);
                                                     return (
-                                                        <div key={`${detail.dateKey}-${detail.share}`} className="grid grid-cols-6 gap-2">
+                                                        <div key={`${detail.dateKey}-${detail.share}`} className="grid grid-cols-7 gap-2">
                                                             <span>{formatDateForDisplay(detail.dateKey)}</span>
                                                             <span className="text-right">{formatHours(detail.employeeMinutes)}</span>
                                                             <span className="text-right">{formatHours(ghostMinutes)}</span>
                                                             <span className="text-right">{formatHours(attendanceMinutes)}</span>
                                                             <span className="text-right">{formatPeso(detail.pool)}</span>
+                                                            <span className="text-right">{formatPeso(ghostShareEach)}</span>
                                                             <span className="text-right text-accent-green font-semibold">{formatPeso(detail.share)}</span>
                                                         </div>
                                                     );

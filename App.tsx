@@ -245,6 +245,8 @@ const App: React.FC = () => {
     ]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+    const [manualPaidMinutes, setManualPaidMinutes] = useState<Record<string, Record<number, number>>>({});
+    const [manualGhostMinutes, setManualGhostMinutes] = useState<Record<string, number>>({});
     const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>([]);
     const [recipeCostings, setRecipeCostings] = useState<RecipeCosting[]>(initialRecipeCostings);
     const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
@@ -287,6 +289,8 @@ const App: React.FC = () => {
             setEmployees(data.employees || []);
             setAttendanceRecords(data.attendanceRecords || []);
             setPayrollRecords(data.payrollRecords || []);
+            setManualPaidMinutes(data.manualPaidMinutes || {});
+            setManualGhostMinutes(data.manualGhostMinutes || {});
             setRecipeCostings(data.recipeCostings || initialRecipeCostings);
             setCalendarEvents(data.calendarEvents || []);
         } else {
@@ -304,10 +308,12 @@ const App: React.FC = () => {
             attendanceRecords,
             payrollRecords,
             recipeCostings,
-            calendarEvents
+            calendarEvents,
+            manualPaidMinutes,
+            manualGhostMinutes,
         };
         localStorage.setItem('cafeManagementData', JSON.stringify(dataToSave));
-    }, [salesData, inventoryItems, productInventoryItems, purchaseOrders, employees, attendanceRecords, payrollRecords, recipeCostings, calendarEvents]);
+    }, [salesData, inventoryItems, productInventoryItems, purchaseOrders, employees, attendanceRecords, payrollRecords, recipeCostings, calendarEvents, manualPaidMinutes, manualGhostMinutes]);
 
     useEffect(() => {
         loadData();
@@ -454,15 +460,30 @@ const App: React.FC = () => {
             case 'costing':
                 return <Costing recipeCostings={recipeCostings} setRecipeCostings={setRecipeCostings} productInventoryItems={productInventoryItems} />;
             case 'attendance':
-                return <Attendance employees={employees} setEmployees={setEmployees} attendanceRecords={attendanceRecords} setAttendanceRecords={setAttendanceRecords} setPayrollRecords={setPayrollRecords} salesData={salesData} />;
+                return (
+                    <Attendance
+                        employees={employees}
+                        setEmployees={setEmployees}
+                        attendanceRecords={attendanceRecords}
+                        setAttendanceRecords={setAttendanceRecords}
+                        setPayrollRecords={setPayrollRecords}
+                        salesData={salesData}
+                        setManualPaidMinutes={setManualPaidMinutes}
+                        setManualGhostMinutes={setManualGhostMinutes}
+                    />
+                );
             case 'payroll':
-                return <Payroll 
-                            employees={employees}
-                            attendanceRecords={attendanceRecords}
-                            payrollRecords={payrollRecords} 
-                            setPayrollRecords={setPayrollRecords} 
-                            salesData={salesData}
-                        />;
+                return (
+                    <Payroll
+                        employees={employees}
+                        attendanceRecords={attendanceRecords}
+                        payrollRecords={payrollRecords}
+                        setPayrollRecords={setPayrollRecords}
+                        salesData={salesData}
+                        manualPaidMinutes={manualPaidMinutes}
+                        manualGhostMinutes={manualGhostMinutes}
+                    />
+                );
             case 'calendar':
                 return <Calendar events={calendarEvents} setEvents={setCalendarEvents} />;
             default:

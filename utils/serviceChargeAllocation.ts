@@ -1,13 +1,10 @@
-import type { AttendanceRecord, Employee, SalesData, ServiceChargeBreakdown, ServiceChargeDayDetail } from '../types';
+import type { AttendanceRecord, Employee, SalesData, Schedule, ServiceChargeBreakdown, ServiceChargeDayDetail } from '../types';
 import { extractDateKey, extractServiceCharge, parseNumericValue } from './salesData';
 
-const BREAK_THRESHOLD_MINUTES = 4 * 60;
-const DEDUCTED_BREAK_MINUTES = 60;
 const GHOST_EMPLOYEE_COUNT = 2;
 const GHOST_EMPLOYEE_MINUTES = 12 * 60;
 const DAILY_GHOST_MINUTES = GHOST_EMPLOYEE_COUNT * GHOST_EMPLOYEE_MINUTES;
-const SERVICE_CHARGE_EMPLOYEE_DEDUCTION_MINUTES = 60;
-const SERVICE_CHARGE_DEDUCTION_RATE = 0.4;
+const SERVICE_CHARGE_DEDUCTION_RATE = 0.6;
 const SERVICE_CHARGE_PAYOUT_RATE = 1 - SERVICE_CHARGE_DEDUCTION_RATE;
 
 const timeStringToMinutes = (timeStr?: string): number | null => {
@@ -87,6 +84,41 @@ const computePaidMinutes = (
     return Math.max(0, paidRegular);
 };
 
+const computeLoginMinutes = (
+    schedule?: Schedule,
+    attendance?: AttendanceRecord,
+): number => {
+    if (!schedule || schedule.off || !schedule.timeIn || !schedule.timeOut) return 0;
+    if (!attendance || !attendance.timeIn || !attendance.timeOut) return 0;
+
+    const scheduledIn = timeStringToMinutes(schedule.timeIn);
+    const scheduledOut = timeStringToMinutes(schedule.timeOut);
+    const actualIn = timeStringToMinutes(attendance.timeIn);
+    const actualOut = timeStringToMinutes(attendance.timeOut);
+
+    if (
+        scheduledIn === null ||
+        scheduledOut === null ||
+        actualIn === null ||
+        actualOut === null ||
+        actualOut <= actualIn
+    ) {
+        return 0;
+    }
+
+    const effectiveIn = Math.max(actualIn, scheduledIn);
+    const worked = Math.max(0, Math.min(actualOut, scheduledOut) - effectiveIn);
+    return worked;
+};
+
+const computeRawLoginMinutes = (attendance?: AttendanceRecord): number => {
+    if (!attendance || !attendance.timeIn || !attendance.timeOut) return 0;
+    const actualIn = timeStringToMinutes(attendance.timeIn);
+    const actualOut = timeStringToMinutes(attendance.timeOut);
+    if (actualIn === null || actualOut === null || actualOut <= actualIn) return 0;
+    return actualOut - actualIn;
+};
+
 export interface DistributionInput {
     employees: Employee[];
     attendanceRecords: AttendanceRecord[];
@@ -94,6 +126,8 @@ export interface DistributionInput {
     start: string;
     end: string;
     dailyServiceChargeTotals?: Record<string, number>;
+    manualPaidMinutes?: Record<string, Record<number, number>>;
+    manualGhostMinutes?: Record<string, number>;
 }
 
 export interface ServiceChargeDistributionResult {
@@ -142,6 +176,8 @@ export const calculateServiceChargeDistribution = ({
     start,
     end,
     dailyServiceChargeTotals,
+    manualPaidMinutes,
+    manualGhostMinutes,
 }: DistributionInput): ServiceChargeDistributionResult => {
     if (!start || !end) {
         return {
@@ -189,76 +225,83 @@ export const calculateServiceChargeDistribution = ({
             ghostMinutes: 0,
         };
 
-        for (const employee of employees) {
-            const records = attendanceByEmployee[employee.name.trim().toLowerCase()] || [];
-            const attendance = records.find(r => r.date === dateKey);
-            let adjustedMinutes = 0;
+        const manualEntriesForDate = manualPaidMinutes?.[dateKey];
+        const usingManual = manualEntriesForDate && Object.keys(manualEntriesForDate).length > 0;
 
-            if (attendance && attendance.timeIn && attendance.timeOut) {
-                let paidMinutes = computePaidMinutes(employee, attendance, dateKey);
-
-                const schedule = employee.schedule?.[dateKey];
-                if (schedule && schedule.timeIn) {
-                    const scheduledIn = timeStringToMinutes(schedule.timeIn);
-                    const actualIn = timeStringToMinutes(attendance.timeIn);
-                    if (
-                        scheduledIn !== null &&
-                        actualIn !== null &&
-                        actualIn > scheduledIn
-                    ) {
-                        paidMinutes = 0;
-                    }
+        if (usingManual) {
+            for (const employee of employees) {
+                const minutes = manualEntriesForDate?.[employee.id] ?? 0;
+                if (minutes !== 0) {
+                    perDay.teamMinutes += minutes;
+                    perDay.employeeMinutes[employee.id] = minutes;
+                } else {
+                    perDay.employeeMinutes[employee.id] = 0;
                 }
-
-                adjustedMinutes = Math.max(
-                    0,
-                    paidMinutes - SERVICE_CHARGE_EMPLOYEE_DEDUCTION_MINUTES
-                );
-            }
-
-            if (adjustedMinutes > 0) {
-                perDay.teamMinutes += adjustedMinutes;
-                perDay.employeeMinutes[employee.id] = adjustedMinutes;
-            }
-
-            if (attendance && attendance.timeIn && attendance.timeOut) {
-                const rawIn = timeStringToMinutes(attendance.timeIn);
-                const rawOut = timeStringToMinutes(attendance.timeOut);
-                if (rawIn !== null && rawOut !== null && rawOut > rawIn) {
-                    perDay.attendanceMinutes += rawOut - rawIn;
+                if (minutes > 0) {
+                    perDay.attendanceMinutes += minutes;
                 }
             }
-        }
-
-        if (perDay.teamMinutes > 0) {
-            perDay.ghostMinutes = DAILY_GHOST_MINUTES;
-            perDay.totalMinutes = perDay.teamMinutes + perDay.ghostMinutes;
-            dailyMinutes[dateKey] = perDay;
         } else {
-            dailyMinutes[dateKey] = { ...perDay };
+            for (const employee of employees) {
+                const records = attendanceByEmployee[employee.name.trim().toLowerCase()] || [];
+                const attendance = records.find(r => r.date === dateKey);
+                const schedule = employee.schedule?.[dateKey];
+                const loginMinutes = computeLoginMinutes(schedule, attendance);
+                const rawMinutes = computeRawLoginMinutes(attendance);
+                let adjustedMinutes = 0;
+
+                if (loginMinutes > 0) {
+                    adjustedMinutes = loginMinutes;
+                } else if (rawMinutes > 0) {
+                    adjustedMinutes = rawMinutes;
+                }
+
+                if (adjustedMinutes !== 0) {
+                    perDay.teamMinutes += adjustedMinutes;
+                    perDay.employeeMinutes[employee.id] = adjustedMinutes;
+                }
+
+                if (rawMinutes > 0) {
+                    perDay.attendanceMinutes += rawMinutes;
+                }
+            }
         }
+
+        if (Object.keys(perDay.employeeMinutes).length > 0) {
+            if (usingManual && manualGhostMinutes?.[dateKey] !== undefined) {
+                perDay.ghostMinutes = manualGhostMinutes[dateKey];
+            } else {
+                perDay.ghostMinutes = DAILY_GHOST_MINUTES;
+            }
+            perDay.totalMinutes = perDay.teamMinutes + perDay.ghostMinutes;
+        } else {
+            perDay.totalMinutes = perDay.teamMinutes;
+        }
+        dailyMinutes[dateKey] = perDay;
 
         const employeeMinuteEntries = Object.entries(perDay.employeeMinutes);
+        const totalMinutes = perDay.totalMinutes;
         if (
             !pool ||
             pool <= 0 ||
             employeeMinuteEntries.length === 0 ||
-            perDay.teamMinutes <= 0
+            totalMinutes <= 0
         ) {
             continue;
         }
 
         rangeTotals[dateKey] = pool;
         const employeeSharePool = pool * SERVICE_CHARGE_PAYOUT_RATE;
-        const ghostShareTotal = pool * SERVICE_CHARGE_DEDUCTION_RATE;
+        const ghostMinutesShare =
+            totalMinutes > 0 ? employeeSharePool * (perDay.ghostMinutes / totalMinutes) : 0;
+        const ghostShareTotal = pool * SERVICE_CHARGE_DEDUCTION_RATE + ghostMinutesShare;
         const ghostSharePerGhost =
-            GHOST_EMPLOYEE_COUNT > 0 ? ghostShareTotal / GHOST_EMPLOYEE_COUNT : 0;
+            GHOST_EMPLOYEE_COUNT > 0 ? ghostShareTotal / GHOST_EMPLOYEE_COUNT : ghostShareTotal;
 
         for (const [employeeIdStr, minutes] of employeeMinuteEntries) {
             const employeeId = Number(employeeIdStr);
-            if (minutes <= 0) continue;
-            const rawShare = pool * (minutes / perDay.teamMinutes);
-            const share = employeeSharePool * (minutes / perDay.teamMinutes);
+            const rawShare = pool * (minutes / totalMinutes);
+            const share = employeeSharePool * (minutes / totalMinutes);
             const deductionAmount = rawShare - share;
             const entry: ServiceChargeDayDetail = {
                 dateKey,

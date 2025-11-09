@@ -5,6 +5,7 @@ import { UploadIcon, CalendarDaysIcon, PencilSquareIcon, ChevronLeftIcon, Chevro
 import EmployeeProfile from '../components/EmployeeProfile';
 import ScheduleEditModal from '../components/ScheduleEditModal';
 import AttendanceEditModal from '../components/AttendanceEditModal';
+import { parsePaidHoursCsv, mapPaidHoursToEmployees, parseCsvText } from '../utils/paidHours';
 
 interface AttendanceProps {
     employees: Employee[];
@@ -13,6 +14,8 @@ interface AttendanceProps {
     setAttendanceRecords: React.Dispatch<React.SetStateAction<AttendanceRecord[]>>;
     setPayrollRecords: React.Dispatch<React.SetStateAction<PayrollRecord[]>>;
     salesData: SalesData[];
+    setManualPaidMinutes: React.Dispatch<React.SetStateAction<Record<string, Record<number, number>>>>;
+    setManualGhostMinutes: React.Dispatch<React.SetStateAction<Record<string, number>>>;
 }
 
 const StatusTag: React.FC<{text: string, type: 'off' | 'absent'}> = ({text, type}) => {
@@ -107,7 +110,16 @@ const DatePickerPopup: React.FC<{
 };
 
 
-const Attendance: React.FC<AttendanceProps> = ({ employees, setEmployees, attendanceRecords, setAttendanceRecords, setPayrollRecords, salesData }) => {
+const Attendance: React.FC<AttendanceProps> = ({
+    employees,
+    setEmployees,
+    attendanceRecords,
+    setAttendanceRecords,
+    setPayrollRecords,
+    salesData,
+    setManualPaidMinutes,
+    setManualGhostMinutes,
+}) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalType, setModalType] = useState<'add' | 'edit'>('add');
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -546,6 +558,38 @@ const Attendance: React.FC<AttendanceProps> = ({ employees, setEmployees, attend
         alert(`${newRecords.length} attendance records have been successfully imported.`);
     };
 
+    const handlePaidHoursUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            const text = e.target?.result;
+            if (typeof text === 'string') {
+                parsePaidHoursCSV(text);
+            }
+            event.target.value = '';
+        };
+        reader.readAsText(file);
+    };
+
+    const parsePaidHoursCSV = (csvText: string) => {
+        const parsed = parsePaidHoursCsv(csvText);
+        if (Object.keys(parsed.paidMinutesByDate).length === 0) {
+            alert('No paid hours data found in the CSV.');
+            return;
+        }
+        const { manualPaidMinutes: mappedPaid, manualGhostMinutes: mappedGhost } = mapPaidHoursToEmployees(parsed, employees);
+        setManualPaidMinutes(mappedPaid);
+        setManualGhostMinutes(mappedGhost);
+        alert(`Paid hours imported for ${Object.keys(mappedPaid).length} days.`);
+    };
+
+    const clearManualPaidHours = () => {
+        setManualPaidMinutes({});
+        setManualGhostMinutes({});
+        alert('Paid hours overrides cleared.');
+    };
+
     const formatTimeForDisplay = (time: string) => {
         if (!time) return 'Not Set';
         const [hours, minutes] = time.split(':');
@@ -907,6 +951,14 @@ const Attendance: React.FC<AttendanceProps> = ({ employees, setEmployees, attend
                             Upload Attendance
                         </label>
                         <input type="file" id="attendance-csv-input" accept=".csv" className="hidden" onChange={handleAttendanceUpload} />
+                        <label htmlFor="paid-hours-csv-input" className="cursor-pointer bg-bg-tertiary text-text-primary px-3 py-2 rounded-lg font-medium text-sm hover:bg-hover-bg transition flex items-center gap-2">
+                            <UploadIcon className="w-5 h-5"/>
+                            Upload Paid Hours
+                        </label>
+                        <input type="file" id="paid-hours-csv-input" accept=".csv" className="hidden" onChange={handlePaidHoursUpload} />
+                        <button onClick={clearManualPaidHours} className="bg-bg-tertiary text-text-secondary px-3 py-2 rounded-lg font-medium text-sm border border-border-color hover:bg-hover-bg transition">
+                            Clear Paid Hours
+                        </button>
                          {isAttendanceLocked ? (
                             <button onClick={() => setIsAttendanceLocked(false)} className="bg-accent-orange text-white px-4 py-2 rounded-lg font-medium text-sm hover:bg-opacity-90 transition flex items-center gap-2">
                                 <PencilSquareIcon className="w-5 h-5"/>

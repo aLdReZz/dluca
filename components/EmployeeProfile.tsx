@@ -326,11 +326,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             worked += log.worked;
             approvedOT += approvedOtForDay;
             
-            let dailyPaidRegularMinutes = log.worked;
-            if (totalDailyLoginDuration > 4 * 60) { // > 4 hours
-                dailyPaidRegularMinutes = Math.max(0, log.worked - 60); // deduct 1 hour break from worked hours
-            }
-            paidMinutes += dailyPaidRegularMinutes;
+            paidMinutes += totalDailyLoginDuration;
             
             if (log.status === 'Absent' && log.scheduled !== 'N/A') absence++;
         });
@@ -516,6 +512,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                                     <th className="p-2 text-right">Paid Hrs</th>
                                                     <th className="p-2 text-right">Ghost Hrs</th>
                                                     <th className="p-2 text-right">Pool</th>
+                                                    <th className="p-2 text-right">Ghost Share</th>
                                                     <th className="p-2 text-right">Your Share</th>
                                                 </tr>
                                             </thead>
@@ -526,6 +523,14 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                                         <td className="p-2 text-right">{formatHoursLabel(detail.employeeMinutes)}</td>
                                                         <td className="p-2 text-right">{formatHoursLabel(detail.ghostMinutes)}</td>
                                                         <td className="p-2 text-right">{formatPeso(detail.pool)}</td>
+                                                        <td className="p-2 text-right">
+                                                            {formatPeso(
+                                                                detail.ghostSharePerGhost ??
+                                                                    (detail.ghostShareTotal && detail.ghostCount
+                                                                        ? detail.ghostShareTotal / detail.ghostCount
+                                                                        : detail.ghostShareTotal ?? detail.deductionAmount ?? 0),
+                                                            )}
+                                                        </td>
                                                         <td className="p-2 text-right font-semibold text-accent-green">
                                                             {formatPeso(detail.share)}
                                                         </td>
@@ -538,7 +543,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                     <p className="mt-3 text-sm text-text-secondary">No service charge recorded for this employee in the selected range.</p>
                                 )}
                                 <p className="text-xs text-text-secondary mt-3">
-                                    Two ghost employees (12h each) are included in the team total each day to smooth allocations. A 40% daily deduction is applied before the share shown here is credited.
+                                    Two ghost employees (12h each) are included in the team total each day to smooth allocations. Staff split 40% of the pool based on adjusted paid hours, while the remaining 60% is divided equally between the ghost employees (see Ghost Share).
                                 </p>
                             </div>
                             <div className="animate-fade-in-up">

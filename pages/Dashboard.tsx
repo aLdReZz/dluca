@@ -130,8 +130,8 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
             return sum + parseNumericValue(value);
         }, 0);
 
-        const employeeShare = totalServiceCharge * 0.8;
-        const ghostShare = totalServiceCharge * 0.2;
+        const employeeShare = totalServiceCharge * 0.4;
+        const ghostShare = totalServiceCharge * 0.6;
         const netSales = Math.max(totalGrossSales - totalServiceCharge, 0);
 
         setStats({
