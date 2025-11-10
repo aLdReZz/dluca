@@ -59,6 +59,9 @@ export interface Employee {
     schedule: { [dateKey: string]: Schedule };
     phone?: string;
     email?: string;
+    department?: string;
+    bankAccount?: string;
+    paymentMode?: string;
     approvedOvertime?: { [dateKey: string]: number }; // in minutes
     paidHoursOverride?: { [dateKey: string]: number };
 }
@@ -105,6 +108,9 @@ export interface PayrollRecord {
     id: number;
     employee: string;
     position: string;
+    department?: string;
+    bankAccount?: string;
+    paymentMode?: string;
     rate: number;
     regularHours: number;
     overtimeHours: number;

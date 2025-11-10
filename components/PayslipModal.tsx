@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { PayrollRecord } from '../types';
 import { XMarkIcon, PrinterIcon, InformationCircleIcon } from './Icons';
+import { generatePayslipPdf, type PayslipPdfData } from '../utils/payslipPdf';
 
 interface PayslipModalProps {
     record: PayrollRecord;
@@ -49,6 +50,46 @@ const formatDateMonthYear = (dateString?: string) => {
         timeZone: 'UTC',
     });
 };
+const formatDateShort = (dateString?: string) => {
+
+    if (!dateString) return null;
+
+    const date = new Date(dateString + 'T00:00:00Z');
+
+    if (Number.isNaN(date.getTime())) return null;
+
+    return date.toLocaleDateString('en-US', {
+
+        month: 'short',
+
+        day: 'numeric',
+
+        timeZone: 'UTC',
+
+    });
+
+};
+
+
+
+
+const formatDateShortFromDate = (date: Date) => {
+
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
+
+    return date.toLocaleDateString('en-US', {
+
+        month: 'short',
+
+        day: 'numeric',
+
+        timeZone: 'UTC',
+
+    });
+
+};
+
+
 
 const formatHours = (minutes: number) => {
     if (!Number.isFinite(minutes)) return '--';
@@ -68,6 +109,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
         (record.customDeduction ?? 0) > 0,
     );
     const [isPrinting, setIsPrinting] = useState(false);
+    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
     const afterPrintHandlerRef = useRef<(() => void) | null>(null);
     const trimmedDeductionNotes = deductionNotes.trim();
 
@@ -175,10 +217,34 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
         }, 50);
     };
 
+    const handleExportTemplate = async () => {
+        setIsGeneratingPdf(true);
+        try {
+            const pdfPayload = buildPayslipPdfData();
+
+            await generatePayslipPdf(pdfPayload);
+        } catch (error) {
+            console.error('Failed to export template PDF', error);
+            alert('Unable to export the official PDF template. Please try again.');
+        } finally {
+            setIsGeneratingPdf(false);
+        }
+    };
+
     const coverageLabel = formatDateMonthYear(payPeriod.end);
     const payDateLabel = formatDateLong(payPeriod.end);
     const payPeriodRangeLabel = `${formatDateLong(payPeriod.start)} - ${formatDateLong(payPeriod.end)}`;
     const printableCoverageLabel = coverageLabel !== 'N/A' ? coverageLabel : payPeriodRangeLabel;
+    const shortStartLabel = formatDateShort(payPeriod.start);
+
+    const shortEndLabel = formatDateShort(payPeriod.end);
+
+    const payPeriodRangeShortLabel =
+
+        shortStartLabel && shortEndLabel ? `${shortStartLabel} - ${shortEndLabel}` : payPeriodRangeLabel;
+
+    const payDateExportLabel = formatDateShortFromDate(new Date());
+
     const customDeductionValue = Math.max(0, customDeduction);
     const serviceChargeDetails = useMemo(() => {
         const details = record.serviceChargeBreakdown?.details ?? [];
@@ -220,16 +286,55 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
         ],
     );
 
+    const getInfoValue = (value?: string | null) => {
+        if (!value) return 'N/A';
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : 'N/A';
+    };
     const mandatoryDeductionsTotal = record.deductions.total;
     const combinedDeductions = mandatoryDeductionsTotal + customDeductionValue;
     const formattedGrossPay = formatPeso(grossPay);
     const formattedNetPay = formatPeso(netPay);
     const formattedMandatoryDeductions = formatPeso(mandatoryDeductionsTotal);
     const formattedCombinedDeductions = formatPeso(combinedDeductions);
-    const bankAccountLabel = 'N/A';
-    const paymentModeLabel = 'N/A';
-    const departmentLabel = 'N/A';
+    const bankAccountLabel = getInfoValue(record.bankAccount);
+    const paymentModeLabel = getInfoValue(record.paymentMode);
+    const departmentLabel = getInfoValue(record.department);
     const designationLabel = record.position || 'N/A';
+
+    const buildPayslipPdfData = (): PayslipPdfData => ({
+
+        companyName: "D'Luca Bistro X Cafe",
+
+        companyAddress: '123 Anywhere St., Any City, ST 12345',
+
+        employeeName: record.employee,
+
+        department: departmentLabel,
+
+        designation: designationLabel,
+
+        payCoverage: payPeriodRangeShortLabel,
+
+        payDate: payDateExportLabel,
+
+        bankAccount: bankAccountLabel,
+
+        paymentMode: paymentModeLabel,
+
+        earnings: earningsRows.map(row => ({ description: row.label, amount: row.amount })),
+
+        deductions: deductionRows.map(row => ({ description: row.label, amount: row.amount })),
+
+        totalEarnings: grossPay,
+
+        totalDeductions: combinedDeductions,
+
+        netSalary: netPay,
+
+    });
+
+
 
     const DetailRow: React.FC<{
         label: string;
@@ -695,21 +800,29 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                         </div>
                     </div>
                 </div>
-                <div className="p-4 bg-bg-tertiary/50 border-t border-border-color flex justify-end items-center gap-4 rounded-b-2xl no-print">
-                    <div className="relative group flex items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={handlePrint}
-                            disabled={isPrinting}
-                            className="px-4 py-2 rounded-lg font-medium text-sm bg-bg-tertiary hover:bg-hover-bg transition flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-                            aria-busy={isPrinting}
-                        >
-                            <PrinterIcon className="w-5 h-5" /> Print / Export
-                        </button>
-                    </div>
+                <div className="p-4 bg-bg-tertiary/50 border-t border-border-color flex flex-wrap justify-end items-center gap-3 rounded-b-2xl no-print">
                     <button
+                        type="button"
+                        onClick={handleExportTemplate}
+                        disabled={isGeneratingPdf}
+                        className="px-4 py-2 rounded-lg font-semibold text-sm bg-accent-blue text-white hover:bg-opacity-80 transition flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                        aria-busy={isGeneratingPdf}
+                    >
+                        <PrinterIcon className="w-5 h-5" /> {isGeneratingPdf ? 'Generating PDF...' : 'Export Official PDF'}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handlePrint}
+                        disabled={isPrinting}
+                        className="px-4 py-2 rounded-lg font-medium text-sm bg-bg-tertiary hover:bg-hover-bg transition flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                        aria-busy={isPrinting}
+                    >
+                        <PrinterIcon className="w-5 h-5" /> Print Current View
+                    </button>
+                    <button
+                        type="button"
                         onClick={handleSave}
-                        className="px-4 py-2 rounded-lg font-semibold bg-accent-blue text-white hover:bg-opacity-80 transition"
+                        className="px-4 py-2 rounded-lg font-semibold bg-bg-primary border border-border-color text-text-primary hover:bg-bg-secondary transition"
                     >
                         Save & Close
                     </button>

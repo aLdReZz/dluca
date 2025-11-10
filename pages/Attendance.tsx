@@ -124,7 +124,17 @@ const Attendance: React.FC<AttendanceProps> = ({
     const [modalType, setModalType] = useState<'add' | 'edit'>('add');
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
     const [viewedEmployee, setViewedEmployee] = useState<Employee | null>(null);
-    const [formData, setFormData] = useState({ id: 0, name: '', position: '', rate: '', phone: '', email: '' });
+    const [formData, setFormData] = useState({
+        id: 0,
+        name: '',
+        position: '',
+        department: '',
+        rate: '',
+        phone: '',
+        email: '',
+        bankAccount: '',
+        paymentMode: '',
+    });
     const [isScheduleLocked, setIsScheduleLocked] = useState(true);
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
     const [isScheduleTotalHrsVisible, setScheduleTotalHrsVisible] = useState(false);
@@ -258,14 +268,34 @@ const Attendance: React.FC<AttendanceProps> = ({
     const openAddModal = () => {
         setModalType('add');
         setSelectedEmployee(null);
-        setFormData({ id: 0, name: '', position: '', rate: '', phone: '', email: '' });
+        setFormData({
+            id: 0,
+            name: '',
+            position: '',
+            department: '',
+            rate: '',
+            phone: '',
+            email: '',
+            bankAccount: '',
+            paymentMode: '',
+        });
         setIsModalOpen(true);
     };
 
     const openEditModal = (employee: Employee) => {
         setModalType('edit');
         setSelectedEmployee(employee);
-        setFormData({ id: employee.id, name: employee.name, position: employee.position, rate: String(employee.rate), phone: employee.phone || '', email: employee.email || '' });
+        setFormData({
+            id: employee.id,
+            name: employee.name,
+            position: employee.position,
+            department: employee.department || '',
+            rate: String(employee.rate),
+            phone: employee.phone || '',
+            email: employee.email || '',
+            bankAccount: employee.bankAccount || '',
+            paymentMode: employee.paymentMode || '',
+        });
         setIsModalOpen(true);
     };
 
@@ -285,17 +315,30 @@ const Attendance: React.FC<AttendanceProps> = ({
                     id: Date.now(),
                     name: formData.name,
                     position: formData.position,
+                    department: formData.department,
                     rate: parseFloat(formData.rate) || 0,
                     schedule: {},
                     phone: formData.phone,
                     email: formData.email,
+                    bankAccount: formData.bankAccount,
+                    paymentMode: formData.paymentMode,
                 },
             ]);
         } else if (selectedEmployee) {
             setEmployees(
                 employees.map(emp =>
                     emp.id === selectedEmployee.id
-                        ? { ...emp, name: formData.name, position: formData.position, rate: parseFloat(formData.rate) || 0, phone: formData.phone, email: formData.email }
+                        ? {
+                              ...emp,
+                              name: formData.name,
+                              position: formData.position,
+                              department: formData.department,
+                              rate: parseFloat(formData.rate) || 0,
+                              phone: formData.phone,
+                              email: formData.email,
+                              bankAccount: formData.bankAccount,
+                              paymentMode: formData.paymentMode,
+                          }
                         : emp
                 )
             );
@@ -1224,19 +1267,35 @@ const Attendance: React.FC<AttendanceProps> = ({
                                     <input type="text" name="position" value={formData.position} onChange={handleFormChange} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue" />
                                 </div>
                             </div>
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-text-secondary mb-1">Department</label>
+                                    <input type="text" name="department" value={formData.department} onChange={handleFormChange} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue" />
+                                </div>
                                 <div>
                                     <label className="block text-sm font-medium text-text-secondary mb-1">Hourly Rate (₱)*</label>
                                     <input type="number" name="rate" value={formData.rate} onChange={handleFormChange} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue" />
                                 </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-text-secondary mb-1">Phone</label>
                                     <input type="tel" name="phone" value={formData.phone} onChange={handleFormChange} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue" />
                                 </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-text-secondary mb-1">Payment Mode</label>
+                                    <input type="text" name="paymentMode" value={formData.paymentMode} onChange={handleFormChange} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue" placeholder="e.g., Bank Transfer, Cash" />
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-text-secondary mb-1">Email</label>
-                                <input type="email" name="email" value={formData.email} onChange={handleFormChange} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue" />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-text-secondary mb-1">Email</label>
+                                    <input type="email" name="email" value={formData.email} onChange={handleFormChange} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-text-secondary mb-1">Bank Account</label>
+                                    <input type="text" name="bankAccount" value={formData.bankAccount} onChange={handleFormChange} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue" placeholder="e.g., 123-456-789" />
+                                </div>
                             </div>
                         </div>
                         <div className="flex justify-between items-center mt-8">
