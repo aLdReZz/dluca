@@ -306,7 +306,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
 
         companyName: "D'Luca Bistro X Cafe",
 
-        companyAddress: '123 Anywhere St., Any City, ST 12345',
+        companyAddress: "2nd flr. Soho Bldg. Governors's Drive, Brgy. Cabuco, Trece Martires Cavite",
 
         employeeName: record.employee,
 
@@ -331,6 +331,14 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
         totalDeductions: combinedDeductions,
 
         netSalary: netPay,
+
+        daysPresent: record.daysPresent,
+
+        daysAbsent: record.daysAbsent,
+
+        daysLate: record.daysLate,
+
+        totalHours: record.totalHours,
 
     });
 
@@ -662,7 +670,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                             <div>
                                                 <p className="text-sm font-semibold text-text-primary">Daily Allocation Details</p>
                                                 <p className="text-[11px] text-text-secondary">
-                                                    Paid hrs ÷ adjusted team hrs × (service pool × 60%). The other 40% is split equally between 2 ghost employees (12h each).
+                                                    Paid hrs ï¿½ adjusted team hrs ï¿½ (service pool ï¿½ 60%). The other 40% is split equally between 2 ghost employees (12h each).
                                                 </p>
                                             </div>
                                             <span className="text-sm font-semibold">{formattedServiceChargeTotal}</span>

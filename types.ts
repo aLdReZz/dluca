@@ -28,6 +28,7 @@ export interface ProductInventoryItem {
     name: string;
     brand: string;
     unit: string;
+    quantity: number;
     price: number;
     supplier: string;
 }

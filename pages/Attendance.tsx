@@ -699,74 +699,83 @@ const Attendance: React.FC<AttendanceProps> = ({
     return (
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-8">
             <div>
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                    <h2 className="text-2xl font-bold">Employee Management</h2>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+                    <div>
+                        <h2 className="text-2xl font-bold text-text-primary">Employee Management</h2>
+                        <p className="text-sm text-text-secondary mt-0.5">{employees.length} {employees.length === 1 ? 'employee' : 'employees'} registered</p>
+                    </div>
                      <div className="flex items-center gap-2">
-                        <button onClick={handleClearAllData} className="flex items-center gap-2 bg-accent-red/20 text-accent-red px-3 py-2 rounded-lg font-medium text-sm hover:bg-accent-red/30 transition">
-                            <TrashIcon className="w-5 h-5" />
-                            Clear All Data
+                        <button onClick={handleClearAllData} className="flex items-center gap-1.5 bg-accent-red/10 text-accent-red px-3 py-2 rounded-lg font-medium text-xs hover:bg-accent-red/20 transition border border-accent-red/20">
+                            <TrashIcon className="w-4 h-4" />
+                            <span className="hidden sm:inline">Clear All</span>
                         </button>
-                        <button onClick={openAddModal} className="flex items-center gap-2 bg-accent-blue text-white px-3 py-2 rounded-lg font-medium text-sm shadow-md hover:bg-opacity-80 transition">
-                            <PlusIcon className="w-5 h-5" />
+                        <button onClick={openAddModal} className="flex items-center gap-1.5 bg-accent-blue text-white px-4 py-2 rounded-lg font-semibold text-xs shadow-lg shadow-accent-blue/30 hover:bg-opacity-90 transition hover:scale-105">
+                            <PlusIcon className="w-4 h-4" />
                             Add Employee
                         </button>
                     </div>
                 </div>
-                <div className="bg-bg-secondary rounded-xl border border-border-color p-4">
+                <div className="bg-gradient-to-br from-bg-secondary to-bg-tertiary/30 rounded-xl border border-border-color p-3 shadow-sm">
                    <div className="relative">
-                     <div className="flex flex-nowrap gap-4 p-2 overflow-x-auto horizontal-scrollbar-hide">
+                     <div className="flex flex-nowrap gap-3 p-2 overflow-x-auto horizontal-scrollbar-hide">
                          {employees.length > 0 ? employees.map(emp => (
-                            <div key={emp.id} className="relative flex flex-col items-center w-28 flex-shrink-0">
-                               <button 
+                            <div key={emp.id} className="relative flex flex-col items-center w-24 flex-shrink-0 group">
+                               <button
                                     onClick={() => setViewedEmployee(emp)}
-                                    className="w-16 h-16 rounded-full bg-teal-400/20 text-teal-300 flex items-center justify-center font-bold text-2xl transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-secondary focus:ring-accent-blue"
+                                    className="relative w-14 h-14 rounded-full bg-gradient-to-br from-accent-blue/20 to-accent-blue/10 text-accent-blue flex items-center justify-center font-bold text-xl transition-all hover:scale-110 hover:shadow-lg hover:shadow-accent-blue/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-secondary focus:ring-accent-blue border-2 border-accent-blue/20"
                                 >
                                     {emp.name.charAt(0)}
                                 </button>
-                                <p className="mt-2 text-sm font-medium text-text-primary text-center truncate w-full">{emp.name}</p>
-                                <p className="text-xs text-text-secondary text-center truncate w-full capitalize">{emp.position}</p>
+                                <p className="mt-1.5 text-xs font-semibold text-text-primary text-center truncate w-full group-hover:text-accent-blue transition-colors">{emp.name}</p>
+                                <p className="text-[10px] text-text-secondary text-center truncate w-full capitalize">{emp.position}</p>
                             </div>
                          )) : (
-                             <div className="w-full flex items-center justify-center h-[100px] text-text-secondary">No employees added yet.</div>
+                             <div className="w-full flex flex-col items-center justify-center h-24 text-text-secondary">
+                                <PlusIcon className="w-8 h-8 mb-2 opacity-30" />
+                                <p className="text-xs">No employees added yet</p>
+                             </div>
                          )}
                        </div>
-                       <div className="absolute top-0 right-0 bottom-0 w-16 bg-gradient-to-l from-bg-secondary pointer-events-none lg:hidden"></div>
+                       <div className="absolute top-0 right-0 bottom-0 w-12 bg-gradient-to-l from-bg-secondary pointer-events-none lg:hidden"></div>
                    </div>
                 </div>
             </div>
 
             <div>
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                    <h2 className="text-2xl font-bold">Weekly Schedule</h2>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+                    <div>
+                        <h2 className="text-2xl font-bold text-text-primary">Weekly Schedule</h2>
+                        <p className="text-sm text-text-secondary mt-0.5">Manage employee work schedules</p>
+                    </div>
                      <div className="flex items-center gap-2 flex-wrap justify-start w-full sm:w-auto">
                         <div className="relative" ref={datePickerRef}>
-                             <button 
+                             <button
                                 onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                                className="flex items-center gap-2 bg-bg-tertiary border border-border-color rounded-lg py-2 px-3 text-sm font-medium hover:bg-hover-bg transition"
+                                className="flex items-center gap-1.5 bg-bg-tertiary border border-border-color rounded-lg py-2 px-3 text-xs font-medium hover:bg-hover-bg transition"
                             >
-                                <CalendarDaysIcon className="w-5 h-5 text-text-secondary" />
+                                <CalendarDaysIcon className="w-4 h-4 text-text-secondary" />
                                 <span>{new Date(scheduleWeekStart + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</span>
                             </button>
                             {isDatePickerOpen && (
-                                <DatePickerPopup 
+                                <DatePickerPopup
                                     initialDate={scheduleWeekStart}
                                     onDateSelect={handleDateSelect}
                                 />
                             )}
                         </div>
-                         <label htmlFor="schedule-csv-input" className="cursor-pointer bg-bg-tertiary text-text-primary px-3 py-2 rounded-lg font-medium text-sm hover:bg-hover-bg transition flex items-center gap-2">
-                            <UploadIcon className="w-5 h-5"/>
-                            Upload CSV
+                         <label htmlFor="schedule-csv-input" className="cursor-pointer bg-bg-tertiary text-text-primary px-3 py-2 rounded-lg font-medium text-xs hover:bg-hover-bg transition flex items-center gap-1.5 border border-border-color">
+                            <UploadIcon className="w-4 h-4"/>
+                            <span className="hidden sm:inline">Upload CSV</span>
                         </label>
                         <input type="file" id="schedule-csv-input" accept=".csv" className="hidden" onChange={handleScheduleUpload} />
                          {isScheduleLocked ? (
-                            <button onClick={handleEditSchedules} className="bg-accent-orange text-white px-4 py-2 rounded-lg font-medium text-sm hover:bg-opacity-90 transition flex items-center gap-2">
-                                <PencilSquareIcon className="w-5 h-5"/>
+                            <button onClick={handleEditSchedules} className="bg-accent-orange text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-orange/30">
+                                <PencilSquareIcon className="w-4 h-4"/>
                                 Edit Schedule
                             </button>
                         ) : (
-                            <button onClick={handleSaveSchedules} className="bg-accent-green text-white px-4 py-2 rounded-lg font-medium text-sm hover:bg-opacity-80 transition flex items-center gap-2">
-                                <CheckIcon className="w-5 h-5" />
+                            <button onClick={handleSaveSchedules} className="bg-accent-green text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-green/30">
+                                <CheckIcon className="w-4 h-4" />
                                 Save Schedule
                             </button>
                         )}
@@ -778,17 +787,17 @@ const Attendance: React.FC<AttendanceProps> = ({
                         <div className="overflow-x-auto hidden lg:block">
                             <table className="w-full border-collapse table-fixed">
                                 <thead>
-                                    <tr className="bg-bg-tertiary/40">
-                                        <th className="p-3 text-left text-sm font-medium text-text-secondary sticky left-0 bg-bg-tertiary/40 z-10 w-36 uppercase">Employee</th>
+                                    <tr className="bg-gradient-to-r from-bg-tertiary/50 to-bg-tertiary/30">
+                                        <th className="px-3 py-2.5 text-left text-xs font-bold text-text-secondary sticky left-0 bg-gradient-to-r from-bg-tertiary/50 to-bg-tertiary/30 z-10 w-32 uppercase tracking-wide">Employee</th>
                                         {weekDates.map(dateInfo => (
-                                            <th key={dateInfo.key} className={`p-2 text-center text-xs font-semibold uppercase tracking-wider border-l border-border-color transition-colors ${dateInfo.isToday ? 'bg-border-color/20 text-text-primary' : ''} ${dateInfo.isWeekend ? 'bg-bg-tertiary/30' : ''}`}>
+                                            <th key={dateInfo.key} className={`px-2 py-2.5 text-center text-[10px] font-bold uppercase tracking-wider border-l border-border-color transition-colors ${dateInfo.isToday ? 'bg-accent-blue/10 text-accent-blue' : 'text-text-secondary'} ${dateInfo.isWeekend ? 'bg-bg-tertiary/40' : ''}`}>
                                                 {dateInfo.date.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }).toUpperCase()}
-                                                <div className="font-normal">{dateInfo.date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', timeZone: 'UTC' })}</div>
+                                                <div className="font-medium text-[9px] mt-0.5">{dateInfo.date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', timeZone: 'UTC' })}</div>
                                             </th>
                                         ))}
-                                        <th className={`text-center text-sm font-medium text-text-secondary uppercase border-l border-border-color transition-all duration-300 ease-in-out ${isScheduleTotalHrsVisible ? 'w-28 p-3' : 'w-0 p-0'}`}>
-                                            <div className={`whitespace-nowrap overflow-hidden ${isScheduleTotalHrsVisible ? 'opacity-100' : 'opacity-0'}`}>
-                                                Total Hrs
+                                        <th className={`text-center text-xs font-bold text-text-secondary uppercase border-l border-border-color transition-all duration-300 ease-in-out ${isScheduleTotalHrsVisible ? 'w-24 px-2 py-2.5' : 'w-0 p-0'}`}>
+                                            <div className={`whitespace-nowrap overflow-hidden tracking-wide ${isScheduleTotalHrsVisible ? 'opacity-100' : 'opacity-0'}`}>
+                                                Total
                                             </div>
                                         </th>
                                     </tr>
@@ -810,27 +819,27 @@ const Attendance: React.FC<AttendanceProps> = ({
                                             }, 0) / 60;
 
                                             return (
-                                                <tr key={emp.id} className="group/row hover:bg-hover-bg/50 transition-colors">
-                                                    <td className="p-3 font-medium sticky left-0 bg-bg-secondary group-hover/row:bg-hover-bg/50 z-10 w-36">{emp.name}</td>
+                                                <tr key={emp.id} className="group/row hover:bg-hover-bg/30 transition-colors border-b border-border-color/50">
+                                                    <td className="px-3 py-2.5 font-semibold text-sm sticky left-0 bg-bg-secondary group-hover/row:bg-hover-bg/30 z-10 w-32">{emp.name}</td>
                                                     {weekDates.map(dateInfo => {
                                                         const currentDayKey = dateToKey(dateInfo.date);
                                                         const schedule = emp.schedule[currentDayKey];
-                                                        const cellClasses = `text-center border-l border-border-color ${dateInfo.isToday ? 'bg-border-color/20' : ''} ${dateInfo.isWeekend ? 'bg-bg-tertiary/20' : ''}`;
-                                                        
+                                                        const cellClasses = `text-center border-l border-border-color/50 ${dateInfo.isToday ? 'bg-accent-blue/5' : ''} ${dateInfo.isWeekend ? 'bg-bg-tertiary/10' : ''}`;
+
                                                         const renderCellContent = () => {
                                                             if (schedule?.off) {
-                                                                return <span className="bg-bg-tertiary text-text-secondary font-semibold text-xs uppercase px-3 py-1 rounded-md">OFF</span>;
+                                                                return <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-bg-tertiary/70 text-text-secondary font-bold text-[10px] uppercase">OFF</span>;
                                                             }
                                                             if (schedule?.timeIn && schedule?.timeOut) {
-                                                                return <span className="text-xs">{`${formatTimeForDisplay(schedule.timeIn)} - ${formatTimeForDisplay(schedule.timeOut)}`}</span>;
+                                                                return <span className="text-[10px] leading-tight">{`${formatTimeForDisplay(schedule.timeIn)} - ${formatTimeForDisplay(schedule.timeOut)}`}</span>;
                                                             }
-                                                            return <span className="text-sm text-text-secondary/60">Not Set</span>
+                                                            return <span className="text-xs text-text-secondary/40">-</span>
                                                         }
 
                                                         if (isScheduleLocked) {
                                                             return (
                                                     <td key={`${emp.id}-${currentDayKey}`} className={`${cellClasses} p-0 align-middle`}>
-                                                                    <div className="flex items-center justify-center p-2 h-full">
+                                                                    <div className="flex items-center justify-center px-1 py-2 h-full">
                                                                         {renderCellContent()}
                                                                     </div>
                                                                 </td>
@@ -842,16 +851,16 @@ const Attendance: React.FC<AttendanceProps> = ({
                                                     <td key={`${emp.id}-${currentDayKey}`} className={`${cellClasses} p-1 align-middle`}>
                                                                 <button
                                                                     onClick={() => handleOpenScheduleModal(emp, currentDayKey, dateInfo.date)}
-                                                                    className="w-full h-full text-center bg-bg-primary/50 border border-border-color rounded-lg hover:bg-hover-bg/50 transition-colors p-2 flex items-center justify-center"
+                                                                    className="w-full h-full text-center bg-bg-primary/50 border border-border-color/50 rounded-md hover:bg-hover-bg/50 hover:border-accent-blue/30 transition-all px-1 py-1.5 flex items-center justify-center"
                                                                 >
                                                                     {renderCellContent()}
                                                                 </button>
                                                             </td>
                                                         );
                                                     })}
-                                                    <td className={`text-center text-sm font-medium border-l border-border-color transition-all duration-300 ${isScheduleTotalHrsVisible ? 'p-3' : 'p-0 w-0'}`}>
+                                                    <td className={`text-center text-xs font-bold text-accent-blue border-l border-border-color/50 transition-all duration-300 ${isScheduleTotalHrsVisible ? 'px-2 py-2.5' : 'p-0 w-0'}`}>
                                                         <div className={`transition-opacity duration-150 whitespace-nowrap overflow-hidden ${isScheduleTotalHrsVisible ? 'opacity-100' : 'opacity-0'}`}>
-                                                            {totalScheduledHours > 0 ? `${totalScheduledHours.toFixed(2)} hrs` : '--'}
+                                                            {totalScheduledHours > 0 ? `${totalScheduledHours.toFixed(1)}h` : '-'}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -866,24 +875,24 @@ const Attendance: React.FC<AttendanceProps> = ({
                                    )}
                                 </tbody>
                                 <tfoot>
-                                    <tr className="bg-bg-tertiary/30 border-t border-border-color">
-                                        <td className="p-3 font-semibold text-sm uppercase text-text-secondary sticky left-0 bg-bg-tertiary/30 z-10">
-                                            Total Hours
+                                    <tr className="bg-gradient-to-r from-bg-tertiary/40 to-bg-tertiary/20 border-t-2 border-border-color">
+                                        <td className="px-3 py-2.5 font-bold text-xs uppercase text-text-secondary sticky left-0 bg-gradient-to-r from-bg-tertiary/40 to-bg-tertiary/20 z-10 tracking-wide">
+                                            Total
                                         </td>
                                         {weekDates.map(dateInfo => {
                                             const totalHours = dailyScheduleTotals[dateToKey(dateInfo.date)];
                                             return (
                                                 <td
                                                     key={`schedule-total-${dateInfo.key}`}
-                                                    className="p-2 text-center text-sm font-semibold text-text-primary border-l border-border-color"
+                                                    className="px-2 py-2.5 text-center text-[10px] font-bold text-text-primary border-l border-border-color/50"
                                                 >
-                                                    {totalHours && totalHours > 0 ? `${totalHours.toFixed(2)} hrs` : '--'}
+                                                    {totalHours && totalHours > 0 ? `${totalHours.toFixed(1)}h` : '-'}
                                                 </td>
                                             );
                                         })}
                                         <td
-                                            className={`text-center text-sm font-semibold border-l border-border-color transition-all duration-300 ${
-                                                isAttendanceTotalHrsVisible ? 'p-3' : 'p-0 w-0'
+                                            className={`text-center text-xs font-bold text-accent-blue border-l border-border-color/50 transition-all duration-300 ${
+                                                isAttendanceTotalHrsVisible ? 'px-2 py-2.5' : 'p-0 w-0'
                                             }`}
                                         >
                                             <div
@@ -891,7 +900,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                                                     isAttendanceTotalHrsVisible ? 'opacity-100' : 'opacity-0'
                                                 }`}
                                             >
-                                                {weeklyScheduleTotalHours > 0 ? `${weeklyScheduleTotalHours.toFixed(2)} hrs` : '--'}
+                                                {weeklyScheduleTotalHours > 0 ? `${weeklyScheduleTotalHours.toFixed(1)}h` : '-'}
                                             </div>
                                         </td>
                                     </tr>
@@ -986,31 +995,34 @@ const Attendance: React.FC<AttendanceProps> = ({
             </div>
 
             <div>
-                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                    <h2 className="text-2xl font-bold">Weekly Attendance</h2>
+                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+                    <div>
+                        <h2 className="text-2xl font-bold text-text-primary">Weekly Attendance</h2>
+                        <p className="text-sm text-text-secondary mt-0.5">Track actual employee attendance</p>
+                    </div>
                     <div className="flex items-center gap-2 flex-wrap justify-start sm:justify-end w-full sm:w-auto">
-                        <label htmlFor="attendance-csv-input" className="cursor-pointer bg-bg-tertiary text-text-primary px-3 py-2 rounded-lg font-medium text-sm hover:bg-hover-bg transition flex items-center gap-2">
-                            <UploadIcon className="w-5 h-5"/>
-                            Upload Attendance
+                        <label htmlFor="attendance-csv-input" className="cursor-pointer bg-bg-tertiary text-text-primary px-3 py-2 rounded-lg font-medium text-xs hover:bg-hover-bg transition flex items-center gap-1.5 border border-border-color">
+                            <UploadIcon className="w-4 h-4"/>
+                            <span className="hidden sm:inline">Upload</span>
                         </label>
                         <input type="file" id="attendance-csv-input" accept=".csv" className="hidden" onChange={handleAttendanceUpload} />
-                        <label htmlFor="paid-hours-csv-input" className="cursor-pointer bg-bg-tertiary text-text-primary px-3 py-2 rounded-lg font-medium text-sm hover:bg-hover-bg transition flex items-center gap-2">
-                            <UploadIcon className="w-5 h-5"/>
-                            Upload Paid Hours
+                        <label htmlFor="paid-hours-csv-input" className="cursor-pointer bg-bg-tertiary text-text-primary px-3 py-2 rounded-lg font-medium text-xs hover:bg-hover-bg transition flex items-center gap-1.5 border border-border-color">
+                            <UploadIcon className="w-4 h-4"/>
+                            <span className="hidden sm:inline">Paid Hrs</span>
                         </label>
                         <input type="file" id="paid-hours-csv-input" accept=".csv" className="hidden" onChange={handlePaidHoursUpload} />
-                        <button onClick={clearManualPaidHours} className="bg-bg-tertiary text-text-secondary px-3 py-2 rounded-lg font-medium text-sm border border-border-color hover:bg-hover-bg transition">
-                            Clear Paid Hours
+                        <button onClick={clearManualPaidHours} className="bg-bg-tertiary text-text-secondary px-3 py-2 rounded-lg font-medium text-xs border border-border-color hover:bg-hover-bg transition">
+                            Clear
                         </button>
                          {isAttendanceLocked ? (
-                            <button onClick={() => setIsAttendanceLocked(false)} className="bg-accent-orange text-white px-4 py-2 rounded-lg font-medium text-sm hover:bg-opacity-90 transition flex items-center gap-2">
-                                <PencilSquareIcon className="w-5 h-5"/>
-                                Edit Attendance
+                            <button onClick={() => setIsAttendanceLocked(false)} className="bg-accent-orange text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-orange/30">
+                                <PencilSquareIcon className="w-4 h-4"/>
+                                Edit
                             </button>
                         ) : (
-                            <button onClick={() => setIsAttendanceLocked(true)} className="bg-accent-green text-white px-4 py-2 rounded-lg font-medium text-sm hover:bg-opacity-80 transition flex items-center gap-2">
-                                <CheckIcon className="w-5 h-5" />
-                                Save Attendance
+                            <button onClick={() => setIsAttendanceLocked(true)} className="bg-accent-green text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-green/30">
+                                <CheckIcon className="w-4 h-4" />
+                                Save
                             </button>
                         )}
                     </div>
@@ -1021,17 +1033,17 @@ const Attendance: React.FC<AttendanceProps> = ({
                         <div className="overflow-x-auto hidden lg:block">
                             <table className="w-full border-collapse table-fixed">
                                 <thead>
-                                    <tr className="bg-bg-tertiary/40">
-                                        <th className="p-3 text-left text-sm font-medium text-text-secondary sticky left-0 bg-bg-tertiary/40 z-10 w-36 uppercase">Employee</th>
+                                    <tr className="bg-gradient-to-r from-bg-tertiary/50 to-bg-tertiary/30">
+                                        <th className="px-3 py-2.5 text-left text-xs font-bold text-text-secondary sticky left-0 bg-gradient-to-r from-bg-tertiary/50 to-bg-tertiary/30 z-10 w-32 uppercase tracking-wide">Employee</th>
                                         {weekDates.map(dateInfo => (
-                                            <th key={dateInfo.key} className={`p-2 text-center text-xs font-semibold text-text-secondary uppercase tracking-wider border-l border-border-color transition-colors ${dateInfo.isToday ? 'bg-border-color/20 text-text-primary' : ''} ${dateInfo.isWeekend ? 'bg-bg-tertiary/30' : ''}`}>
+                                            <th key={dateInfo.key} className={`px-2 py-2.5 text-center text-[10px] font-bold uppercase tracking-wider border-l border-border-color transition-colors ${dateInfo.isToday ? 'bg-accent-blue/10 text-accent-blue' : 'text-text-secondary'} ${dateInfo.isWeekend ? 'bg-bg-tertiary/40' : ''}`}>
                                                 {dateInfo.date.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }).toUpperCase()}
-                                                <div className="font-normal">{dateInfo.date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', timeZone: 'UTC' })}</div>
+                                                <div className="font-medium text-[9px] mt-0.5">{dateInfo.date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', timeZone: 'UTC' })}</div>
                                             </th>
                                         ))}
-                                        <th className={`text-center text-sm font-medium text-text-secondary uppercase border-l border-border-color transition-all duration-300 ease-in-out ${isAttendanceTotalHrsVisible ? 'w-28 p-3' : 'w-0 p-0'}`}>
-                                            <div className={`whitespace-nowrap overflow-hidden ${isAttendanceTotalHrsVisible ? 'opacity-100' : 'opacity-0'}`}>
-                                                Total Hrs
+                                        <th className={`text-center text-xs font-bold text-text-secondary uppercase border-l border-border-color transition-all duration-300 ease-in-out ${isAttendanceTotalHrsVisible ? 'w-24 px-2 py-2.5' : 'w-0 p-0'}`}>
+                                            <div className={`whitespace-nowrap overflow-hidden tracking-wide ${isAttendanceTotalHrsVisible ? 'opacity-100' : 'opacity-0'}`}>
+                                                Total
                                             </div>
                                         </th>
                                     </tr>
@@ -1053,19 +1065,19 @@ const Attendance: React.FC<AttendanceProps> = ({
                                             }, 0) / 60;
 
                                             return (
-                                                <tr key={emp.id} className="group/row hover:bg-hover-bg/50 transition-colors">
-                                                    <td className="p-3 font-medium sticky left-0 bg-bg-secondary group-hover/row:bg-hover-bg/50 z-10 w-36">{emp.name}</td>
+                                                <tr key={emp.id} className="group/row hover:bg-hover-bg/30 transition-colors border-b border-border-color/50">
+                                                    <td className="px-3 py-2.5 font-semibold text-sm sticky left-0 bg-bg-secondary group-hover/row:bg-hover-bg/30 z-10 w-32">{emp.name}</td>
                                                     {weekDates.map(dateInfo => {
                                                         const currentDayKey = dateToKey(dateInfo.date);
                                                         const record = attendanceRecords.find(r => r.employee.toLowerCase() === emp.name.toLowerCase() && r.date === currentDayKey);
                                                         const schedule = emp.schedule[currentDayKey];
-                                                        const cellClasses = `text-center border-l border-border-color transition-colors ${dateInfo.isToday ? 'bg-border-color/20' : ''} ${dateInfo.isWeekend ? 'bg-bg-tertiary/20' : ''}`;
+                                                        const cellClasses = `text-center border-l border-border-color/50 transition-colors ${dateInfo.isToday ? 'bg-accent-blue/5' : ''} ${dateInfo.isWeekend ? 'bg-bg-tertiary/10' : ''}`;
 
                                                         let cellContent;
                                                         const isFuture = dateInfo.date > todayUTC;
 
                                                         if (schedule?.off) {
-                                                            cellContent = <span className="bg-bg-tertiary text-text-secondary font-semibold text-xs rounded-md px-3 py-1 uppercase">OFF</span>;
+                                                            cellContent = <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-bg-tertiary/70 text-text-secondary font-bold text-[10px] uppercase">OFF</span>;
                                                         } else if (record?.timeIn) {
                                                             let textColorClass = '';
                                                             if (record.timeIn && schedule?.timeIn) {
@@ -1076,36 +1088,38 @@ const Attendance: React.FC<AttendanceProps> = ({
                                                                 }
                                                             }
                                                             const timeOutDisplay = record.timeOut ? ` - ${formatTime12Hour(record.timeOut)}` : '';
-                                                            cellContent = <span className={`text-xs ${textColorClass}`}>{`${formatTime12Hour(record.timeIn)}${timeOutDisplay}`}</span>;
+                                                            cellContent = <span className={`text-[10px] leading-tight font-medium ${textColorClass}`}>{`${formatTime12Hour(record.timeIn)}${timeOutDisplay}`}</span>;
                                                         } else if (schedule?.timeIn) {
                                                             if (isFuture) {
-                                                                cellContent = <span className="text-sm text-text-secondary/60">Not Set</span>;
+                                                                cellContent = <span className="text-xs text-text-secondary/40">-</span>;
                                                             } else {
-                                                                cellContent = <StatusTag text="Absent" type="absent" />;
+                                                                cellContent = <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-accent-red/10 text-accent-red font-bold text-[10px] uppercase">Absent</span>;
                                                             }
                                                         } else {
-                                                            cellContent = <span className="text-sm text-text-secondary/60">Not Set</span>;
+                                                            cellContent = <span className="text-xs text-text-secondary/40">-</span>;
                                                         }
-                                                        
+
                                                         if (isAttendanceLocked) {
                                                             return (
-                                                            <td key={`${emp.id}-${currentDayKey}`} className={`${cellClasses} p-2`}>
-                                                                    {cellContent}
+                                                            <td key={`${emp.id}-${currentDayKey}`} className={`${cellClasses} p-0 align-middle`}>
+                                                                    <div className="flex items-center justify-center px-1 py-2 h-full">
+                                                                        {cellContent}
+                                                                    </div>
                                                                 </td>
                                                             );
                                                         }
 
                                                         return (
                                                             <td key={`${emp.id}-${currentDayKey}`} className={`${cellClasses} p-1 align-middle`}>
-                                                                <button onClick={() => handleOpenAttendanceModal(emp, currentDayKey, dateInfo.date)} className="w-full h-full text-center bg-bg-primary/50 border border-border-color rounded-lg hover:bg-hover-bg/50 transition-colors p-2 flex items-center justify-center">
+                                                                <button onClick={() => handleOpenAttendanceModal(emp, currentDayKey, dateInfo.date)} className="w-full h-full text-center bg-bg-primary/50 border border-border-color/50 rounded-md hover:bg-hover-bg/50 hover:border-accent-blue/30 transition-all px-1 py-1.5 flex items-center justify-center">
                                                                     {cellContent}
                                                                 </button>
                                                             </td>
                                                         );
                                                     })}
-                                                    <td className={`text-center text-sm font-medium border-l border-border-color transition-all duration-300 ${isAttendanceTotalHrsVisible ? 'p-3' : 'p-0 w-0'}`}>
+                                                    <td className={`text-center text-xs font-bold text-accent-blue border-l border-border-color/50 transition-all duration-300 ${isAttendanceTotalHrsVisible ? 'px-2 py-2.5' : 'p-0 w-0'}`}>
                                                         <div className={`transition-opacity duration-150 whitespace-nowrap overflow-hidden ${isAttendanceTotalHrsVisible ? 'opacity-100' : 'opacity-0'}`}>
-                                                            {totalAttendedHours > 0 ? `${totalAttendedHours.toFixed(2)} hrs` : '--'}
+                                                            {totalAttendedHours > 0 ? `${totalAttendedHours.toFixed(1)}h` : '-'}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -1120,24 +1134,24 @@ const Attendance: React.FC<AttendanceProps> = ({
                                    )}
                                 </tbody>
                                 <tfoot>
-                                    <tr className="bg-bg-tertiary/30 border-t border-border-color">
-                                        <td className="p-3 font-semibold text-sm uppercase text-text-secondary sticky left-0 bg-bg-tertiary/30 z-10">
-                                            Total Hours
+                                    <tr className="bg-gradient-to-r from-bg-tertiary/40 to-bg-tertiary/20 border-t-2 border-border-color">
+                                        <td className="px-3 py-2.5 font-bold text-xs uppercase text-text-secondary sticky left-0 bg-gradient-to-r from-bg-tertiary/40 to-bg-tertiary/20 z-10 tracking-wide">
+                                            Total
                                         </td>
                                         {weekDates.map(dateInfo => {
                                             const totalHours = dailyAttendanceTotals[dateToKey(dateInfo.date)];
                                             return (
                                                 <td
                                                     key={`attendance-total-${dateInfo.key}`}
-                                                    className="p-2 text-center text-sm font-semibold text-text-primary border-l border-border-color"
+                                                    className="px-2 py-2.5 text-center text-[10px] font-bold text-text-primary border-l border-border-color/50"
                                                 >
-                                                    {totalHours && totalHours > 0 ? `${totalHours.toFixed(2)} hrs` : '--'}
+                                                    {totalHours && totalHours > 0 ? `${totalHours.toFixed(1)}h` : '-'}
                                                 </td>
                                             );
                                         })}
                                         <td
-                                            className={`text-center text-sm font-semibold border-l border-border-color transition-all duration-300 ${
-                                                isAttendanceTotalHrsVisible ? 'p-3' : 'p-0 w-0'
+                                            className={`text-center text-xs font-bold text-accent-blue border-l border-border-color/50 transition-all duration-300 ${
+                                                isAttendanceTotalHrsVisible ? 'px-2 py-2.5' : 'p-0 w-0'
                                             }`}
                                         >
                                             <div
@@ -1145,7 +1159,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                                                     isAttendanceTotalHrsVisible ? 'opacity-100' : 'opacity-0'
                                                 }`}
                                             >
-                                                {weeklyAttendanceTotalHours > 0 ? `${weeklyAttendanceTotalHours.toFixed(2)} hrs` : '--'}
+                                                {weeklyAttendanceTotalHours > 0 ? `${weeklyAttendanceTotalHours.toFixed(1)}h` : '-'}
                                             </div>
                                         </td>
                                     </tr>

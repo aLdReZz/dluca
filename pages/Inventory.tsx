@@ -82,9 +82,9 @@ const ProductInventoryView: React.FC<{
     const handleFieldChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         if (!editingProductData) return;
         const { name, value } = e.target;
-        setEditingProductData({ 
-            ...editingProductData, 
-            [name]: name === 'price' ? parseFloat(value) || 0 : value 
+        setEditingProductData({
+            ...editingProductData,
+            [name]: (name === 'price' || name === 'quantity') ? parseFloat(value) || 0 : value
         });
     };
 
@@ -101,51 +101,51 @@ const ProductInventoryView: React.FC<{
     };
     
     return (
-        <div className="bg-bg-secondary rounded-xl border border-border-color overflow-hidden">
-            <div className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-border-color">
-                <h2 className="text-xl font-semibold">Product Pricelist</h2>
+        <div className="bg-bg-secondary rounded-xl border border-border-color overflow-hidden shadow-lg">
+            <div className="px-5 py-4 flex flex-col sm:flex-row justify-between items-center gap-3 border-b border-border-color bg-gradient-to-r from-bg-secondary to-bg-tertiary/20">
+                <h2 className="text-lg font-bold">Product Pricelist</h2>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                     <div className="relative w-full sm:w-auto">
-                        <SearchIcon className="w-5 h-5 text-text-secondary absolute top-1/2 left-3 -translate-y-1/2" />
+                        <SearchIcon className="w-4 h-4 text-text-secondary absolute top-1/2 left-3 -translate-y-1/2" />
                         <input
                             type="text"
                             placeholder="Search item..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="bg-bg-primary border border-border-color rounded-lg py-2 pl-10 pr-4 text-sm focus:ring-accent-blue focus:border-accent-blue w-full sm:w-64"
+                            className="bg-bg-primary border border-border-color rounded-lg py-2 pl-9 pr-3 text-sm focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue w-full sm:w-56 transition-all"
                         />
                     </div>
-                    <button onClick={onUploadClick} className="flex items-center gap-2 bg-bg-tertiary text-text-primary px-4 py-2 text-sm font-medium rounded-lg hover:bg-hover-bg transition">
+                    <button onClick={onUploadClick} className="flex items-center gap-1.5 bg-bg-tertiary text-text-primary px-3 py-2 text-xs font-semibold rounded-lg hover:bg-hover-bg transition-all hover:scale-102 border border-border-color">
                         <UploadIcon className="w-4 h-4" />
-                        <span>Upload CSV</span>
+                        <span className="hidden sm:inline">Upload CSV</span>
                     </button>
-                    <button onClick={onAddItemClick} className="flex items-center gap-2 bg-accent-green text-white px-4 py-2 text-sm font-medium rounded-lg shadow-md hover:bg-opacity-80 transition">
+                    <button onClick={onAddItemClick} className="flex items-center gap-1.5 bg-accent-green text-white px-3 py-2 text-xs font-semibold rounded-lg shadow-md hover:bg-opacity-90 transition-all hover:scale-105">
                         <PlusIcon className="w-4 h-4" />
-                        <span>Add Item</span>
+                        <span className="hidden sm:inline">Add Item</span>
                     </button>
                 </div>
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full min-w-[1000px]">
-                    <thead className="bg-bg-tertiary/40">
+                    <thead className="bg-bg-tertiary/50 border-b border-border-color">
                         <tr>
-                            {['Category', 'Item Name', 'Brand', 'Unit', 'Price', 'Supplier', 'Action'].map(header => (
-                                <th key={header} className="p-4 text-left text-sm font-medium text-text-secondary uppercase tracking-wider">{header}</th>
+                            {['Category', 'Item Name', 'Brand', 'Unit', 'Qty', 'Price', 'Supplier', 'Action'].map(header => (
+                                <th key={header} className="px-3 py-2.5 text-left text-xs font-bold text-text-secondary uppercase tracking-wider">{header}</th>
                             ))}
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-border-color">
+                    <tbody className="divide-y divide-border-color/50">
                         {filteredProducts.length > 0 ? filteredProducts.map(product => {
                             const isEditing = editingProductId === product.id;
                             return (
-                                <tr key={product.id} className={`transition-colors ${isEditing ? 'bg-hover-bg' : 'hover:bg-hover-bg/50'}`}>
+                                <tr key={product.id} className={`transition-all ${isEditing ? 'bg-accent-blue/5 border-l-2 border-accent-blue' : 'hover:bg-hover-bg/30'}`}>
                                     {isEditing && editingProductData ? (
                                         <>
-                                            <td className="p-2 text-sm"><input type="text" name="category" value={editingProductData.category} onChange={handleFieldChange} className="bg-bg-primary border border-border-color rounded-md p-1.5 w-full text-sm"/></td>
-                                            <td className="p-2 text-sm font-medium"><input type="text" name="name" value={editingProductData.name} onChange={handleFieldChange} className="bg-bg-primary border border-border-color rounded-md p-1.5 w-full text-sm"/></td>
-                                            <td className="p-2 text-sm"><input type="text" name="brand" value={editingProductData.brand} onChange={handleFieldChange} className="bg-bg-primary border border-border-color rounded-md p-1.5 w-full text-sm"/></td>
-                                            <td className="p-2 text-sm text-text-secondary">
-                                                <select name="unit" value={editingProductData.unit} onChange={handleFieldChange} className="bg-bg-primary border border-border-color rounded-md p-1.5 w-full text-sm">
+                                            <td className="px-3 py-2 text-sm"><input type="text" name="category" value={editingProductData.category} onChange={handleFieldChange} className="bg-bg-primary border border-border-color rounded-md px-2 py-1 w-full text-xs focus:ring-2 focus:ring-accent-blue/50"/></td>
+                                            <td className="px-3 py-2 text-sm font-medium"><input type="text" name="name" value={editingProductData.name} onChange={handleFieldChange} className="bg-bg-primary border border-border-color rounded-md px-2 py-1 w-full text-xs focus:ring-2 focus:ring-accent-blue/50"/></td>
+                                            <td className="px-3 py-2 text-sm"><input type="text" name="brand" value={editingProductData.brand} onChange={handleFieldChange} className="bg-bg-primary border border-border-color rounded-md px-2 py-1 w-full text-xs focus:ring-2 focus:ring-accent-blue/50"/></td>
+                                            <td className="px-3 py-2 text-sm">
+                                                <select name="unit" value={editingProductData.unit} onChange={handleFieldChange} className="bg-bg-primary border border-border-color rounded-md px-2 py-1 w-full text-xs focus:ring-2 focus:ring-accent-blue/50">
                                                     {!productUnits.includes(editingProductData.unit) && editingProductData.unit && (
                                                         <option value={editingProductData.unit}>{editingProductData.unit}</option>
                                                     )}
@@ -154,30 +154,34 @@ const ProductInventoryView: React.FC<{
                                                     ))}
                                                 </select>
                                             </td>
-                                            <td className="p-2 text-sm font-semibold"><input type="number" name="price" value={editingProductData.price} onChange={handleFieldChange} className="bg-bg-primary border border-border-color rounded-md p-1.5 w-full text-sm"/></td>
-                                            <td className="p-2 text-sm"><input type="text" name="supplier" value={editingProductData.supplier} onChange={handleFieldChange} className="bg-bg-primary border border-border-color rounded-md p-1.5 w-full text-sm"/></td>
-                                            <td className="p-2 text-sm">
-                                                <div className="flex items-center gap-2">
-                                                    <button onClick={handleSaveClick} className="text-accent-green hover:bg-accent-green/20 p-2 rounded-full" title="Save"><CheckIcon className="w-5 h-5"/></button>
-                                                    <button onClick={handleCancelClick} className="text-accent-red hover:bg-accent-red/20 p-2 rounded-full" title="Cancel"><XMarkIcon className="w-5 h-5"/></button>
+                                            <td className="px-3 py-2 text-sm"><input type="number" name="quantity" value={editingProductData.quantity} onChange={handleFieldChange} className="bg-bg-primary border border-border-color rounded-md px-2 py-1 w-full text-xs focus:ring-2 focus:ring-accent-blue/50"/></td>
+                                            <td className="px-3 py-2 text-sm"><input type="number" name="price" value={editingProductData.price} onChange={handleFieldChange} className="bg-bg-primary border border-border-color rounded-md px-2 py-1 w-full text-xs focus:ring-2 focus:ring-accent-blue/50"/></td>
+                                            <td className="px-3 py-2 text-sm"><input type="text" name="supplier" value={editingProductData.supplier} onChange={handleFieldChange} className="bg-bg-primary border border-border-color rounded-md px-2 py-1 w-full text-xs focus:ring-2 focus:ring-accent-blue/50"/></td>
+                                            <td className="px-3 py-2">
+                                                <div className="flex items-center gap-1">
+                                                    <button onClick={handleSaveClick} className="text-accent-green hover:bg-accent-green/20 p-1.5 rounded-md transition-all" title="Save"><CheckIcon className="w-4 h-4"/></button>
+                                                    <button onClick={handleCancelClick} className="text-accent-red hover:bg-accent-red/20 p-1.5 rounded-md transition-all" title="Cancel"><XMarkIcon className="w-4 h-4"/></button>
                                                 </div>
                                             </td>
                                         </>
                                     ) : (
                                         <>
-                                            <td className="p-4 text-sm">{product.category}</td>
-                                            <td className="p-4 text-sm font-medium">{product.name}</td>
-                                            <td className="p-4 text-sm">{product.brand}</td>
-                                            <td className="p-4 text-sm text-text-secondary">{product.unit}</td>
-                                            <td className="p-4 text-sm font-semibold">{formatPeso(product.price)}</td>
-                                            <td className="p-4 text-sm">{product.supplier}</td>
-                                            <td className="p-4 text-sm">
+                                            <td className="px-3 py-3 text-xs">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-bg-tertiary/50 text-text-secondary font-medium">{product.category}</span>
+                                            </td>
+                                            <td className="px-3 py-3 text-sm font-semibold text-text-primary">{product.name}</td>
+                                            <td className="px-3 py-3 text-xs text-text-secondary">{product.brand}</td>
+                                            <td className="px-3 py-3 text-xs text-text-secondary">{product.unit}</td>
+                                            <td className="px-3 py-3 text-sm font-bold text-accent-blue">{product.quantity}</td>
+                                            <td className="px-3 py-3 text-sm font-bold text-text-primary">{formatPeso(product.price)}</td>
+                                            <td className="px-3 py-3 text-xs text-text-secondary truncate max-w-[150px]" title={product.supplier}>{product.supplier}</td>
+                                            <td className="px-3 py-3">
                                                 <div className="flex items-center gap-1">
-                                                    <button onClick={() => handleEditClick(product)} className="text-text-secondary hover:text-text-primary p-2 hover:bg-hover-bg rounded-full" title="Edit">
-                                                        <PencilIcon className="w-5 h-5" />
+                                                    <button onClick={() => handleEditClick(product)} className="text-text-secondary hover:text-accent-blue hover:bg-accent-blue/10 p-1.5 rounded-md transition-all" title="Edit">
+                                                        <PencilIcon className="w-4 h-4" />
                                                     </button>
-                                                    <button onClick={() => onDeleteProduct(product)} className="text-text-secondary hover:text-accent-red p-2 hover:bg-hover-bg rounded-full" title="Delete">
-                                                        <TrashIcon className="w-5 h-5" />
+                                                    <button onClick={() => onDeleteProduct(product)} className="text-text-secondary hover:text-accent-red hover:bg-accent-red/10 p-1.5 rounded-md transition-all" title="Delete">
+                                                        <TrashIcon className="w-4 h-4" />
                                                     </button>
                                                 </div>
                                             </td>
@@ -187,7 +191,14 @@ const ProductInventoryView: React.FC<{
                             )
                         }) : (
                             <tr>
-                                <td colSpan={7} className="text-center p-16 text-text-secondary">No items found.</td>
+                                <td colSpan={8} className="text-center py-12 text-text-secondary text-sm">
+                                    <div className="flex flex-col items-center gap-2">
+                                        <svg className="w-12 h-12 text-text-secondary/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                        </svg>
+                                        <p>No items found.</p>
+                                    </div>
+                                </td>
                             </tr>
                         )}
                     </tbody>
@@ -455,6 +466,7 @@ const Inventory: React.FC<InventoryProps> = ({ inventoryItems, setInventoryItems
         const quantityIndex = headers.indexOf('QUANTITY');
         const unitIndex = headers.indexOf('UNIT');
         const priceIndex = headers.indexOf('PRICE');
+        const supplierIndex = headers.indexOf('SUPPLIER');
 
         if (nameIndex === -1 || categoryIndex === -1) {
             alert('CSV must contain "ITEM" and "CATEGORY" columns.');
@@ -485,17 +497,20 @@ const Inventory: React.FC<InventoryProps> = ({ inventoryItems, setInventoryItems
             if (!category) return;
 
             const productKey = `${name.toLowerCase().trim()}-${brand.toLowerCase().trim()}`;
-            
+
             const unit = unitIndex > -1 ? values[unitIndex] : 'pcs';
+            const quantity = quantityIndex > -1 ? parseFloat(values[quantityIndex]) : 0;
             const price = priceIndex > -1 ? parseFloat(values[priceIndex]) : 0;
-            
+            const supplier = supplierIndex > -1 ? values[supplierIndex] : '';
+
             const productData = {
                 name,
                 brand,
                 category,
                 unit: unit || 'pcs',
+                quantity: isNaN(quantity) ? 0 : quantity,
                 price: isNaN(price) ? 0 : price,
-                supplier: '', // Supplier not in CSV, can be edited later
+                supplier: supplier || '',
             };
 
             const existingProduct = existingProductsMap.get(productKey);
@@ -503,7 +518,9 @@ const Inventory: React.FC<InventoryProps> = ({ inventoryItems, setInventoryItems
             if (existingProduct) {
                 productsToUpdate[existingProduct.id] = {
                     unit: productData.unit,
+                    quantity: productData.quantity,
                     price: productData.price,
+                    supplier: productData.supplier || existingProduct.supplier,
                 };
             } else {
                 productsToAdd.push(productData);

@@ -20,6 +20,10 @@ export interface PayslipPdfData {
     totalEarnings: number;
     totalDeductions: number;
     netSalary: number;
+    daysPresent: number;
+    daysAbsent: number;
+    daysLate: number;
+    totalHours: number;
 }
 
 const MARGIN = 72; // 1 inch margin on A4 (72pt = 1in)
@@ -185,20 +189,22 @@ export const generatePayslipPdf = async (data: PayslipPdfData) => {
 
     setTextColor(doc, TEXT_COLOR);
 
-    let cursorY = MARGIN;
+    let cursorY = MARGIN - 20; // Move starting position up
 
     const columnGap = 28;
     const columnWidth = (pageWidth - MARGIN * 2 - columnGap) / 2;
     const logoWidth = 120;
     const logoHeight = 120;
+    const logoX = MARGIN - 15; // Move logo to the left
+    const logoY = cursorY - 10; // Move logo up
     const logoDataUrl = await loadLogoDataUrl();
 
     if (logoDataUrl) {
-        doc.addImage(logoDataUrl, 'PNG', MARGIN, cursorY, logoWidth, logoHeight, undefined, 'FAST');
+        doc.addImage(logoDataUrl, 'PNG', logoX, logoY, logoWidth, logoHeight, undefined, 'FAST');
     } else {
         const fallbackDiameter = 96;
-        const logoCenterX = MARGIN + fallbackDiameter / 2;
-        const logoCenterY = cursorY + fallbackDiameter / 2;
+        const logoCenterX = logoX + fallbackDiameter / 2;
+        const logoCenterY = logoY + fallbackDiameter / 2;
         doc.setFillColor(LOGO_BG.r, LOGO_BG.g, LOGO_BG.b);
         doc.circle(logoCenterX, logoCenterY, fallbackDiameter / 2, 'F');
         doc.setDrawColor(LOGO_BG.r, LOGO_BG.g, LOGO_BG.b);
@@ -216,11 +222,11 @@ export const generatePayslipPdf = async (data: PayslipPdfData) => {
     setTextColor(doc, TEXT_COLOR);
     doc.setFont(HEADER_FONT, 'bold');
     doc.setFontSize(28);
-    doc.text(data.companyName, headerRightX, cursorY + 26, { align: 'right' });
+    doc.text(data.companyName, headerRightX, cursorY + 35, { align: 'right' });
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(11);
+    doc.setFontSize(9);
     setTextColor(doc, SUBTEXT_COLOR);
-    doc.text(data.companyAddress, headerRightX, cursorY + 44, { align: 'right' });
+    doc.text(data.companyAddress, headerRightX, cursorY + 52, { align: 'right', maxWidth: 200 });
     setTextColor(doc, TEXT_COLOR);
 
     cursorY += logoHeight + 40;
@@ -236,14 +242,11 @@ export const generatePayslipPdf = async (data: PayslipPdfData) => {
 
     const leftRows = [
         { label: 'Employee Name', value: data.employeeName },
-        { label: 'Department', value: data.department },
         { label: 'Designation', value: data.designation },
     ];
     const rightRows = [
         { label: 'Pay Coverage', value: data.payCoverage },
         { label: 'Pay Date', value: data.payDate },
-        { label: 'Bank Account', value: data.bankAccount },
-        { label: 'Payment Mode', value: data.paymentMode },
     ];
 
     drawInfoColumn(doc, leftRows, MARGIN, cursorY, columnWidth);
@@ -270,11 +273,40 @@ export const generatePayslipPdf = async (data: PayslipPdfData) => {
         pageWidth,
     });
 
-    cursorY += 40;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(18);
-    setTextColor(doc, EMPHASIS_TEXT);
-    doc.text(`NET SALARY : ${formatMoney(data.netSalary)}`, MARGIN, cursorY);
+    cursorY += 20;
 
-    doc.save('payslip.pdf');
+    // Net Salary Box - matching table style
+    const tableWidth = pageWidth - MARGIN * 2;
+    const netSalaryHeight = 35;
+
+    doc.setFillColor(TABLE_TOTAL_FILL.r, TABLE_TOTAL_FILL.g, TABLE_TOTAL_FILL.b);
+    doc.rect(MARGIN, cursorY, tableWidth, netSalaryHeight, 'F');
+    doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
+    doc.setLineWidth(1);
+    doc.rect(MARGIN, cursorY, tableWidth, netSalaryHeight, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    setTextColor(doc, TEXT_COLOR);
+    doc.text('NET SALARY', MARGIN + 12, cursorY + netSalaryHeight - 11);
+
+    doc.setFontSize(18);
+    doc.text(formatMoney(data.netSalary), MARGIN + tableWidth - 12, cursorY + netSalaryHeight - 11, { align: 'right' });
+
+    cursorY += netSalaryHeight + 40;
+
+    // Bottom note
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(9);
+    setTextColor(doc, SUBTEXT_COLOR);
+    const noteText = 'This is a computer-generated payslip and does not require a signature.';
+    doc.text(noteText, pageWidth / 2, cursorY, { align: 'center' });
+
+    // Generate filename: [employee name] Payslip [pay duration]
+    const sanitizeFilename = (str: string) => str.replace(/[^a-zA-Z0-9\s\-]/g, '');
+    const employeePart = sanitizeFilename(data.employeeName);
+    const durationPart = sanitizeFilename(data.payCoverage);
+    const filename = `${employeePart} Payslip ${durationPart}.pdf`;
+
+    doc.save(filename);
 };

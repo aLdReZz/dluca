@@ -71,7 +71,7 @@ const Combobox: React.FC<ComboboxProps> = ({
 
 const ProductItemModal: React.FC<ProductItemModalProps> = ({ isOpen, onClose, onSave, categories, brands, units, suppliers }) => {
     const initialState = {
-        category: '', name: '', brand: '', unit: '', price: 0, supplier: '',
+        category: '', name: '', brand: '', unit: '', quantity: 0, price: 0, supplier: '',
     };
     const [formData, setFormData] = useState(initialState);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -115,7 +115,7 @@ const ProductItemModal: React.FC<ProductItemModalProps> = ({ isOpen, onClose, on
         const { name, value } = e.target;
         setFormData(prev => ({
             ...prev,
-            [name]: name === 'price' ? parseFloat(value) || 0 : value,
+            [name]: (name === 'price' || name === 'quantity') ? parseFloat(value) || 0 : value,
         }));
         if (errors[name]) {
             setErrors(prev => ({ ...prev, [name]: '' }));
@@ -282,19 +282,23 @@ const ProductItemModal: React.FC<ProductItemModalProps> = ({ isOpen, onClose, on
                                 onMouseEnterSuggestion={setHighlightedSupplierIndex}
                             />
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                             <Combobox
                                 label="Unit" name="unit" value={formData.unit} placeholder="Type or select a unit"
                                 suggestions={displayUnitSuggestions} showSuggestions={showUnitSuggestions}
-                                highlightedIndex={highlightedUnitIndex} 
-                                
+                                highlightedIndex={highlightedUnitIndex}
+
                                 onChange={(e) => handleComboboxChange(e, setShowUnitSuggestions, setHighlightedUnitIndex)}
                                 onFocus={() => setShowUnitSuggestions(true)}
                                 onBlur={createBlurHandler(setShowUnitSuggestions)}
-                                onKeyDown={(e) => handleKeyDown(e, displayUnitSuggestions, highlightedUnitIndex, setHighlightedUnitIndex, (item) => handleSuggestionClick('unit', item, setShowUnitSuggestions), formData.unit, 'price')}
+                                onKeyDown={(e) => handleKeyDown(e, displayUnitSuggestions, highlightedUnitIndex, setHighlightedUnitIndex, (item) => handleSuggestionClick('unit', item, setShowUnitSuggestions), formData.unit, 'quantity')}
                                 onSuggestionClick={(item) => handleSuggestionClick('unit', item.startsWith('+ Add') ? formData.unit.trim() : item, setShowUnitSuggestions)}
                                 onMouseEnterSuggestion={setHighlightedUnitIndex}
                             />
+                            <div>
+                                <label className="block text-sm font-medium text-text-secondary mb-1">Quantity</label>
+                                <input type="number" name="quantity" value={String(formData.quantity)} onChange={handleChange} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue" />
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium text-text-secondary mb-1">Price (₱)</label>
                                 <input type="number" name="price" value={String(formData.price)} onChange={handleChange} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue" />
