@@ -715,28 +715,28 @@ const Attendance: React.FC<AttendanceProps> = ({
                         </button>
                     </div>
                 </div>
-                <div className="bg-gradient-to-br from-bg-secondary to-bg-tertiary/30 rounded-xl border border-border-color p-3 shadow-sm">
+                <div className="bg-gradient-to-br from-bg-secondary to-bg-tertiary/30 rounded-xl border border-border-color p-6 shadow-sm">
                    <div className="relative">
-                     <div className="flex flex-nowrap gap-3 p-2 overflow-x-auto horizontal-scrollbar-hide">
+                     <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-6 justify-items-center">
                          {employees.length > 0 ? employees.map(emp => (
-                            <div key={emp.id} className="relative flex flex-col items-center w-24 flex-shrink-0 group">
+                            <div key={emp.id} className="relative flex flex-col items-center group w-full max-w-[90px]">
                                <button
                                     onClick={() => setViewedEmployee(emp)}
-                                    className="relative w-14 h-14 rounded-full bg-gradient-to-br from-accent-blue/20 to-accent-blue/10 text-accent-blue flex items-center justify-center font-bold text-xl transition-all hover:scale-110 hover:shadow-lg hover:shadow-accent-blue/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-secondary focus:ring-accent-blue border-2 border-accent-blue/20"
+                                    className="relative w-16 h-16 rounded-full bg-gradient-to-br from-accent-blue/20 to-accent-blue/10 text-accent-blue flex items-center justify-center font-bold text-xl transition-all hover:scale-110 hover:shadow-xl hover:shadow-accent-blue/40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-secondary focus:ring-accent-blue border-2 border-accent-blue/30"
                                 >
-                                    {emp.name.charAt(0)}
+                                    {emp.name.charAt(0).toUpperCase()}
                                 </button>
-                                <p className="mt-1.5 text-xs font-semibold text-text-primary text-center truncate w-full group-hover:text-accent-blue transition-colors">{emp.name}</p>
-                                <p className="text-[10px] text-text-secondary text-center truncate w-full capitalize">{emp.position}</p>
+                                <p className="mt-2 text-xs font-semibold text-text-primary text-center truncate w-full group-hover:text-accent-blue transition-colors">{emp.name}</p>
+                                <p className="text-[10px] text-text-secondary text-center truncate w-full capitalize mt-0.5">{emp.position}</p>
                             </div>
                          )) : (
-                             <div className="w-full flex flex-col items-center justify-center h-24 text-text-secondary">
-                                <PlusIcon className="w-8 h-8 mb-2 opacity-30" />
-                                <p className="text-xs">No employees added yet</p>
+                             <div className="col-span-full flex flex-col items-center justify-center py-8 text-text-secondary w-full">
+                                <PlusIcon className="w-10 h-10 mb-2 opacity-30" />
+                                <p className="text-sm font-medium">No employees added yet</p>
+                                <p className="text-xs mt-1 opacity-70">Click "Add Employee" to get started</p>
                              </div>
                          )}
                        </div>
-                       <div className="absolute top-0 right-0 bottom-0 w-12 bg-gradient-to-l from-bg-secondary pointer-events-none lg:hidden"></div>
                    </div>
                 </div>
             </div>
