@@ -338,6 +338,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                               email: formData.email,
                               bankAccount: formData.bankAccount,
                               paymentMode: formData.paymentMode,
+                              // Preserve existing fields like schedule, approvedOvertime, salaryDeductions
                           }
                         : emp
                 )

@@ -439,9 +439,12 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         const overtimePay = totalOvertimeHours * employee.rate * OVERTIME_RATE_MULTIPLIER;
         const serviceChargeShare = employeeServiceChargeBreakdown?.totalShare ?? 0;
         const grossPay = regularPay + overtimePay + serviceChargeShare;
-        
+
+        // Calculate total salary deductions
+        const totalSalaryDeductions = (employee.salaryDeductions || []).reduce((sum, d) => sum + d.amount, 0);
+
         const deductions = { sss: 0, philhealth: 0, pagibig: 0, total: 0 };
-        const netPay = grossPay - deductions.total;
+        const netPay = grossPay - deductions.total - totalSalaryDeductions;
 
         const newRecord: PayrollRecord = {
             id: employee.id,
@@ -461,7 +464,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             daysAbsent,
             daysLate,
             deductionNotes: '',
-            customDeduction: 0,
+            customDeduction: totalSalaryDeductions,
             serviceChargeBreakdown: employeeServiceChargeBreakdown,
         };
         

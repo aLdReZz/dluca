@@ -10,6 +10,7 @@ import {
     parseSalesDate,
 } from '../utils/salesData';
 import { calculateServiceChargeDistribution } from '../utils/serviceChargeAllocation';
+import { generateConsolidatedPayslipsPdf, PayslipPdfData } from '../utils/payslipPdf';
 
 
 interface PayrollProps {
@@ -228,15 +229,18 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
             const regularPay = totalRegularHours * employee.rate;
             const overtimePay = totalOvertimeHours * employee.rate * OVERTIME_RATE_MULTIPLIER;
             const grossPay = regularPay + overtimePay;
-            
+
+            // Calculate total salary deductions
+            const totalSalaryDeductions = (employee.salaryDeductions || []).reduce((sum, d) => sum + d.amount, 0);
+
             const deductions = {
                 sss: 0,
                 philhealth: 0,
                 pagibig: 0,
                 total: 0
             };
-            
-            const netPay = grossPay - deductions.total;
+
+            const netPay = grossPay - deductions.total - totalSalaryDeductions;
 
             return {
                 id: employee.id,
@@ -259,7 +263,7 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
                 daysAbsent,
                 daysLate,
                 deductionNotes: '',
-                customDeduction: 0
+                customDeduction: totalSalaryDeductions
             };
         });
 
@@ -325,6 +329,74 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
         setSelectedRecord(null);
     };
 
+    const handleExportAllPayslips = async () => {
+        if (payrollRecords.length === 0) {
+            alert('No payroll records to export. Please ensure there are employees with attendance data.');
+            return;
+        }
+
+        const payslipsData: PayslipPdfData[] = payrollRecords.map(record => {
+            const earnings: { description: string; amount: number }[] = [];
+
+            // Add Basic Salary (regular pay)
+            if (record.regularPay > 0) {
+                earnings.push({ description: 'Basic Salary', amount: record.regularPay });
+            }
+
+            // Add Overtime Pay
+            if (record.overtimeHours > 0 && record.overtimePay > 0) {
+                earnings.push({ description: 'Overtime Pay', amount: record.overtimePay });
+            }
+
+            // Add Service Charge
+            if (record.serviceCharge > 0) {
+                earnings.push({ description: 'Service Charge', amount: record.serviceCharge });
+            }
+
+            const deductions: { description: string; amount: number }[] = [];
+            if (record.deductions.sss > 0) {
+                deductions.push({ description: 'SSS Contribution', amount: record.deductions.sss });
+            }
+            if (record.deductions.philhealth > 0) {
+                deductions.push({ description: 'PhilHealth Contribution', amount: record.deductions.philhealth });
+            }
+            if (record.deductions.pagibig > 0) {
+                deductions.push({ description: 'Pag-IBIG Contribution', amount: record.deductions.pagibig });
+            }
+
+            // Add salary deductions with their actual descriptions
+            const employee = employees.find(e => e.id === record.id);
+            if (employee?.salaryDeductions && employee.salaryDeductions.length > 0) {
+                employee.salaryDeductions.forEach(deduction => {
+                    deductions.push({ description: deduction.description, amount: deduction.amount });
+                });
+            }
+
+            return {
+                companyName: "D'Luca Bistro X Cafe",
+                companyAddress: "2nd flr. Soho Bldg. Governors's Drive, Brgy. Cabuco, Trece Martires Cavite",
+                employeeName: record.employee,
+                department: record.department || 'N/A',
+                designation: record.position,
+                payCoverage: `${formatDateForDisplay(payPeriod.start)} - ${formatDateForDisplay(payPeriod.end)}`,
+                payDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+                bankAccount: record.bankAccount || 'N/A',
+                paymentMode: record.paymentMode || 'Cash',
+                earnings,
+                deductions,
+                totalEarnings: record.grossPay,
+                totalDeductions: record.deductions.total + (record.customDeduction || 0),
+                netSalary: record.netPay,
+                daysPresent: record.daysPresent,
+                daysAbsent: record.daysAbsent,
+                daysLate: record.daysLate,
+                totalHours: record.totalHours,
+            };
+        });
+
+        await generateConsolidatedPayslipsPdf(payslipsData);
+    };
+
     const summaryStats = useMemo(() => {
         return payrollRecords.reduce(
             (acc, record) => {
@@ -361,8 +433,18 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
                     <p className="text-text-secondary mt-1">Automatically generated for the selected pay period.</p>
                 </div>
                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                        onClick={handleExportAllPayslips}
+                        disabled={payrollRecords.length === 0}
+                        className="bg-accent-blue text-white border border-accent-blue rounded-lg px-4 py-2 text-sm font-medium flex items-center gap-2 hover:bg-accent-blue/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span>Export All PDFs</span>
+                    </button>
                     <div className="relative" ref={calendarRef}>
-                        <button 
+                        <button
                             onClick={() => setIsCalendarOpen(!isCalendarOpen)}
                             className="bg-bg-tertiary border border-border-color rounded-lg p-2 text-sm font-medium flex items-center gap-2 hover:bg-hover-bg transition"
                         >
@@ -370,7 +452,7 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
                             <span>{`${formatDateForDisplay(payPeriod.start)} - ${formatDateForDisplay(payPeriod.end)}`}</span>
                         </button>
                         {isCalendarOpen && (
-                            <CalendarPopup 
+                            <CalendarPopup
                                 initialRange={payPeriod}
                                 onRangeComplete={handleRangeComplete}
                                 onClose={() => setIsCalendarOpen(false)}

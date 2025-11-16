@@ -65,13 +65,17 @@ const drawInfoColumn = (
         const valueX = colonX + 10;
         const maxValueWidth = Math.max(60, columnWidth - labelWidth - 10);
 
+        // Ensure label and value are valid strings
+        const label = String(row.label || '');
+        const value = String(row.value || 'N/A');
+
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(11);
-        doc.text(row.label, startX, y);
+        doc.text(label, startX, y);
         doc.text(':', colonX, y);
 
         doc.setFont('helvetica', 'normal');
-        doc.text(row.value, valueX, y, { maxWidth: maxValueWidth });
+        doc.text(value, valueX, y, { maxWidth: maxValueWidth });
     });
 };
 
@@ -102,17 +106,17 @@ const drawTable = ({
     doc.text(title, MARGIN, y);
     y += 18;
 
-    const headerHeight = 22;
+    const headerHeight = 26;
     doc.setFillColor(TABLE_HEADER_FILL.r, TABLE_HEADER_FILL.g, TABLE_HEADER_FILL.b);
     doc.rect(MARGIN, y, tableWidth, headerHeight, 'F');
     doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
     doc.rect(MARGIN, y, tableWidth, headerHeight, 'S');
 
-    doc.setFontSize(10);
+    doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(255, 255, 255);
-    doc.text('Description', MARGIN + 12, y + headerHeight - 8);
-    doc.text('Amount', MARGIN + tableWidth - 12, y + headerHeight - 8, { align: 'right' });
+    setTextColor(doc, TEXT_COLOR);
+    doc.text('Description', MARGIN + 12, y + headerHeight - 9);
+    doc.text('Amount', MARGIN + tableWidth - 12, y + headerHeight - 9, { align: 'right' });
     y += headerHeight;
 
     const rowHeight = 20;
@@ -127,8 +131,13 @@ const drawTable = ({
         doc.setFillColor(fillColor.r, fillColor.g, fillColor.b);
         doc.rect(MARGIN, y, tableWidth, rowHeight, 'F');
         doc.rect(MARGIN, y, tableWidth, rowHeight, 'S');
-        doc.text(row.description, MARGIN + 12, y + rowHeight - 7);
-        doc.text(formatMoney(row.amount), MARGIN + tableWidth - 12, y + rowHeight - 7, {
+
+        // Ensure description is a valid string
+        const description = String(row.description || 'N/A');
+        const amount = Number.isFinite(row.amount) ? row.amount : 0;
+
+        doc.text(description, MARGIN + 12, y + rowHeight - 7);
+        doc.text(formatMoney(amount), MARGIN + tableWidth - 12, y + rowHeight - 7, {
             align: 'right',
         });
         y += rowHeight;
@@ -183,8 +192,7 @@ const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
     return btoa(binary);
 };
 
-export const generatePayslipPdf = async (data: PayslipPdfData) => {
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: string | null) => {
     const pageWidth = doc.internal.pageSize.getWidth();
 
     setTextColor(doc, TEXT_COLOR);
@@ -197,7 +205,6 @@ export const generatePayslipPdf = async (data: PayslipPdfData) => {
     const logoHeight = 120;
     const logoX = MARGIN - 15; // Move logo to the left
     const logoY = cursorY - 10; // Move logo up
-    const logoDataUrl = await loadLogoDataUrl();
 
     if (logoDataUrl) {
         doc.addImage(logoDataUrl, 'PNG', logoX, logoY, logoWidth, logoHeight, undefined, 'FAST');
@@ -301,12 +308,43 @@ export const generatePayslipPdf = async (data: PayslipPdfData) => {
     setTextColor(doc, SUBTEXT_COLOR);
     const noteText = 'This is a computer-generated payslip and does not require a signature.';
     doc.text(noteText, pageWidth / 2, cursorY, { align: 'center' });
+};
+
+export const generatePayslipPdf = async (data: PayslipPdfData) => {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+    const logoDataUrl = await loadLogoDataUrl();
+
+    await renderPayslipPage(doc, data, logoDataUrl);
 
     // Generate filename: [employee name] Payslip [pay duration]
     const sanitizeFilename = (str: string) => str.replace(/[^a-zA-Z0-9\s\-]/g, '');
     const employeePart = sanitizeFilename(data.employeeName);
     const durationPart = sanitizeFilename(data.payCoverage);
     const filename = `${employeePart} Payslip ${durationPart}.pdf`;
+
+    doc.save(filename);
+};
+
+export const generateConsolidatedPayslipsPdf = async (payslipsData: PayslipPdfData[]) => {
+    if (payslipsData.length === 0) {
+        console.warn('No payslip data provided for consolidated PDF');
+        return;
+    }
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+    const logoDataUrl = await loadLogoDataUrl();
+
+    for (let i = 0; i < payslipsData.length; i++) {
+        if (i > 0) {
+            doc.addPage();
+        }
+        await renderPayslipPage(doc, payslipsData[i], logoDataUrl);
+    }
+
+    // Generate filename using first payslip's pay coverage
+    const sanitizeFilename = (str: string) => str.replace(/[^a-zA-Z0-9\s\-]/g, '');
+    const durationPart = sanitizeFilename(payslipsData[0].payCoverage);
+    const filename = `All Payslips ${durationPart}.pdf`;
 
     doc.save(filename);
 };
