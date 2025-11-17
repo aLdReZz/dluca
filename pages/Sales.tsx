@@ -2,10 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import type { SalesData } from '../types';
 import { UploadIcon } from '../components/Icons';
+import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
+import { salesService } from '../utils/firebaseService';
 
 interface SalesProps {
-    salesData: SalesData[];
-    setSalesData: React.Dispatch<React.SetStateAction<SalesData[]>>;
+    salesData?: SalesData[];
+    setSalesData?: React.Dispatch<React.SetStateAction<SalesData[]>>;
 }
 
 const PLACEHOLDER_SALES: SalesData[] = [
@@ -57,14 +59,32 @@ const PLACEHOLDER_SALES: SalesData[] = [
     },
 ];
 
-const Sales: React.FC<SalesProps> = ({ salesData, setSalesData }) => {
+const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: setPropSalesData }) => {
+    // Fetch sales data from Firebase
+    const { data: firebaseSalesData = [], loading: salesLoading, error: salesError } = useFirebaseData(
+        () => salesService.getAll(),
+        []
+    );
+
+    // Batch upload mutation for CSV imports
+    const { mutate: batchUpload, loading: uploadLoading, error: uploadError } = useFirebaseMutation(
+        (records: SalesData[]) => salesService.batch(records)
+    );
+
+    // Use Firebase data if available, otherwise use prop data (for backward compatibility)
+    const salesData = (Array.isArray(firebaseSalesData) && firebaseSalesData.length > 0) ? firebaseSalesData : (propSalesData || []);
+
     const [dragActive, setDragActive] = useState(false);
+    const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
     useEffect(() => {
-        if (salesData.length === 0) {
-            setSalesData(PLACEHOLDER_SALES);
+        if (salesData.length === 0 && !salesLoading) {
+            // Try to set placeholder data to prop setSalesData if available
+            if (setPropSalesData) {
+                setPropSalesData(PLACEHOLDER_SALES);
+            }
         }
-    }, [salesData.length, setSalesData]);
+    }, [salesData.length, salesLoading, setPropSalesData]);
 
     const handleFile = (file: File) => {
         if (file && file.type === 'text/csv') {
@@ -104,70 +124,141 @@ const Sales: React.FC<SalesProps> = ({ salesData, setSalesData }) => {
         }
     };
 
-    const parseSalesCSV = (text: string) => {
-        const rows: string[][] = [];
-        let current = '';
-        let row: string[] = [];
-        let inQuotes = false;
-        const input = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const parseSalesCSV = async (text: string) => {
+        try {
+            const rows: string[][] = [];
+            let current = '';
+            let row: string[] = [];
+            let inQuotes = false;
+            const input = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-        for (let i = 0; i < input.length; i++) {
-            const char = input[i];
-            const nextChar = input[i + 1];
+            for (let i = 0; i < input.length; i++) {
+                const char = input[i];
+                const nextChar = input[i + 1];
 
-            if (char === '"') {
-                if (inQuotes && nextChar === '"') {
-                    current += '"';
-                    i++;
+                if (char === '"') {
+                    if (inQuotes && nextChar === '"') {
+                        current += '"';
+                        i++;
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (char === ',' && !inQuotes) {
+                    row.push(current);
+                    current = '';
+                } else if (char === '\n' && !inQuotes) {
+                    row.push(current);
+                    rows.push(row);
+                    row = [];
+                    current = '';
                 } else {
-                    inQuotes = !inQuotes;
+                    current += char;
                 }
-            } else if (char === ',' && !inQuotes) {
-                row.push(current);
-                current = '';
-            } else if (char === '\n' && !inQuotes) {
+            }
+
+            if (current.length > 0 || row.length > 0) {
                 row.push(current);
                 rows.push(row);
-                row = [];
-                current = '';
-            } else {
-                current += char;
             }
+
+            if (rows.length === 0) {
+                if (setPropSalesData) {
+                    setPropSalesData([]);
+                }
+                setUploadStatus({ type: 'error', message: 'No data found in CSV file' });
+                return;
+            }
+
+            const headers = rows[0].map(header => header.trim().replace(/^\uFEFF/, '').replace(/"/g, ''));
+            const data: SalesData[] = [];
+
+            for (let i = 1; i < rows.length; i++) {
+                const values = rows[i];
+                if (values.every(value => !value || !value.trim())) continue;
+                const rowData: SalesData = {};
+                headers.forEach((header, index) => {
+                    const raw = values[index] ?? '';
+                    rowData[header] = raw.trim().replace(/^\uFEFF/, '').replace(/"/g, '');
+                });
+                rowData.__column1 = (values[0] ?? '').trim().replace(/^\uFEFF/, '').replace(/"/g, '');
+                rowData.__column10 = (values[9] ?? '').trim().replace(/^\uFEFF/, '').replace(/"/g, '');
+                data.push(rowData);
+            }
+
+            // Upload to Firebase
+            await batchUpload(data);
+
+            // Also update prop data for backward compatibility
+            if (setPropSalesData) {
+                setPropSalesData(data);
+            }
+
+            setUploadStatus({ type: 'success', message: `Successfully uploaded ${data.length} sales records` });
+            setTimeout(() => setUploadStatus(null), 3000);
+        } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : 'Failed to upload sales data';
+            setUploadStatus({ type: 'error', message: errorMsg });
         }
-
-        if (current.length > 0 || row.length > 0) {
-            row.push(current);
-            rows.push(row);
-        }
-
-        if (rows.length === 0) {
-            setSalesData([]);
-            return;
-        }
-
-        const headers = rows[0].map(header => header.trim().replace(/^\uFEFF/, '').replace(/"/g, ''));
-        const data: SalesData[] = [];
-
-        for (let i = 1; i < rows.length; i++) {
-            const values = rows[i];
-            if (values.every(value => !value || !value.trim())) continue;
-            const rowData: SalesData = {};
-            headers.forEach((header, index) => {
-                const raw = values[index] ?? '';
-                rowData[header] = raw.trim().replace(/^\uFEFF/, '').replace(/"/g, '');
-            });
-            rowData.__column1 = (values[0] ?? '').trim().replace(/^\uFEFF/, '').replace(/"/g, '');
-            rowData.__column10 = (values[9] ?? '').trim().replace(/^\uFEFF/, '').replace(/"/g, '');
-            data.push(rowData);
-        }
-
-        setSalesData(data);
     };
     
     const headers = salesData.length > 0 ? Object.keys(salesData[0]) : [];
 
+    // Show loading state
+    if (salesLoading) {
+        return (
+            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+                <div className="flex flex-col items-center justify-center h-96">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-blue mx-auto mb-4"></div>
+                        <p className="text-text-secondary">Loading sales data...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Show error state
+    if (salesError) {
+        return (
+            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
+                    <p className="text-red-500 font-medium">Error loading sales data</p>
+                    <p className="text-text-secondary text-sm mt-1">{salesError}</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+            {/* Upload Status Messages */}
+            {uploadStatus && (
+                <div className={`mb-6 p-4 rounded-lg border ${
+                    uploadStatus.type === 'success'
+                        ? 'bg-green-500/10 border-green-500/30'
+                        : 'bg-red-500/10 border-red-500/30'
+                }`}>
+                    <p className={uploadStatus.type === 'success' ? 'text-green-500' : 'text-red-500'}>
+                        {uploadStatus.message}
+                    </p>
+                </div>
+            )}
+
+            {/* Upload Status - During Upload */}
+            {uploadLoading && (
+                <div className="mb-6 p-4 rounded-lg bg-accent-blue/10 border border-accent-blue/30 flex items-center gap-3">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-accent-blue"></div>
+                    <p className="text-accent-blue">Uploading sales data to Firestore...</p>
+                </div>
+            )}
+
+            {/* Upload Error */}
+            {uploadError && (
+                <div className="mb-6 p-4 rounded-lg bg-red-500/10 border border-red-500/30">
+                    <p className="text-red-500 text-sm">Upload error: {uploadError}</p>
+                </div>
+            )}
+
             <label
                 htmlFor="salesFileInput"
                 onDragEnter={handleDrag}
@@ -201,7 +292,7 @@ const Sales: React.FC<SalesProps> = ({ salesData, setSalesData }) => {
                                 {salesData.map((row, rowIndex) => (
                                     <tr key={rowIndex} className="hover:bg-hover-bg/50 transition-colors">
                                         {headers.map(header => (
-                                            <td key={`${rowIndex}-${header}`} className="p-4 text-sm text-text-primary">{row[header]}</td>
+                                            <td key={`${rowIndex}-${header}`} className="p-4 text-sm text-text-primary">{typeof row[header] === 'string' || typeof row[header] === 'number' ? row[header] : String(row[header] || '')}</td>
                                         ))}
                                     </tr>
                                 ))}
@@ -215,7 +306,7 @@ const Sales: React.FC<SalesProps> = ({ salesData, setSalesData }) => {
                                 {headers.map(header => (
                                     <div key={`${rowIndex}-${header}`} className="flex justify-between text-sm py-1 border-b border-border-color/50 last:border-b-0">
                                         <span className="font-medium text-text-secondary">{header}</span>
-                                        <span className="text-text-primary text-right break-all">{row[header]}</span>
+                                        <span className="text-text-primary text-right break-all">{typeof row[header] === 'string' || typeof row[header] === 'number' ? row[header] : String(row[header] || '')}</span>
                                     </div>
                                 ))}
                             </div>
