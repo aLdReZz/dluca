@@ -3,21 +3,23 @@ import type { InventoryItem, PurchaseOrder, ProductInventoryItem } from '../type
 import { PlusIcon, SearchIcon, FilterIcon, PencilIcon, TrashIcon, ViewDetailsIcon, EllipsisHorizontalIcon, ClockIcon, ExclamationCircleIcon, ClipboardDocumentListIcon, ArchiveBoxXMarkIcon, CheckIcon, XMarkIcon, UploadIcon } from '../components/Icons';
 import ProductItemModal from '../components/ProductItemModal';
 import ConfirmationModal from '../components/ConfirmationModal';
+import { useFirebaseData } from '../hooks/useFirebase';
+import { inventoryService, productInventoryService } from '../utils/firebaseService';
 
 
 interface InventoryProps {
-    inventoryItems: InventoryItem[];
-    setInventoryItems: React.Dispatch<React.SetStateAction<InventoryItem[]>>;
-    purchaseOrders: PurchaseOrder[];
-    setPurchaseOrders: React.Dispatch<React.SetStateAction<PurchaseOrder[]>>;
-    productInventoryItems: ProductInventoryItem[];
-    setProductInventoryItems: React.Dispatch<React.SetStateAction<ProductInventoryItem[]>>;
+    inventoryItems?: InventoryItem[];
+    setInventoryItems?: React.Dispatch<React.SetStateAction<InventoryItem[]>>;
+    purchaseOrders?: PurchaseOrder[];
+    setPurchaseOrders?: React.Dispatch<React.SetStateAction<PurchaseOrder[]>>;
+    productInventoryItems?: ProductInventoryItem[];
+    setProductInventoryItems?: React.Dispatch<React.SetStateAction<ProductInventoryItem[]>>;
     activeView: 'supplies' | 'product';
     productCategories: string[];
     productBrands: string[];
     productUnits: string[];
     productSuppliers: string[];
-    onAddProduct: (product: Omit<ProductInventoryItem, 'id'>) => void;
+    onAddProduct?: (product: Omit<ProductInventoryItem, 'id'>) => void;
 }
 
 const StatCard: React.FC<{ title: string; value: string | number; description: string; icon: React.FC<{ className?: string }>; iconClasses: string }> = ({ title, value, description, icon: Icon, iconClasses }) => {
@@ -389,11 +391,28 @@ const InventoryAndSuppliesView: React.FC<{ inventoryItems: InventoryItem[] }> = 
     );
 };
 
-const Inventory: React.FC<InventoryProps> = ({ inventoryItems, setInventoryItems, purchaseOrders, setPurchaseOrders, productInventoryItems, setProductInventoryItems, activeView, productCategories, productBrands, productUnits, productSuppliers, onAddProduct }) => {
-    
+const Inventory: React.FC<InventoryProps> = ({ inventoryItems: propInventoryItems, setInventoryItems: setPropInventoryItems, purchaseOrders: propPurchaseOrders, setPurchaseOrders: setPropPurchaseOrders, productInventoryItems: propProductInventoryItems, setProductInventoryItems: setPropProductInventoryItems, activeView, productCategories, productBrands, productUnits, productSuppliers, onAddProduct }) => {
+    // Fetch inventory items from Firebase
+    const { data: firebaseInventoryItems = [], loading: inventoryLoading, error: inventoryError } = useFirebaseData(
+        () => inventoryService.getAll(),
+        []
+    );
+
+    // Fetch product inventory items from Firebase
+    const { data: firebaseProductItems = [], loading: productLoading, error: productError } = useFirebaseData(
+        () => productInventoryService.getAll(),
+        []
+    );
+
+    // Use Firebase data if available, otherwise use prop data (for backward compatibility)
+    const inventoryItems = (Array.isArray(firebaseInventoryItems) && firebaseInventoryItems.length > 0) ? firebaseInventoryItems : (propInventoryItems || []);
+    const productInventoryItems = (Array.isArray(firebaseProductItems) && firebaseProductItems.length > 0) ? firebaseProductItems : (propProductInventoryItems || []);
+    const purchaseOrders = propPurchaseOrders || [];
+
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<ProductInventoryItem | null>(null);
+    const [operationStatus, setOperationStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const formattedDate = new Intl.DateTimeFormat('en-US', {
@@ -573,8 +592,46 @@ const Inventory: React.FC<InventoryProps> = ({ inventoryItems, setInventoryItems
         fileInputRef.current?.click();
     };
 
+    // Show loading state
+    if (inventoryLoading || productLoading) {
+        return (
+            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+                <div className="flex flex-col items-center justify-center h-96">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-blue mx-auto mb-4"></div>
+                        <p className="text-text-secondary">Loading inventory items...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Show error state
+    if (inventoryError || productError) {
+        return (
+            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
+                    <p className="text-red-500 font-medium">Error loading inventory items</p>
+                    <p className="text-text-secondary text-sm mt-1">{inventoryError || productError}</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+            {/* Operation Status Messages */}
+            {operationStatus && (
+                <div className={`mb-6 p-4 rounded-lg border ${
+                    operationStatus.type === 'success'
+                        ? 'bg-green-500/10 border-green-500/30'
+                        : 'bg-red-500/10 border-red-500/30'
+                }`}>
+                    <p className={operationStatus.type === 'success' ? 'text-green-500' : 'text-red-500'}>
+                        {operationStatus.message}
+                    </p>
+                </div>
+            )}
             <input 
                 type="file" 
                 ref={fileInputRef} 
