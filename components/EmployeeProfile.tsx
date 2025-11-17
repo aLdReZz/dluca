@@ -18,6 +18,8 @@ interface EmployeeProfileProps {
     employees: Employee[];
     attendanceRecords: AttendanceRecord[];
     salesData: SalesData[];
+    payrollRecords?: PayrollRecord[];
+    setPayrollRecords?: React.Dispatch<React.SetStateAction<PayrollRecord[]>>;
     onClose: () => void;
     onEdit: () => void;
     onDelete: () => void;
@@ -118,7 +120,7 @@ const Tag: React.FC<{text: string, type: 'present' | 'off' | 'absent' | 'late'}>
     return <span className={`inline-block text-center px-2 py-1 text-xs font-medium rounded-md uppercase ${classes[type]}`}>{text}</span>
 };
 
-const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, attendanceRecords, salesData, onClose, onEdit, onDelete, onUpdateEmployee }) => {
+const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, attendanceRecords, salesData, payrollRecords, setPayrollRecords, onClose, onEdit, onDelete, onUpdateEmployee }) => {
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     const calendarRef = useRef<HTMLDivElement>(null);
     const [editingOtDateKey, setEditingOtDateKey] = useState<string | null>(null);
@@ -129,13 +131,20 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
     const [isServiceChargeExpanded, setIsServiceChargeExpanded] = useState(true);
 
     const [committedRange, setCommittedRange] = useState(() => {
-        // FIX: Corrected typo `new date()` to `new Date()`.
         const date = new Date();
-        const start = new Date(Date.UTC(date.getFullYear(), date.getMonth(), 1));
-        const end = new Date(Date.UTC(date.getFullYear(), date.getMonth() + 1, 0));
+        const start = new Date(date.getFullYear(), date.getMonth(), 1);
+        const end = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+        const formatDateKeyLocal = (d: Date): string => {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
         return {
-            start: start.toISOString().split('T')[0],
-            end: end.toISOString().split('T')[0],
+            start: formatDateKeyLocal(start),
+            end: formatDateKeyLocal(end),
         };
     });
     
@@ -338,6 +347,42 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
 
     const employeeServiceChargeShare = employeeServiceChargeBreakdown?.totalShare ?? 0;
     const employeeServiceChargeDetails = employeeServiceChargeBreakdown?.details ?? [];
+
+    const periodEarnings = useMemo(() => {
+        if (!committedRange.start || !committedRange.end) return { regularPay: 0, overtimePay: 0, serviceCharge: 0, total: 0 };
+
+        // Calculate regular and overtime pay from daily log for the filtered date range
+        const OVERTIME_RATE_MULTIPLIER = 1.25;
+        let totalRegularMinutes = 0;
+        let totalOvertimeMinutes = 0;
+
+        dailyLog.forEach(day => {
+            const dateKey = day.date.toISOString().split('T')[0];
+            // Only include days within the committed range
+            if (dateKey >= committedRange.start && dateKey <= committedRange.end) {
+                const approvedOT = employee.approvedOvertime?.[dateKey] || 0;
+                const paidMinutes = day.paidHours - approvedOT;
+
+                if (paidMinutes > 0) {
+                    totalRegularMinutes += paidMinutes;
+                }
+                if (approvedOT > 0) {
+                    totalOvertimeMinutes += approvedOT;
+                }
+            }
+        });
+
+        const totalRegularPay = (totalRegularMinutes / 60) * employee.rate;
+        const totalOvertimePay = (totalOvertimeMinutes / 60) * employee.rate * OVERTIME_RATE_MULTIPLIER;
+        const total = totalRegularPay + totalOvertimePay;
+
+        return {
+            regularPay: Math.round(totalRegularPay * 100) / 100,
+            overtimePay: Math.round(totalOvertimePay * 100) / 100,
+            serviceCharge: 0,
+            total: Math.round(total * 100) / 100,
+        };
+    }, [dailyLog, employee.rate, employee.approvedOvertime, committedRange]);
 
     const summary = useMemo(() => {
         let scheduled = 0, worked = 0, totalDelay = 0, absence = 0, approvedOT = 0, paidMinutes = 0, totalLoginMinutes = 0;
@@ -682,6 +727,10 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                         <div className="flex flex-col text-right">
                                             <p className="text-xs text-text-secondary uppercase tracking-wide">Your Share</p>
                                             <p className="text-xl font-bold text-accent-green">{formatPeso(employeeServiceChargeShare)}</p>
+                                        </div>
+                                        <div className="flex flex-col text-right">
+                                            <p className="text-xs text-text-secondary uppercase tracking-wide">Period Earning</p>
+                                            <p className="text-xl font-bold text-accent-blue">{formatPeso(periodEarnings.total)}</p>
                                         </div>
                                     </div>
                                     <ChevronDownIcon className={`w-5 h-5 text-text-secondary ml-3 transition-transform ${isServiceChargeExpanded ? 'rotate-180' : ''}`} />

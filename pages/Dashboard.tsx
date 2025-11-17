@@ -5,6 +5,8 @@ import { Chart, registerables } from 'chart.js';
 import StatCard from '../components/StatCard';
 import { CurrencyPesoIcon, ArrowTrendingUpIcon, BanknotesIcon, CalendarDaysIcon, SparklesIcon } from '../components/Icons';
 import CalendarPopup from '../components/CalendarPopup';
+import { useFirebaseData } from '../hooks/useFirebase';
+import { salesService } from '../utils/firebaseService';
 import {
     parseSalesDate,
     parseNumericValue,
@@ -24,7 +26,7 @@ import {
 Chart.register(...registerables);
 
 interface DashboardProps {
-    salesData: SalesData[];
+    salesData?: SalesData[];
 }
 
 const formatPeso = (amount?: number) => {
@@ -52,7 +54,16 @@ const formatDateForDisplay = (dateString: string) => {
     });
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
+const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
+    // Fetch sales data from Firebase
+    const { data: firebaseSalesData = [], loading: salesLoading, error: salesError } = useFirebaseData(
+        () => salesService.getAll(),
+        []
+    );
+
+    // Use Firebase data if available, otherwise use prop data (for backward compatibility)
+    const salesData = (Array.isArray(firebaseSalesData) && firebaseSalesData.length > 0) ? firebaseSalesData : (propSalesData || []);
+
     const [filter, setFilter] = useState<'daily' | 'weekly' | 'monthly' | 'lastMonth' | 'custom'>('monthly');
     const [stats, setStats] = useState({
         netSales: 0,
@@ -354,6 +365,32 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData }) => {
             {label}
         </button>
     );
+
+    // Show loading state
+    if (salesLoading) {
+        return (
+            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+                <div className="flex flex-col items-center justify-center h-96">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-blue mx-auto mb-4"></div>
+                        <p className="text-text-secondary">Loading sales data...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Show error state
+    if (salesError) {
+        return (
+            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
+                    <p className="text-red-500 font-medium">Error loading sales data</p>
+                    <p className="text-text-secondary text-sm mt-1">{salesError}</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">

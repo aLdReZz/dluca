@@ -320,25 +320,6 @@ const App: React.FC = () => {
     }, [loadData]);
 
     useEffect(() => {
-        if (employees.length > 0) {
-            const needsUpdate = employees.some(emp => 
-                (emp.name.toLowerCase() === 'paul' && emp.rate !== 50) ||
-                (emp.name.toLowerCase() !== 'paul' && emp.rate !== 53)
-            );
-    
-            if (needsUpdate) {
-                const updatedEmployees = employees.map(emp => {
-                    if (emp.name.toLowerCase() === 'paul') {
-                        return { ...emp, rate: 50 };
-                    }
-                    return { ...emp, rate: 53 };
-                });
-                setEmployees(updatedEmployees);
-            }
-        }
-    }, [employees]);
-
-    useEffect(() => {
         saveData();
     }, [saveData]);
     
@@ -466,6 +447,7 @@ const App: React.FC = () => {
                         setEmployees={setEmployees}
                         attendanceRecords={attendanceRecords}
                         setAttendanceRecords={setAttendanceRecords}
+                        payrollRecords={payrollRecords}
                         setPayrollRecords={setPayrollRecords}
                         salesData={salesData}
                         setManualPaidMinutes={setManualPaidMinutes}
