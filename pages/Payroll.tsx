@@ -4,6 +4,8 @@ import type { PayrollRecord, Employee, AttendanceRecord, SalesData } from '../ty
 import CalendarPopup from '../components/CalendarPopup';
 import { CalendarDaysIcon, CurrencyPesoIcon, ClockIcon, BanknotesIcon } from '../components/Icons';
 import PayslipModal from '../components/PayslipModal';
+import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
+import { payrollService } from '../utils/firebaseService';
 import {
     extractDateKey,
     extractServiceCharge,
@@ -16,8 +18,8 @@ import { generateConsolidatedPayslipsPdf, PayslipPdfData } from '../utils/paysli
 interface PayrollProps {
     employees: Employee[];
     attendanceRecords: AttendanceRecord[];
-    payrollRecords: PayrollRecord[];
-    setPayrollRecords: React.Dispatch<React.SetStateAction<PayrollRecord[]>>;
+    payrollRecords?: PayrollRecord[];
+    setPayrollRecords?: React.Dispatch<React.SetStateAction<PayrollRecord[]>>;
     salesData: SalesData[];
     manualPaidMinutes: Record<string, Record<number, number>>;
     manualGhostMinutes: Record<string, number>;
@@ -109,18 +111,33 @@ const SummaryCard: React.FC<{title: string, value: string, icon: React.FC<{class
 
 const OVERTIME_RATE_MULTIPLIER = 1.5;
 
-const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payrollRecords, setPayrollRecords, salesData, manualPaidMinutes, manualGhostMinutes }) => {
+const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payrollRecords: propPayrollRecords, setPayrollRecords: setPropPayrollRecords, salesData, manualPaidMinutes, manualGhostMinutes }) => {
+    // Fetch payroll records from Firebase
+    const { data: firebasePayrollRecords = [], loading: payrollLoading, error: payrollError } = useFirebaseData(
+        () => payrollService.getAll(),
+        []
+    );
+
+    // Update payroll record mutation
+    const { mutate: updateRecord, loading: updateLoading, error: updateError } = useFirebaseMutation(
+        (data: { id: string; updates: any }) => payrollService.update(data.id, data.updates)
+    );
+
+    // Use Firebase payroll records if available, otherwise use prop records (for backward compatibility)
+    const payrollRecords = (Array.isArray(firebasePayrollRecords) && firebasePayrollRecords.length > 0) ? firebasePayrollRecords : (propPayrollRecords || []);
+
     const [payPeriod, setPayPeriod] = useState(() => {
         const today = new Date();
         const start = new Date(today.getFullYear(), today.getMonth(), 1);
-        const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
         return {
-            start: start.toISOString().split('T')[0],
-            end: end.toISOString().split('T')[0],
+            start: formatDateKeyLocal(start),
+            end: formatDateKeyLocal(end),
         };
     });
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     const [selectedRecord, setSelectedRecord] = useState<PayrollRecord | null>(null);
+    const [operationStatus, setOperationStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
     const calendarRef = useRef<HTMLDivElement>(null);
 
     const dailyServiceCharges = useMemo(() => {
@@ -425,8 +442,47 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
 
     const tableHeaders = ['Staff', 'Rate', 'Regular Hrs', 'OT Hrs', 'Gross Pay', 'Net Pay', 'Present', 'Absent', 'Late', 'Actions'];
 
+    // Show loading state
+    if (payrollLoading) {
+        return (
+            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+                <div className="flex flex-col items-center justify-center h-96">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-blue mx-auto mb-4"></div>
+                        <p className="text-text-secondary">Loading payroll records...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Show error state
+    if (payrollError) {
+        return (
+            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
+                    <p className="text-red-500 font-medium">Error loading payroll records</p>
+                    <p className="text-text-secondary text-sm mt-1">{payrollError}</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+            {/* Operation Status Messages */}
+            {operationStatus && (
+                <div className={`mb-6 p-4 rounded-lg border ${
+                    operationStatus.type === 'success'
+                        ? 'bg-green-500/10 border-green-500/30'
+                        : 'bg-red-500/10 border-red-500/30'
+                }`}>
+                    <p className={operationStatus.type === 'success' ? 'text-green-500' : 'text-red-500'}>
+                        {operationStatus.message}
+                    </p>
+                </div>
+            )}
+
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                 <div>
                     <h2 className="text-3xl font-semibold">Payroll</h2>
