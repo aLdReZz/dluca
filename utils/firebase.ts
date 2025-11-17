@@ -12,10 +12,21 @@ const firebaseConfig = {
     measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-// Validate Firebase configuration
-const isFirebaseConfigured = Object.values(firebaseConfig).every(value =>
-    value && typeof value === 'string' && !value.includes('YOUR_')
-);
+const requiredFirebaseKeys: (keyof typeof firebaseConfig)[] = [
+    'apiKey',
+    'authDomain',
+    'projectId',
+    'storageBucket',
+    'messagingSenderId',
+    'appId',
+];
+
+const missingFirebaseKeys = requiredFirebaseKeys.filter((key) => {
+    const value = firebaseConfig[key];
+    return !(value && typeof value === 'string' && !value.includes('YOUR_'));
+});
+
+const isFirebaseConfigured = missingFirebaseKeys.length === 0;
 
 let app: any;
 let db: any;
@@ -29,7 +40,11 @@ try {
         db = getFirestore(app);
         console.log('Firebase Firestore initialized successfully');
     } else {
-        console.warn('Firebase is not configured. Please update .env.local with your Firebase credentials.');
+        console.warn(
+            `Firebase is not configured. Missing or placeholder values for: ${
+                missingFirebaseKeys.length > 0 ? missingFirebaseKeys.join(', ') : 'unknown keys'
+            }. Please update .env.local with your Firebase credentials.`
+        );
     }
 } catch (error) {
     console.error('Error initializing Firebase:', error);

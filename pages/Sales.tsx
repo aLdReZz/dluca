@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { SalesData } from '../types';
-import { UploadIcon } from '../components/Icons';
+import { UploadIcon, TrashIcon } from '../components/Icons';
 import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
 import { salesService } from '../utils/firebaseService';
 
@@ -71,11 +71,17 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
         (records: SalesData[]) => salesService.batch(records)
     );
 
+    // Delete all mutation
+    const { mutate: deleteAllSales, loading: deleteLoading, error: deleteError } = useFirebaseMutation(
+        () => salesService.deleteAll()
+    );
+
     // Use Firebase data if available, otherwise use prop data (for backward compatibility)
     const salesData = (Array.isArray(firebaseSalesData) && firebaseSalesData.length > 0) ? firebaseSalesData : (propSalesData || []);
 
     const [dragActive, setDragActive] = useState(false);
     const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     useEffect(() => {
         if (salesData.length === 0 && !salesLoading) {
@@ -121,6 +127,28 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             handleFile(e.target.files[0]);
+        }
+    };
+
+    const handleDeleteAll = async () => {
+        try {
+            await deleteAllSales(undefined);
+
+            // Also clear prop data for backward compatibility
+            if (setPropSalesData) {
+                setPropSalesData([]);
+            }
+
+            setUploadStatus({ type: 'success', message: 'All sales data has been deleted' });
+            setShowDeleteConfirm(false);
+            setTimeout(() => setUploadStatus(null), 3000);
+
+            // Refresh the page data
+            window.location.reload();
+        } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : 'Failed to delete sales data';
+            setUploadStatus({ type: 'error', message: errorMsg });
+            setShowDeleteConfirm(false);
         }
     };
 
@@ -259,19 +287,74 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                 </div>
             )}
 
-            <label
-                htmlFor="salesFileInput"
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-                className={`flex flex-col items-center justify-center p-8 sm:p-12 text-center bg-bg-secondary border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 mb-8 ${dragActive ? 'border-accent-blue bg-bg-tertiary' : 'border-border-color'}`}
-            >
-                <UploadIcon className="w-12 h-12 mb-4 text-text-secondary/70" />
-                <h3 className="text-xl font-semibold">Upload Sales CSV</h3>
-                <p className="text-text-secondary mt-2">Click to browse or drag and drop your file here</p>
-                <input type="file" id="salesFileInput" className="hidden" accept=".csv" onChange={handleFileChange} />
-            </label>
+            <div className="flex flex-col sm:flex-row gap-4 mb-8">
+                <label
+                    htmlFor="salesFileInput"
+                    onDragEnter={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDragOver={handleDrag}
+                    onDrop={handleDrop}
+                    className={`flex-1 flex flex-col items-center justify-center p-8 sm:p-12 text-center bg-bg-secondary border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 ${dragActive ? 'border-accent-blue bg-bg-tertiary' : 'border-border-color'}`}
+                >
+                    <UploadIcon className="w-12 h-12 mb-4 text-text-secondary/70" />
+                    <h3 className="text-xl font-semibold">Upload Sales CSV</h3>
+                    <p className="text-text-secondary mt-2">Click to browse or drag and drop your file here</p>
+                    <input type="file" id="salesFileInput" className="hidden" accept=".csv" onChange={handleFileChange} />
+                </label>
+
+                {salesData.length > 0 && (
+                    <div className="flex items-center">
+                        <button
+                            onClick={() => setShowDeleteConfirm(true)}
+                            disabled={deleteLoading}
+                            className="px-6 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 border-2 border-red-500/30 rounded-xl font-semibold transition-all duration-300 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <TrashIcon className="w-5 h-5" />
+                            Delete All Data
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-bg-secondary border border-border-color rounded-xl p-6 max-w-md w-full shadow-2xl">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+                                <TrashIcon className="w-6 h-6 text-red-500" />
+                            </div>
+                            <h3 className="text-xl font-semibold">Delete All Sales Data?</h3>
+                        </div>
+                        <p className="text-text-secondary mb-6">
+                            This action cannot be undone. All sales transactions will be permanently deleted from the database.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowDeleteConfirm(false)}
+                                disabled={deleteLoading}
+                                className="flex-1 px-4 py-2 bg-bg-tertiary hover:bg-hover-bg text-text-primary rounded-lg font-semibold transition-colors disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDeleteAll}
+                                disabled={deleteLoading}
+                                className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {deleteLoading ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                        Deleting...
+                                    </>
+                                ) : (
+                                    'Delete All'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             
             {salesData.length > 0 && (
                 <div className="bg-bg-secondary rounded-xl border border-border-color overflow-hidden">

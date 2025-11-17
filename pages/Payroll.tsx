@@ -178,7 +178,9 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
 
     const generatePayroll = useCallback(() => {
         if (employees.length === 0 || attendanceRecords.length === 0) {
-            setPayrollRecords([]);
+            if (setPropPayrollRecords) {
+                setPropPayrollRecords([]);
+            }
             return;
         }
 
@@ -326,8 +328,10 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
             };
         });
 
-        setPayrollRecords(finalRecords);
-    }, [employees, attendanceRecords, payPeriod, setPayrollRecords, dailyServiceCharges, dailyAttendanceTotals]);
+        if (setPropPayrollRecords) {
+            setPropPayrollRecords(finalRecords);
+        }
+    }, [employees, attendanceRecords, payPeriod, setPropPayrollRecords, dailyServiceCharges, dailyAttendanceTotals]);
 
     useEffect(() => {
         generatePayroll();
@@ -342,7 +346,9 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
 
     const handleSavePayslip = (updatedRecord: PayrollRecord) => {
         const updatedPayroll = payrollRecords.map(r => r.id === updatedRecord.id ? updatedRecord : r);
-        setPayrollRecords(updatedPayroll);
+        if (setPropPayrollRecords) {
+            setPropPayrollRecords(updatedPayroll);
+        }
         setSelectedRecord(null);
     };
 

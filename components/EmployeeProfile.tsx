@@ -298,15 +298,22 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         const startKey = committedRange.start;
         const endKey = committedRange.end;
         const map: Record<string, number> = {};
+        console.log('Service Charge Debug:', {
+            totalSalesRows: salesData.length,
+            dateRange: { start: startKey, end: endKey },
+            sampleRow: salesData[0]
+        });
         for (const row of salesData) {
             const dateKey = extractDateKey(row);
             if (!dateKey) continue;
             if (dateKey < startKey || dateKey > endKey) continue;
             const amount = extractServiceCharge(row);
+            console.log('Service charge found:', { dateKey, amount, row });
             if (amount > 0) {
                 map[dateKey] = (map[dateKey] || 0) + amount;
             }
         }
+        console.log('Service charges by date:', map);
         return map;
     }, [salesData, committedRange]);
 

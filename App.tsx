@@ -12,6 +12,9 @@ import Calendar from './pages/Calendar';
 import PurchaseRequest from './pages/PurchaseRequest';
 import type { Role, Page, SalesData, InventoryItem, PurchaseOrder, Employee, CalendarEvent, RecipeCosting, PayrollRecord, AttendanceRecord, ProductInventoryItem } from './types';
 import { MenuIcon, ShieldCheckIcon, UserIcon } from './components/Icons';
+import { useFirebaseData } from './hooks/useFirebase';
+import { employeesService, attendanceService } from './utils/firebaseService';
+import { isFirebaseConfigured } from './utils/firebase';
 
 const ADMIN_PIN = '1234';
 
@@ -195,6 +198,18 @@ const App: React.FC = () => {
     const [dashboardIntro, setDashboardIntro] = useState(false);
     const dashboardIntroTimeout = useRef<number | null>(null);
 
+    // Fetch employees from Firebase
+    const { data: firebaseEmployees = [], loading: employeesLoading } = useFirebaseData(
+        () => employeesService.getAll(),
+        []
+    );
+
+    // Fetch attendance records from Firebase
+    const { data: firebaseAttendanceRecords = [], loading: attendanceLoading } = useFirebaseData(
+        () => attendanceService.getAll(),
+        []
+    );
+
     // App Data State
     const [salesData, setSalesData] = useState<SalesData[]>(placeholderSalesData);
     const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([
@@ -286,8 +301,10 @@ const App: React.FC = () => {
             // setInventoryItems(data.inventoryItems || []); // Use hardcoded data for demo
             setProductInventoryItems(data.productInventoryItems || initialProductInventory);
             // setPurchaseOrders(data.purchaseOrders || []); // Use hardcoded data for demo
-            setEmployees(data.employees || []);
-            setAttendanceRecords(data.attendanceRecords || []);
+            if (!isFirebaseConfigured) {
+                setEmployees(data.employees || []);
+                setAttendanceRecords(data.attendanceRecords || []);
+            }
             setPayrollRecords(data.payrollRecords || []);
             setManualPaidMinutes(data.manualPaidMinutes || {});
             setManualGhostMinutes(data.manualGhostMinutes || {});
@@ -318,6 +335,20 @@ const App: React.FC = () => {
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    // Update employees when Firebase data loads
+    useEffect(() => {
+        if (!employeesLoading && firebaseEmployees.length > 0) {
+            setEmployees(firebaseEmployees);
+        }
+    }, [firebaseEmployees, employeesLoading]);
+
+    // Update attendance records when Firebase data loads
+    useEffect(() => {
+        if (!attendanceLoading && firebaseAttendanceRecords.length > 0) {
+            setAttendanceRecords(firebaseAttendanceRecords);
+        }
+    }, [firebaseAttendanceRecords, attendanceLoading]);
 
     useEffect(() => {
         saveData();

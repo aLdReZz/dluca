@@ -6,7 +6,7 @@ import EmployeeProfile from '../components/EmployeeProfile';
 import ScheduleEditModal from '../components/ScheduleEditModal';
 import AttendanceEditModal from '../components/AttendanceEditModal';
 import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
-import { attendanceService } from '../utils/firebaseService';
+import { attendanceService, salesService, employeesService } from '../utils/firebaseService';
 import { parsePaidHoursCsv, mapPaidHoursToEmployees, parseCsvText } from '../utils/paidHours';
 
 interface AttendanceProps {
@@ -120,18 +120,42 @@ const Attendance: React.FC<AttendanceProps> = ({
     setAttendanceRecords: setPropAttendanceRecords,
     payrollRecords: propPayrollRecords,
     setPayrollRecords: setPropPayrollRecords,
-    salesData = [],
+    salesData: propSalesData = [],
     setManualPaidMinutes,
     setManualGhostMinutes,
 }) => {
+    const [attendanceDataVersion, setAttendanceDataVersion] = useState(0);
+
     // Fetch attendance records from Firebase
     const { data: firebaseAttendanceRecords = [], loading: attendanceLoading, error: attendanceError } = useFirebaseData(
         () => attendanceService.getAll(),
+        [attendanceDataVersion]
+    );
+
+    // Fetch sales data from Firebase
+    const { data: firebaseSalesData = [], loading: salesLoading, error: salesError } = useFirebaseData(
+        () => salesService.getAll(),
         []
+    );
+
+    // Batch upload mutation for attendance records
+    const { mutate: batchUploadAttendance, loading: uploadingAttendance } = useFirebaseMutation(
+        (records: AttendanceRecord[]) => attendanceService.batch(records)
+    );
+
+    // Individual attendance record update mutation (for modal edits)
+    const { mutate: updateSingleAttendance } = useFirebaseMutation(
+        (record: AttendanceRecord) => attendanceService.batch([record])
+    );
+
+    // Employee schedule sync mutation (for schedule edits)
+    const { mutate: syncEmployees } = useFirebaseMutation(
+        (employees: Employee[]) => employeesService.batchUpsert(employees)
     );
 
     // Use Firebase records if available, otherwise use prop records (for backward compatibility)
     const attendanceRecords = (Array.isArray(firebaseAttendanceRecords) && firebaseAttendanceRecords.length > 0) ? firebaseAttendanceRecords : (propAttendanceRecords || []);
+    const salesData = (Array.isArray(firebaseSalesData) && firebaseSalesData.length > 0) ? firebaseSalesData : (propSalesData || []);
     const payrollRecords = propPayrollRecords || [];
     const [operationStatus, setOperationStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -157,6 +181,11 @@ const Attendance: React.FC<AttendanceProps> = ({
     const [editingScheduleContext, setEditingScheduleContext] = useState<{ emp: Employee, dateKey: string, date: Date } | null>(null);
     const [isAttendanceLocked, setIsAttendanceLocked] = useState(true);
     const [editingAttendanceContext, setEditingAttendanceContext] = useState<{ emp: Employee, dateKey: string, date: Date } | null>(null);
+
+    const getEmployeeListKey = (employee: Employee, index: number) => {
+        const baseIdentifier = employee?.id ?? employee?.name ?? index;
+        return `${baseIdentifier}-${index}`;
+    };
 
     const [scheduleWeekStart, setScheduleWeekStart] = useState(() => {
         const today = new Date();
@@ -363,8 +392,8 @@ const Attendance: React.FC<AttendanceProps> = ({
             );
 
             // Update payroll records if rate or other employee details changed
-            if (payrollRecords && payrollRecords.length > 0) {
-                setPayrollRecords(
+            if (payrollRecords && payrollRecords.length > 0 && setPropPayrollRecords) {
+                setPropPayrollRecords(
                     payrollRecords.map(record => {
                         if (record.employee.toLowerCase() === selectedEmployee.name.toLowerCase()) {
                             const updatedRecord = { ...record };
@@ -400,10 +429,36 @@ const Attendance: React.FC<AttendanceProps> = ({
         setIsModalOpen(false);
     };
     
-    const handleClearAllData = () => {
-        if (window.confirm('Are you sure you want to clear all employee and attendance data? This action cannot be undone.')) {
+    const handleClearAllData = async () => {
+        const confirmed = window.confirm('Are you sure you want to clear all employee and attendance data? This action cannot be undone.');
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            setOperationStatus(null);
+
+            await Promise.all([
+                employeesService.clearAll(),
+                attendanceService.clearAll(),
+            ]);
+
             setEmployees([]);
-            setAttendanceRecords([]);
+            if (setPropAttendanceRecords) {
+                setPropAttendanceRecords([]);
+            }
+            if (setManualPaidMinutes) {
+                setManualPaidMinutes({});
+            }
+            if (setManualGhostMinutes) {
+                setManualGhostMinutes({});
+            }
+
+            setAttendanceDataVersion(prev => prev + 1);
+            setOperationStatus({ type: 'success', message: 'All employee and attendance data have been cleared.' });
+        } catch (error) {
+            console.error('Error clearing employee and attendance data:', error);
+            setOperationStatus({ type: 'error', message: 'Failed to clear data. Please try again.' });
         }
     };
 
@@ -411,7 +466,9 @@ const Attendance: React.FC<AttendanceProps> = ({
         setEmployees(employees.filter(emp => emp.id !== employeeId));
     };
     
-    const handleSaveSchedules = () => {
+    const handleSaveSchedules = async () => {
+        // Save all employees to Firebase
+        await syncEmployees(employees);
         setIsScheduleLocked(true);
         alert('All schedule changes have been saved!');
     };
@@ -424,17 +481,24 @@ const Attendance: React.FC<AttendanceProps> = ({
         setEditingScheduleContext({ emp, dateKey, date });
     };
 
-    const handleSaveScheduleFromModal = (newScheduleData: Schedule) => {
+    const handleSaveScheduleFromModal = async (newScheduleData: Schedule) => {
         if (!editingScheduleContext) return;
         const { emp, dateKey } = editingScheduleContext;
 
-        setEmployees(employees.map(e => {
+        // Update local state
+        const updatedEmployees = employees.map(e => {
             if (e.id === emp.id) {
                 const newSchedule = { ...e.schedule, [dateKey]: newScheduleData };
                 return { ...e, schedule: newSchedule };
             }
             return e;
-        }));
+        });
+
+        setEmployees(updatedEmployees);
+
+        // Save to Firebase
+        await syncEmployees(updatedEmployees);
+
         setEditingScheduleContext(null);
     };
     
@@ -442,36 +506,50 @@ const Attendance: React.FC<AttendanceProps> = ({
         setEditingAttendanceContext({ emp, dateKey, date });
     };
 
-    const handleSaveAttendanceFromModal = (newAttendanceData: { timeIn: string; timeOut: string; }) => {
+    const handleSaveAttendanceFromModal = async (newAttendanceData: { timeIn: string; timeOut: string; }) => {
         if (!editingAttendanceContext) return;
         const { emp, dateKey } = editingAttendanceContext;
 
-        setAttendanceRecords(prevRecords => {
-            const existingRecordIndex = prevRecords.findIndex(
-                r => r.employee.toLowerCase() === emp.name.toLowerCase() && r.date === dateKey
-            );
+        // Save to Firebase first
+        if (newAttendanceData.timeIn || newAttendanceData.timeOut) {
+            const recordToSave: AttendanceRecord = {
+                employee: emp.name,
+                date: dateKey,
+                timeIn: newAttendanceData.timeIn,
+                timeOut: newAttendanceData.timeOut,
+            };
+            await updateSingleAttendance(recordToSave);
+        }
 
-            const updatedRecords = [...prevRecords];
+        // Also update local state for backward compatibility
+        if (setPropAttendanceRecords) {
+            setPropAttendanceRecords(prevRecords => {
+                const existingRecordIndex = prevRecords.findIndex(
+                    r => r.employee.toLowerCase() === emp.name.toLowerCase() && r.date === dateKey
+                );
 
-            if (!newAttendanceData.timeIn && !newAttendanceData.timeOut) {
-                if (existingRecordIndex > -1) {
-                    updatedRecords.splice(existingRecordIndex, 1);
-                }
-            } else {
-                const newRecord: AttendanceRecord = {
-                    employee: emp.name,
-                    date: dateKey,
-                    timeIn: newAttendanceData.timeIn,
-                    timeOut: newAttendanceData.timeOut,
-                };
-                if (existingRecordIndex > -1) {
-                    updatedRecords[existingRecordIndex] = newRecord;
+                const updatedRecords = [...prevRecords];
+
+                if (!newAttendanceData.timeIn && !newAttendanceData.timeOut) {
+                    if (existingRecordIndex > -1) {
+                        updatedRecords.splice(existingRecordIndex, 1);
+                    }
                 } else {
-                    updatedRecords.push(newRecord);
+                    const newRecord: AttendanceRecord = {
+                        employee: emp.name,
+                        date: dateKey,
+                        timeIn: newAttendanceData.timeIn,
+                        timeOut: newAttendanceData.timeOut,
+                    };
+                    if (existingRecordIndex > -1) {
+                        updatedRecords[existingRecordIndex] = newRecord;
+                    } else {
+                        updatedRecords.push(newRecord);
+                    }
                 }
-            }
-            return updatedRecords;
-        });
+                return updatedRecords;
+            });
+        }
         setEditingAttendanceContext(null);
     };
     
@@ -614,7 +692,7 @@ const Attendance: React.FC<AttendanceProps> = ({
         reader.readAsText(file);
     };
 
-    const parseAttendanceCSV = (csvText: string) => {
+    const parseAttendanceCSV = async (csvText: string) => {
         const lines = csvText.split('\n').filter(line => line.trim() !== '');
         if (lines.length < 2) {
             alert("Invalid Attendance CSV. It must contain a header row and at least one data row.");
@@ -651,8 +729,20 @@ const Attendance: React.FC<AttendanceProps> = ({
             }
         });
 
-        setAttendanceRecords(newRecords);
-        alert(`${newRecords.length} attendance records have been successfully imported.`);
+        // Save to Firebase
+        try {
+            await batchUploadAttendance(newRecords);
+
+            // Also save to prop for backward compatibility
+            if (setPropAttendanceRecords) {
+                setPropAttendanceRecords(newRecords);
+            }
+
+            alert(`${newRecords.length} attendance records have been successfully imported and saved to database.`);
+        } catch (error) {
+            console.error('Error uploading attendance records:', error);
+            alert('Failed to save attendance records to database. Please try again.');
+        }
     };
 
     const handlePaidHoursUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -810,8 +900,10 @@ const Attendance: React.FC<AttendanceProps> = ({
                 <div className="bg-gradient-to-br from-bg-secondary to-bg-tertiary/30 rounded-xl border border-border-color p-6 shadow-sm">
                    <div className="relative">
                      <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-6 justify-items-center">
-                         {employees.length > 0 ? employees.map(emp => (
-                            <div key={emp.id} className="relative flex flex-col items-center group w-full max-w-[90px]">
+                         {employees.length > 0 ? employees.map((emp, empIndex) => {
+                            const employeeKey = getEmployeeListKey(emp, empIndex);
+                            return (
+                            <div key={employeeKey} className="relative flex flex-col items-center group w-full max-w-[90px]">
                                <button
                                     onClick={() => setViewedEmployee(emp)}
                                     className="relative w-16 h-16 rounded-full bg-gradient-to-br from-accent-blue/20 to-accent-blue/10 text-accent-blue flex items-center justify-center font-bold text-xl transition-all hover:scale-110 hover:shadow-xl hover:shadow-accent-blue/40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-secondary focus:ring-accent-blue border-2 border-accent-blue/30"
@@ -821,7 +913,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                                 <p className="mt-2 text-xs font-semibold text-text-primary text-center truncate w-full group-hover:text-accent-blue transition-colors">{emp.name}</p>
                                 <p className="text-[10px] text-text-secondary text-center truncate w-full capitalize mt-0.5">{emp.position}</p>
                             </div>
-                         )) : (
+                         )}) : (
                              <div className="col-span-full flex flex-col items-center justify-center py-8 text-text-secondary w-full">
                                 <PlusIcon className="w-10 h-10 mb-2 opacity-30" />
                                 <p className="text-sm font-medium">No employees added yet</p>
@@ -896,7 +988,8 @@ const Attendance: React.FC<AttendanceProps> = ({
                                 </thead>
                                 <tbody className="divide-y divide-border-color">
                                    {employees.length > 0 ? (
-                                       employees.map(emp => {
+                                       employees.map((emp, empIndex) => {
+                                            const employeeKey = getEmployeeListKey(emp, empIndex);
                                             const totalScheduledHours = weekDates.reduce((total, dateInfo) => {
                                                 const currentDayKey = dateToKey(dateInfo.date);
                                                 const schedule = emp.schedule[currentDayKey];
@@ -911,7 +1004,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                                             }, 0) / 60;
 
                                             return (
-                                                <tr key={emp.id} className="group/row hover:bg-hover-bg/30 transition-colors border-b border-border-color/50">
+                                                <tr key={employeeKey} className="group/row hover:bg-hover-bg/30 transition-colors border-b border-border-color/50">
                                                     <td className="px-3 py-2.5 font-semibold text-sm sticky left-0 bg-bg-secondary group-hover/row:bg-hover-bg/30 z-10 w-32">{emp.name}</td>
                                                     {weekDates.map(dateInfo => {
                                                         const currentDayKey = dateToKey(dateInfo.date);
@@ -1002,7 +1095,8 @@ const Attendance: React.FC<AttendanceProps> = ({
                          {/* Mobile/Tablet Card View */}
                         <div className="block lg:hidden p-4 space-y-4">
                             {employees.length > 0 ? (
-                                employees.map(emp => {
+                                employees.map((emp, empIndex) => {
+                                     const employeeKey = getEmployeeListKey(emp, empIndex);
                                      const totalScheduledHours = weekDates.reduce((total, dateInfo) => {
                                         const currentDayKey = dateToKey(dateInfo.date);
                                         const schedule = emp.schedule[currentDayKey];
@@ -1016,7 +1110,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                                         return total;
                                     }, 0) / 60;
                                     return (
-                                        <div key={emp.id} className="bg-bg-tertiary/60 p-4 rounded-lg">
+                                        <div key={employeeKey} className="bg-bg-tertiary/60 p-4 rounded-lg">
                                             <div className="flex justify-between items-start">
                                                 <h3 className="font-semibold text-text-primary">{emp.name}</h3>
                                                 {totalScheduledHours > 0 &&
@@ -1134,7 +1228,8 @@ const Attendance: React.FC<AttendanceProps> = ({
                                 </thead>
                                 <tbody className="divide-y divide-border-color">
                                    {employees.length > 0 ? (
-                                       employees.map(emp => {
+                                       employees.map((emp, empIndex) => {
+                                            const employeeKey = getEmployeeListKey(emp, empIndex);
                                             const totalAttendedHours = weekDates.reduce((total, dateInfo) => {
                                                 const currentDayKey = dateToKey(dateInfo.date);
                                                 const record = attendanceRecords.find(r => r.employee.toLowerCase() === emp.name.toLowerCase() && r.date === currentDayKey);
@@ -1149,7 +1244,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                                             }, 0) / 60;
 
                                             return (
-                                                <tr key={emp.id} className="group/row hover:bg-hover-bg/30 transition-colors border-b border-border-color/50">
+                                                <tr key={employeeKey} className="group/row hover:bg-hover-bg/30 transition-colors border-b border-border-color/50">
                                                     <td className="px-3 py-2.5 font-semibold text-sm sticky left-0 bg-bg-secondary group-hover/row:bg-hover-bg/30 z-10 w-32">{emp.name}</td>
                                                     {weekDates.map(dateInfo => {
                                                         const currentDayKey = dateToKey(dateInfo.date);
@@ -1253,7 +1348,8 @@ const Attendance: React.FC<AttendanceProps> = ({
                          {/* Mobile/Tablet Card View */}
                         <div className="block lg:hidden p-4 space-y-4">
                             {employees.length > 0 ? (
-                                employees.map(emp => {
+                                employees.map((emp, empIndex) => {
+                                    const employeeKey = getEmployeeListKey(emp, empIndex);
                                     const totalAttendedHours = weekDates.reduce((total, dateInfo) => {
                                         const currentDayKey = dateToKey(dateInfo.date);
                                         const record = attendanceRecords.find(r => r.employee.toLowerCase() === emp.name.toLowerCase() && r.date === currentDayKey);
@@ -1267,7 +1363,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                                         return total;
                                     }, 0) / 60;
                                     return (
-                                        <div key={emp.id} className="bg-bg-tertiary/60 p-4 rounded-lg">
+                                        <div key={employeeKey} className="bg-bg-tertiary/60 p-4 rounded-lg">
                                             <div className="flex justify-between items-start">
                                                 <h3 className="font-semibold text-text-primary">{emp.name}</h3>
                                                 {totalAttendedHours > 0 &&
@@ -1428,7 +1524,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                     attendanceRecords={attendanceRecords}
                     salesData={salesData}
                     payrollRecords={payrollRecords}
-                    setPayrollRecords={setPayrollRecords}
+                    setPayrollRecords={setPropPayrollRecords}
                     onClose={() => setViewedEmployee(null)}
                     onEdit={() => {
                         openEditModal(viewedEmployee);

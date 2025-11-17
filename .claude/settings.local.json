@@ -9,7 +9,8 @@
       "Bash(git add:*)",
       "Bash(git commit -m \"$(cat <<''EOF''\nMigrate Calendar page to Firebase\n\n- Added Firebase data fetching with useFirebaseData hook\n- Implemented CRUD mutations for calendar events (add, update, delete)\n- Added loading and error UI states\n- Included success/error messages for user feedback\n- Maintained full backward compatibility with prop-based system\n- Updated MIGRATION_LOG.md with Calendar completion (3/9 pages = 33%)\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
       "Bash(git commit -m \"$(cat <<''EOF''\nMigrate Costing and Purchase Request pages to Firebase\n\nCosting Page:\n- Added Firebase data fetching with useFirebaseData hook\n- Implemented add/update/delete mutations for recipe costings\n- Added loading and error UI states\n- Included success/error messages for user feedback\n- Maintained full backward compatibility\n\nPurchase Request Page:\n- Added Firebase data fetching for purchase orders\n- Implemented add purchase order mutation\n- Added loading and error UI states\n- Included success/error messages for operations\n- Maintained backward compatibility with optional props\n\nUpdated MIGRATION_LOG.md:\n- Moved Costing and PurchaseRequest to completed (5/9 pages = 56%)\n- Updated migration statistics and time estimates\n- Refined pending migrations list\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

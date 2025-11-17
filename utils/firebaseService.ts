@@ -17,6 +17,33 @@ import {
 import { db, isFirebaseConfigured } from './firebase';
 import type { Employee, AttendanceRecord, PayrollRecord, SalesData, InventoryItem, ProductInventoryItem, PurchaseOrder, RecipeCosting, CalendarEvent } from '../types';
 
+const FIRESTORE_BATCH_LIMIT = 450;
+
+const deleteCollectionDocuments = async (collectionName: string) => {
+    if (!db) return;
+
+    const snapshot = await getDocs(collection(db, collectionName));
+    if (snapshot.empty) return;
+
+    let batch = writeBatch(db);
+    let operationCount = 0;
+
+    for (const docSnap of snapshot.docs) {
+        batch.delete(docSnap.ref);
+        operationCount++;
+
+        if (operationCount >= FIRESTORE_BATCH_LIMIT) {
+            await batch.commit();
+            batch = writeBatch(db);
+            operationCount = 0;
+        }
+    }
+
+    if (operationCount > 0) {
+        await batch.commit();
+    }
+};
+
 // Type definitions for Firestore operations
 type FirestoreData = Employee | AttendanceRecord | PayrollRecord | SalesData | InventoryItem | ProductInventoryItem | PurchaseOrder | RecipeCosting | CalendarEvent;
 
@@ -92,6 +119,31 @@ export const employeesService = {
             async () => {
                 await deleteDoc(doc(db, 'employees', id));
             }
+        );
+    },
+
+    // Batch upsert employees (for syncing local state to Firebase)
+    async batchUpsert(employees: Employee[]): Promise<void> {
+        return withFirebaseCheck(
+            async () => {
+                const batch = writeBatch(db);
+                employees.forEach(employee => {
+                    // Use the employee's local ID as the document ID
+                    const docRef = doc(db, 'employees', String(employee.id));
+                    batch.set(docRef, { ...employee, updatedAt: new Date() }, { merge: true });
+                });
+                await batch.commit();
+            }
+        );
+    },
+
+    // Delete every employee document
+    async clearAll(): Promise<void> {
+        return withFirebaseCheck(
+            async () => {
+                await deleteCollectionDocuments('employees');
+            },
+            () => undefined
         );
     },
 };
@@ -195,6 +247,16 @@ export const attendanceService = {
                 });
                 await batch.commit();
             }
+        );
+    },
+
+    // Delete every attendance record
+    async clearAll(): Promise<void> {
+        return withFirebaseCheck(
+            async () => {
+                await deleteCollectionDocuments('attendanceRecords');
+            },
+            () => undefined
         );
     },
 };
@@ -316,14 +378,31 @@ export const salesService = {
         );
     },
 
-    // Batch add sales records
+    // Batch add sales records (prevents duplicates using Transaction ID)
     async batch(records: SalesData[]): Promise<void> {
         return withFirebaseCheck(
             async () => {
                 const batch = writeBatch(db);
                 records.forEach(record => {
-                    const docRef = doc(collection(db, 'salesData'));
-                    batch.set(docRef, { ...record, createdAt: new Date() });
+                    // Use Transaction ID as the document ID to prevent duplicates
+                    const transactionId = record['Transaction ID'] || `transaction-${Date.now()}-${Math.random()}`;
+                    const docRef = doc(db, 'salesData', transactionId);
+                    // Use set with merge to avoid overwriting if it already exists
+                    batch.set(docRef, { ...record, createdAt: new Date() }, { merge: true });
+                });
+                await batch.commit();
+            }
+        );
+    },
+
+    // Delete all sales records
+    async deleteAll(): Promise<void> {
+        return withFirebaseCheck(
+            async () => {
+                const snapshot = await getDocs(collection(db, 'salesData'));
+                const batch = writeBatch(db);
+                snapshot.docs.forEach(doc => {
+                    batch.delete(doc.ref);
                 });
                 await batch.commit();
             }
