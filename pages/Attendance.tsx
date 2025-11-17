@@ -10,15 +10,15 @@ import { attendanceService } from '../utils/firebaseService';
 import { parsePaidHoursCsv, mapPaidHoursToEmployees, parseCsvText } from '../utils/paidHours';
 
 interface AttendanceProps {
-    employees: Employee[];
-    setEmployees: React.Dispatch<React.SetStateAction<Employee[]>>;
+    employees?: Employee[];
+    setEmployees?: React.Dispatch<React.SetStateAction<Employee[]>>;
     attendanceRecords?: AttendanceRecord[];
     setAttendanceRecords?: React.Dispatch<React.SetStateAction<AttendanceRecord[]>>;
     payrollRecords?: PayrollRecord[];
     setPayrollRecords?: React.Dispatch<React.SetStateAction<PayrollRecord[]>>;
-    salesData: SalesData[];
-    setManualPaidMinutes: React.Dispatch<React.SetStateAction<Record<string, Record<number, number>>>>;
-    setManualGhostMinutes: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+    salesData?: SalesData[];
+    setManualPaidMinutes?: React.Dispatch<React.SetStateAction<Record<string, Record<number, number>>>>;
+    setManualGhostMinutes?: React.Dispatch<React.SetStateAction<Record<string, number>>>;
 }
 
 const StatusTag: React.FC<{text: string, type: 'off' | 'absent'}> = ({text, type}) => {
@@ -114,13 +114,13 @@ const DatePickerPopup: React.FC<{
 
 
 const Attendance: React.FC<AttendanceProps> = ({
-    employees,
+    employees = [],
     setEmployees,
     attendanceRecords: propAttendanceRecords,
     setAttendanceRecords: setPropAttendanceRecords,
     payrollRecords: propPayrollRecords,
     setPayrollRecords: setPropPayrollRecords,
-    salesData,
+    salesData = [],
     setManualPaidMinutes,
     setManualGhostMinutes,
 }) => {
