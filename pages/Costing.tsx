@@ -3,10 +3,12 @@ import type { RecipeCosting, ProductInventoryItem } from '../types';
 import { PlusIcon, PencilIcon, TrashIcon } from '../components/Icons';
 import RecipeCostingModal from '../components/RecipeCostingModal';
 import ConfirmationModal from '../components/ConfirmationModal';
+import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
+import { recipesService } from '../utils/firebaseService';
 
 interface CostingProps {
-    recipeCostings: RecipeCosting[];
-    setRecipeCostings: React.Dispatch<React.SetStateAction<RecipeCosting[]>>;
+    recipeCostings?: RecipeCosting[];
+    setRecipeCostings?: React.Dispatch<React.SetStateAction<RecipeCosting[]>>;
     productInventoryItems: ProductInventoryItem[];
 }
 
@@ -56,11 +58,36 @@ const RecipeCard: React.FC<{ recipe: RecipeCosting; onEdit: () => void; onDelete
 };
 
 
-const Costing: React.FC<CostingProps> = ({ recipeCostings, setRecipeCostings, productInventoryItems }) => {
+const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, setRecipeCostings: setPropRecipeCostings, productInventoryItems }) => {
+    // Fetch recipes from Firebase
+    const { data: firebaseRecipes = [], loading: recipesLoading, error: recipesError } = useFirebaseData(
+        () => recipesService.getAll(),
+        []
+    );
+
+    // Add recipe mutation
+    const { mutate: addRecipe, loading: addLoading, error: addError } = useFirebaseMutation(
+        (recipe: Omit<RecipeCosting, 'id'>) => recipesService.add(recipe)
+    );
+
+    // Update recipe mutation
+    const { mutate: updateRecipe, loading: updateLoading, error: updateError } = useFirebaseMutation(
+        (data: { id: string; updates: any }) => recipesService.update(data.id, data.updates)
+    );
+
+    // Delete recipe mutation
+    const { mutate: deleteRecipe, loading: deleteLoading, error: deleteError } = useFirebaseMutation(
+        (id: string) => recipesService.delete(id)
+    );
+
+    // Use Firebase recipes if available, otherwise use prop recipes (for backward compatibility)
+    const recipeCostings = (Array.isArray(firebaseRecipes) && firebaseRecipes.length > 0) ? firebaseRecipes : (propRecipeCostings || []);
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [recipeToEdit, setRecipeToEdit] = useState<RecipeCosting | null>(null);
     const [recipeToDelete, setRecipeToDelete] = useState<RecipeCosting | null>(null);
+    const [operationStatus, setOperationStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
     const handleOpenAddModal = () => {
         setRecipeToEdit(null);
@@ -77,27 +104,51 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings, setRecipeCostings, pr
         setIsConfirmModalOpen(true);
     }
     
-    const handleConfirmDelete = () => {
+    const handleConfirmDelete = async () => {
         if (recipeToDelete) {
-            setRecipeCostings(prev => prev.filter(r => r.id !== recipeToDelete.id));
-            setIsConfirmModalOpen(false);
-            setRecipeToDelete(null);
+            try {
+                await deleteRecipe(String(recipeToDelete.id));
+                setOperationStatus({ type: 'success', message: 'Recipe deleted successfully' });
+                setIsConfirmModalOpen(false);
+                setRecipeToDelete(null);
+                setTimeout(() => setOperationStatus(null), 3000);
+
+                // Update prop for backward compatibility
+                if (setPropRecipeCostings) {
+                    setPropRecipeCostings(recipeCostings.filter(r => String(r.id) !== String(recipeToDelete.id)));
+                }
+            } catch (err) {
+                const errorMsg = err instanceof Error ? err.message : 'Failed to delete recipe';
+                setOperationStatus({ type: 'error', message: errorMsg });
+            }
         }
     };
 
-    const handleSaveRecipe = (recipeData: Omit<RecipeCosting, 'id'> & { id?: number }) => {
-        if (recipeData.id) {
-            // Update existing
-            setRecipeCostings(prev => prev.map(r => r.id === recipeData.id ? { ...r, ...recipeData, id: r.id } : r));
-        } else {
-            // Add new
-            const newRecipe: RecipeCosting = {
-                ...recipeData,
-                id: Date.now(),
-            };
-            setRecipeCostings(prev => [...prev, newRecipe]);
+    const handleSaveRecipe = async (recipeData: Omit<RecipeCosting, 'id'> & { id?: number | string }) => {
+        try {
+            if (recipeData.id) {
+                // Update existing
+                await updateRecipe({
+                    id: String(recipeData.id),
+                    updates: recipeData
+                });
+                setOperationStatus({ type: 'success', message: 'Recipe updated successfully' });
+            } else {
+                // Add new
+                await addRecipe(recipeData);
+                setOperationStatus({ type: 'success', message: 'Recipe created successfully' });
+            }
+            setIsModalOpen(false);
+            setTimeout(() => setOperationStatus(null), 3000);
+
+            // Update prop for backward compatibility
+            if (setPropRecipeCostings) {
+                setPropRecipeCostings(recipeCostings);
+            }
+        } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : 'Failed to save recipe';
+            setOperationStatus({ type: 'error', message: errorMsg });
         }
-        setIsModalOpen(false);
     };
     
     const averageFinalCost = useMemo(() => {
@@ -106,8 +157,47 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings, setRecipeCostings, pr
         return totalPercentage / recipeCostings.length;
     }, [recipeCostings]);
 
+    // Show loading state
+    if (recipesLoading) {
+        return (
+            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+                <div className="flex flex-col items-center justify-center h-96">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-blue mx-auto mb-4"></div>
+                        <p className="text-text-secondary">Loading recipe costings...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Show error state
+    if (recipesError) {
+        return (
+            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
+                    <p className="text-red-500 font-medium">Error loading recipe costings</p>
+                    <p className="text-text-secondary text-sm mt-1">{recipesError}</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+            {/* Operation Status Messages */}
+            {operationStatus && (
+                <div className={`mb-6 p-4 rounded-lg border ${
+                    operationStatus.type === 'success'
+                        ? 'bg-green-500/10 border-green-500/30'
+                        : 'bg-red-500/10 border-red-500/30'
+                }`}>
+                    <p className={operationStatus.type === 'success' ? 'text-green-500' : 'text-red-500'}>
+                        {operationStatus.message}
+                    </p>
+                </div>
+            )}
+
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                  <div>
                     <h2 className="text-3xl font-semibold">Costing Analysis</h2>

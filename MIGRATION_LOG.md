@@ -118,6 +118,36 @@ const parseSalesCSV = async (text: string) => {
 
 ---
 
+### ✅ Costing Page (Completed)
+**File**: `pages/Costing.tsx`
+**Date**: 2024-11-17
+**Status**: Complete and tested
+
+**Changes Made**:
+1. Added Firebase imports for data management
+2. Fetch recipe costings from Firestore with `useFirebaseData`
+3. Add/update/delete mutations for recipe management
+4. Loading and error UI states
+5. Success/error messages for operations
+6. Full backward compatibility maintained
+
+---
+
+### ✅ Purchase Request Page (Completed)
+**File**: `pages/PurchaseRequest.tsx`
+**Date**: 2024-11-17
+**Status**: Complete and tested
+
+**Changes Made**:
+1. Added Firebase imports for purchase order management
+2. Fetch purchase orders from Firestore
+3. Add purchase order mutation
+4. Loading and error UI states
+5. Success/error messages for operations
+6. Maintained optional props for backward compatibility
+
+---
+
 ## Pending Migrations
 
 ### ⬜ Inventory Page
@@ -175,39 +205,18 @@ const parseSalesCSV = async (text: string) => {
 
 ---
 
-### ⬜ Costing Page
-**File**: `pages/Costing.tsx`
-**Complexity**: Low
-**Estimated Time**: 1 hour
-
-**What Needs Migration**:
-- Recipe costing data
-- Use `recipesService`
-
----
-
-### ⬜ Purchase Request Page
-**File**: `pages/PurchaseRequest.tsx`
-**Complexity**: Low
-**Estimated Time**: 1 hour
-
-**What Needs Migration**:
-- Purchase orders
-- Use `purchaseOrderService`
-
----
 
 ## Migration Statistics
 
 | Item | Count |
 |------|-------|
 | Total Pages | 9 |
-| Completed | 3 |
+| Completed | 5 |
 | In Progress | 0 |
-| Pending | 6 |
+| Pending | 4 |
 | Estimated Total Time | 10 hours |
-| Time Spent | ~3 hours |
-| % Complete | 33% |
+| Time Spent | ~4 hours |
+| % Complete | 56% |
 
 ## Common Migration Pattern
 
@@ -265,5 +274,5 @@ const { mutate: addEmployee } = useFirebaseMutation(
 ---
 
 **Last Updated**: 2024-11-17
-**Migration Progress**: 3/9 pages (33%)
-**Estimated Completion**: ~7 hours remaining
+**Migration Progress**: 5/9 pages (56%)
+**Estimated Completion**: ~4 hours remaining

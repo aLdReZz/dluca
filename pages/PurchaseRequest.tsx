@@ -2,12 +2,14 @@ import React, { useState, useMemo } from 'react';
 import type { PurchaseOrder, ProductInventoryItem } from '../types';
 import { PlusIcon, SearchIcon, EllipsisHorizontalIcon } from '../components/Icons';
 import PurchaseRequestModal from '../components/PurchaseRequestModal';
+import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
+import { purchaseOrderService } from '../utils/firebaseService';
 
 interface PurchaseRequestProps {
-    purchaseOrders: PurchaseOrder[];
-    setPurchaseOrders: React.Dispatch<React.SetStateAction<PurchaseOrder[]>>;
+    purchaseOrders?: PurchaseOrder[];
+    setPurchaseOrders?: React.Dispatch<React.SetStateAction<PurchaseOrder[]>>;
     productInventoryItems: ProductInventoryItem[];
-    onAddPurchaseOrder: (order: Omit<PurchaseOrder, 'id' | 'date' | 'status'>) => void;
+    onAddPurchaseOrder?: (order: Omit<PurchaseOrder, 'id' | 'date' | 'status'>) => void;
     departments: string[];
 }
 
@@ -20,9 +22,24 @@ const StatusBadge: React.FC<{ status: PurchaseOrder['status'] }> = ({ status }) 
     return <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${statusClasses[status]}`}>{status}</span>;
 };
 
-const PurchaseRequest: React.FC<PurchaseRequestProps> = ({ purchaseOrders, setPurchaseOrders, productInventoryItems, onAddPurchaseOrder, departments }) => {
+const PurchaseRequest: React.FC<PurchaseRequestProps> = ({ purchaseOrders: propPurchaseOrders, setPurchaseOrders: setPropPurchaseOrders, productInventoryItems, onAddPurchaseOrder, departments }) => {
+    // Fetch purchase orders from Firebase
+    const { data: firebaseOrders = [], loading: ordersLoading, error: ordersError } = useFirebaseData(
+        () => purchaseOrderService.getAll(),
+        []
+    );
+
+    // Add purchase order mutation
+    const { mutate: addOrder, loading: addLoading, error: addError } = useFirebaseMutation(
+        (order: Omit<PurchaseOrder, 'id' | 'date' | 'status'>) => purchaseOrderService.add(order)
+    );
+
+    // Use Firebase orders if available, otherwise use prop orders (for backward compatibility)
+    const purchaseOrders = (Array.isArray(firebaseOrders) && firebaseOrders.length > 0) ? firebaseOrders : (propPurchaseOrders || []);
+
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [operationStatus, setOperationStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
     const filteredOrders = useMemo(() =>
         purchaseOrders.filter(order =>
@@ -30,13 +47,69 @@ const PurchaseRequest: React.FC<PurchaseRequestProps> = ({ purchaseOrders, setPu
             String(order.id).includes(searchTerm)
         ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [purchaseOrders, searchTerm]);
 
-    const handleSaveNewOrder = (newOrderData: Omit<PurchaseOrder, 'id' | 'date' | 'status'>) => {
-        onAddPurchaseOrder(newOrderData);
-        setIsModalOpen(false);
+    const handleSaveNewOrder = async (newOrderData: Omit<PurchaseOrder, 'id' | 'date' | 'status'>) => {
+        try {
+            await addOrder(newOrderData);
+            setOperationStatus({ type: 'success', message: 'Purchase order created successfully' });
+            setIsModalOpen(false);
+            setTimeout(() => setOperationStatus(null), 3000);
+
+            // Update prop for backward compatibility
+            if (setPropPurchaseOrders) {
+                setPropPurchaseOrders(purchaseOrders);
+            }
+
+            // Also call the callback if provided
+            if (onAddPurchaseOrder) {
+                onAddPurchaseOrder(newOrderData);
+            }
+        } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : 'Failed to create purchase order';
+            setOperationStatus({ type: 'error', message: errorMsg });
+        }
     };
     
+    // Show loading state
+    if (ordersLoading) {
+        return (
+            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+                <div className="flex flex-col items-center justify-center h-96">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-blue mx-auto mb-4"></div>
+                        <p className="text-text-secondary">Loading purchase orders...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Show error state
+    if (ordersError) {
+        return (
+            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
+                    <p className="text-red-500 font-medium">Error loading purchase orders</p>
+                    <p className="text-text-secondary text-sm mt-1">{ordersError}</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+            {/* Operation Status Messages */}
+            {operationStatus && (
+                <div className={`mb-6 p-4 rounded-lg border ${
+                    operationStatus.type === 'success'
+                        ? 'bg-green-500/10 border-green-500/30'
+                        : 'bg-red-500/10 border-red-500/30'
+                }`}>
+                    <p className={operationStatus.type === 'success' ? 'text-green-500' : 'text-red-500'}>
+                        {operationStatus.message}
+                    </p>
+                </div>
+            )}
+
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                  <div>
                     <h1 className="text-3xl font-bold text-text-primary">Purchase Requests</h1>
