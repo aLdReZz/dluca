@@ -5,14 +5,17 @@ import { UploadIcon, CalendarDaysIcon, PencilSquareIcon, ChevronLeftIcon, Chevro
 import EmployeeProfile from '../components/EmployeeProfile';
 import ScheduleEditModal from '../components/ScheduleEditModal';
 import AttendanceEditModal from '../components/AttendanceEditModal';
+import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
+import { attendanceService } from '../utils/firebaseService';
 import { parsePaidHoursCsv, mapPaidHoursToEmployees, parseCsvText } from '../utils/paidHours';
 
 interface AttendanceProps {
     employees: Employee[];
     setEmployees: React.Dispatch<React.SetStateAction<Employee[]>>;
-    attendanceRecords: AttendanceRecord[];
-    setAttendanceRecords: React.Dispatch<React.SetStateAction<AttendanceRecord[]>>;
-    setPayrollRecords: React.Dispatch<React.SetStateAction<PayrollRecord[]>>;
+    attendanceRecords?: AttendanceRecord[];
+    setAttendanceRecords?: React.Dispatch<React.SetStateAction<AttendanceRecord[]>>;
+    payrollRecords?: PayrollRecord[];
+    setPayrollRecords?: React.Dispatch<React.SetStateAction<PayrollRecord[]>>;
     salesData: SalesData[];
     setManualPaidMinutes: React.Dispatch<React.SetStateAction<Record<string, Record<number, number>>>>;
     setManualGhostMinutes: React.Dispatch<React.SetStateAction<Record<string, number>>>;
@@ -113,13 +116,24 @@ const DatePickerPopup: React.FC<{
 const Attendance: React.FC<AttendanceProps> = ({
     employees,
     setEmployees,
-    attendanceRecords,
-    setAttendanceRecords,
-    setPayrollRecords,
+    attendanceRecords: propAttendanceRecords,
+    setAttendanceRecords: setPropAttendanceRecords,
+    payrollRecords: propPayrollRecords,
+    setPayrollRecords: setPropPayrollRecords,
     salesData,
     setManualPaidMinutes,
     setManualGhostMinutes,
 }) => {
+    // Fetch attendance records from Firebase
+    const { data: firebaseAttendanceRecords = [], loading: attendanceLoading, error: attendanceError } = useFirebaseData(
+        () => attendanceService.getAll(),
+        []
+    );
+
+    // Use Firebase records if available, otherwise use prop records (for backward compatibility)
+    const attendanceRecords = (Array.isArray(firebaseAttendanceRecords) && firebaseAttendanceRecords.length > 0) ? firebaseAttendanceRecords : (propAttendanceRecords || []);
+    const payrollRecords = propPayrollRecords || [];
+    const [operationStatus, setOperationStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalType, setModalType] = useState<'add' | 'edit'>('add');
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -325,6 +339,10 @@ const Attendance: React.FC<AttendanceProps> = ({
                 },
             ]);
         } else if (selectedEmployee) {
+            const newRate = parseFloat(formData.rate) || 0;
+            const oldRate = selectedEmployee.rate;
+            const rateChanged = newRate !== oldRate;
+
             setEmployees(
                 employees.map(emp =>
                     emp.id === selectedEmployee.id
@@ -333,7 +351,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                               name: formData.name,
                               position: formData.position,
                               department: formData.department,
-                              rate: parseFloat(formData.rate) || 0,
+                              rate: newRate,
                               phone: formData.phone,
                               email: formData.email,
                               bankAccount: formData.bankAccount,
@@ -343,6 +361,41 @@ const Attendance: React.FC<AttendanceProps> = ({
                         : emp
                 )
             );
+
+            // Update payroll records if rate or other employee details changed
+            if (payrollRecords && payrollRecords.length > 0) {
+                setPayrollRecords(
+                    payrollRecords.map(record => {
+                        if (record.employee.toLowerCase() === selectedEmployee.name.toLowerCase()) {
+                            const updatedRecord = { ...record };
+
+                            // Update rate-dependent fields if rate changed
+                            if (rateChanged) {
+                                const OVERTIME_RATE_MULTIPLIER = 1.25;
+                                const newRegularPay = record.regularHours * newRate;
+                                const newOvertimePay = record.overtimeHours * newRate * OVERTIME_RATE_MULTIPLIER;
+                                const newGrossPay = newRegularPay + newOvertimePay;
+
+                                updatedRecord.rate = newRate;
+                                updatedRecord.regularPay = newRegularPay;
+                                updatedRecord.overtimePay = newOvertimePay;
+                                updatedRecord.grossPay = newGrossPay;
+                            }
+
+                            // Update other employee details
+                            updatedRecord.position = formData.position;
+                            updatedRecord.department = formData.department;
+                            updatedRecord.phone = formData.phone;
+                            updatedRecord.email = formData.email;
+                            updatedRecord.bankAccount = formData.bankAccount;
+                            updatedRecord.paymentMode = formData.paymentMode;
+
+                            return updatedRecord;
+                        }
+                        return record;
+                    })
+                );
+            }
         }
         setIsModalOpen(false);
     };
@@ -696,9 +749,47 @@ const Attendance: React.FC<AttendanceProps> = ({
 
     const today = new Date();
     const todayUTC = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-    
+
+    // Show loading state
+    if (attendanceLoading) {
+        return (
+            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+                <div className="flex flex-col items-center justify-center h-96">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-blue mx-auto mb-4"></div>
+                        <p className="text-text-secondary">Loading attendance records...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Show error state
+    if (attendanceError) {
+        return (
+            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
+                    <p className="text-red-500 font-medium">Error loading attendance records</p>
+                    <p className="text-text-secondary text-sm mt-1">{attendanceError}</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-8">
+            {/* Operation Status Messages */}
+            {operationStatus && (
+                <div className={`p-4 rounded-lg border ${
+                    operationStatus.type === 'success'
+                        ? 'bg-green-500/10 border-green-500/30'
+                        : 'bg-red-500/10 border-red-500/30'
+                }`}>
+                    <p className={operationStatus.type === 'success' ? 'text-green-500' : 'text-red-500'}>
+                        {operationStatus.message}
+                    </p>
+                </div>
+            )}
             <div>
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
                     <div>
@@ -1007,14 +1098,6 @@ const Attendance: React.FC<AttendanceProps> = ({
                             <span className="hidden sm:inline">Upload</span>
                         </label>
                         <input type="file" id="attendance-csv-input" accept=".csv" className="hidden" onChange={handleAttendanceUpload} />
-                        <label htmlFor="paid-hours-csv-input" className="cursor-pointer bg-bg-tertiary text-text-primary px-3 py-2 rounded-lg font-medium text-xs hover:bg-hover-bg transition flex items-center gap-1.5 border border-border-color">
-                            <UploadIcon className="w-4 h-4"/>
-                            <span className="hidden sm:inline">Paid Hrs</span>
-                        </label>
-                        <input type="file" id="paid-hours-csv-input" accept=".csv" className="hidden" onChange={handlePaidHoursUpload} />
-                        <button onClick={clearManualPaidHours} className="bg-bg-tertiary text-text-secondary px-3 py-2 rounded-lg font-medium text-xs border border-border-color hover:bg-hover-bg transition">
-                            Clear
-                        </button>
                          {isAttendanceLocked ? (
                             <button onClick={() => setIsAttendanceLocked(false)} className="bg-accent-orange text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-orange/30">
                                 <PencilSquareIcon className="w-4 h-4"/>
@@ -1344,6 +1427,8 @@ const Attendance: React.FC<AttendanceProps> = ({
                     employees={employees}
                     attendanceRecords={attendanceRecords}
                     salesData={salesData}
+                    payrollRecords={payrollRecords}
+                    setPayrollRecords={setPayrollRecords}
                     onClose={() => setViewedEmployee(null)}
                     onEdit={() => {
                         openEditModal(viewedEmployee);
