@@ -2,10 +2,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { CalendarEvent, ContentType, ContentStatus } from '../types';
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, XMarkIcon, TagIcon, CheckCircleIcon, ClockIcon, EyeIcon, TrashIcon } from '../components/Icons';
+import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
+import { calendarService } from '../utils/firebaseService';
 
 interface CalendarProps {
-    events: CalendarEvent[];
-    setEvents: React.Dispatch<React.SetStateAction<CalendarEvent[]>>;
+    events?: CalendarEvent[];
+    setEvents?: React.Dispatch<React.SetStateAction<CalendarEvent[]>>;
 }
 
 const contentTypes: ContentType[] = ['Post', 'Story', 'Reel', 'Ad'];
@@ -147,11 +149,36 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, onSave, onDele
     );
 }
 
-const Calendar: React.FC<CalendarProps> = ({ events, setEvents }) => {
+const Calendar: React.FC<CalendarProps> = ({ events: propEvents, setEvents: setPropEvents }) => {
+    // Fetch events from Firebase
+    const { data: firebaseEvents = [], loading: eventsLoading, error: eventsError } = useFirebaseData(
+        () => calendarService.getAll(),
+        []
+    );
+
+    // Add event mutation
+    const { mutate: addEvent, loading: addLoading, error: addError } = useFirebaseMutation(
+        (event: Omit<CalendarEvent, 'id' | 'created'>) => calendarService.add(event)
+    );
+
+    // Update event mutation
+    const { mutate: updateEvent, loading: updateLoading, error: updateError } = useFirebaseMutation(
+        (data: { id: string; updates: any }) => calendarService.update(data.id, data.updates)
+    );
+
+    // Delete event mutation
+    const { mutate: deleteEvent, loading: deleteLoading, error: deleteError } = useFirebaseMutation(
+        (id: string) => calendarService.delete(id)
+    );
+
+    // Use Firebase events if available, otherwise use prop events (for backward compatibility)
+    const events = (Array.isArray(firebaseEvents) && firebaseEvents.length > 0) ? firebaseEvents : (propEvents || []);
+
     const [currentDate, setCurrentDate] = useState(new Date());
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [eventToEdit, setEventToEdit] = useState<CalendarEvent | null>(null);
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [operationStatus, setOperationStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
     const changeMonth = (direction: number) => {
         setCurrentDate(prev => {
@@ -240,32 +267,102 @@ const Calendar: React.FC<CalendarProps> = ({ events, setEvents }) => {
         setIsModalOpen(true);
     };
 
-    const handleSaveEvent = (eventData: Omit<CalendarEvent, 'id' | 'created' | 'updated'> & { id?: number }) => {
-        if (eventData.id) { // Editing existing event
-            setEvents(events.map(e => e.id === eventData.id ? { ...e, ...eventData, id: e.id, updated: new Date().toISOString() } : e));
-        } else { // Creating new event
-            const newEvent: CalendarEvent = {
-                id: Date.now(),
-                title: eventData.title,
-                description: eventData.description,
-                date: eventData.date,
-                type: eventData.type,
-                status: eventData.status,
-                created: new Date().toISOString(),
-            };
-            setEvents([...events, newEvent]);
+    const handleSaveEvent = async (eventData: Omit<CalendarEvent, 'id' | 'created' | 'updated'> & { id?: number | string }) => {
+        try {
+            if (eventData.id) { // Editing existing event
+                await updateEvent({
+                    id: String(eventData.id),
+                    updates: {
+                        title: eventData.title,
+                        description: eventData.description,
+                        date: eventData.date,
+                        type: eventData.type,
+                        status: eventData.status,
+                    }
+                });
+                setOperationStatus({ type: 'success', message: 'Event updated successfully' });
+            } else { // Creating new event
+                await addEvent({
+                    title: eventData.title,
+                    description: eventData.description,
+                    date: eventData.date,
+                    type: eventData.type,
+                    status: eventData.status,
+                });
+                setOperationStatus({ type: 'success', message: 'Event created successfully' });
+            }
+            setIsModalOpen(false);
+            setTimeout(() => setOperationStatus(null), 3000);
+
+            // Update prop for backward compatibility
+            if (setPropEvents) {
+                setPropEvents(events);
+            }
+        } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : 'Failed to save event';
+            setOperationStatus({ type: 'error', message: errorMsg });
         }
-        setIsModalOpen(false);
     };
 
-    const handleDeleteEvent = (id: number) => {
-        setEvents(events.filter(e => e.id !== id));
-        setIsModalOpen(false);
+    const handleDeleteEvent = async (id: number | string) => {
+        try {
+            await deleteEvent(String(id));
+            setOperationStatus({ type: 'success', message: 'Event deleted successfully' });
+            setIsModalOpen(false);
+            setTimeout(() => setOperationStatus(null), 3000);
+
+            // Update prop for backward compatibility
+            if (setPropEvents) {
+                setPropEvents(events.filter(e => String(e.id) !== String(id)));
+            }
+        } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : 'Failed to delete event';
+            setOperationStatus({ type: 'error', message: errorMsg });
+        }
     };
+
+    // Show loading state
+    if (eventsLoading) {
+        return (
+            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+                <div className="flex flex-col items-center justify-center h-96">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-blue mx-auto mb-4"></div>
+                        <p className="text-text-secondary">Loading calendar events...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Show error state
+    if (eventsError) {
+        return (
+            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
+                    <p className="text-red-500 font-medium">Error loading calendar events</p>
+                    <p className="text-text-secondary text-sm mt-1">{eventsError}</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen w-full bg-bg-primary">
             <div className="p-4 sm:p-8 lg:p-12 max-w-7xl mx-auto w-full space-y-8">
+                {/* Operation Status Messages */}
+                {operationStatus && (
+                    <div className={`p-4 rounded-lg border ${
+                        operationStatus.type === 'success'
+                            ? 'bg-green-500/10 border-green-500/30'
+                            : 'bg-red-500/10 border-red-500/30'
+                    }`}>
+                        <p className={operationStatus.type === 'success' ? 'text-green-500' : 'text-red-500'}>
+                            {operationStatus.message}
+                        </p>
+                    </div>
+                )}
+
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                         <h2 className="text-3xl font-semibold text-text-primary">Content Calendar</h2>
