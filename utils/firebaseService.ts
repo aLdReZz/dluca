@@ -133,6 +133,7 @@ export const employeesService = {
                     batch.set(docRef, { ...employee, updatedAt: new Date() }, { merge: true });
                 });
                 await batch.commit();
+                console.log(`✅ Successfully saved ${employees.length} employees with schedules to Firebase`);
             }
         );
     },

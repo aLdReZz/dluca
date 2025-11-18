@@ -682,15 +682,22 @@ const Attendance: React.FC<AttendanceProps> = ({
             setPropAttendanceRecords([]);
         }
 
-        // Also clear from Firebase if configured
+        // Clear from Firebase and save the new schedule
         try {
+            // Clear old attendance records
             await attendanceService.clearAll();
+
+            // Save the updated employees with schedules to Firebase
+            await syncEmployees(updatedEmployees);
+
+            console.log('✅ Schedule uploaded and saved to Firebase');
         } catch (error) {
-            console.warn('Could not clear old attendance records from Firebase:', error);
+            console.warn('Could not complete schedule upload to Firebase:', error);
+            alert('Warning: Schedule was imported locally but may not have been saved to Firebase. Click "Save Schedules" to ensure they are persisted.');
         }
 
         setIsScheduleLocked(true);
-        alert(`Schedule import complete!\n\n${updatedCount} existing employees updated.\n${createdCount} new employees created.\n\nNote: Previous attendance records have been cleared. Upload attendance CSV separately.`);
+        alert(`Schedule import complete!\n\n${updatedCount} existing employees updated.\n${createdCount} new employees created.\n\nSchedule has been saved to database. Upload attendance CSV separately.`);
     };
 
     const handleAttendanceUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
