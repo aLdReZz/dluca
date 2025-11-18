@@ -242,10 +242,12 @@ export const attendanceService = {
             async () => {
                 const batch = writeBatch(db);
                 records.forEach((record, index) => {
-                    const docRef = doc(collection(db, 'attendanceRecords'), `${record.employee}-${record.date}`);
+                    const docId = `${record.employee}-${record.date}`;
+                    const docRef = doc(db, 'attendanceRecords', docId);
                     batch.set(docRef, { ...record, updatedAt: new Date() }, { merge: true });
                 });
                 await batch.commit();
+                console.log(`✅ Successfully saved ${records.length} attendance records to Firebase`);
             }
         );
     },

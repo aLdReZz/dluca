@@ -752,6 +752,9 @@ const Attendance: React.FC<AttendanceProps> = ({
                 setPropAttendanceRecords(newRecords);
             }
 
+            // Refresh Firebase data to ensure persistence
+            setAttendanceDataVersion(prev => prev + 1);
+
             alert(`${newRecords.length} attendance records have been successfully imported and saved to database.`);
         } catch (error) {
             console.error('Error uploading attendance records:', error);
