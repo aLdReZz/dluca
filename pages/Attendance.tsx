@@ -576,15 +576,15 @@ const Attendance: React.FC<AttendanceProps> = ({
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             const text = e.target?.result as string;
-            parseScheduleCSV(text);
+            await parseScheduleCSV(text);
             event.target.value = '';
         };
         reader.readAsText(file);
     };
 
-    const parseScheduleCSV = (csvText: string) => {
+    const parseScheduleCSV = async (csvText: string) => {
         const lines = csvText.split('\n').filter(line => line.trim() !== '');
         if (lines.length < 5) {
             alert("Invalid CSV format. It should have at least 5 rows (including headers and employee data).");
@@ -675,8 +675,22 @@ const Attendance: React.FC<AttendanceProps> = ({
         });
     
         setEmployees(updatedEmployees);
+
+        // Clear old attendance records when uploading a new schedule
+        // This prevents confusion between schedule and attendance data
+        if (setPropAttendanceRecords) {
+            setPropAttendanceRecords([]);
+        }
+
+        // Also clear from Firebase if configured
+        try {
+            await attendanceService.clearAll();
+        } catch (error) {
+            console.warn('Could not clear old attendance records from Firebase:', error);
+        }
+
         setIsScheduleLocked(true);
-        alert(`Schedule import complete!\n\n${updatedCount} existing employees updated.\n${createdCount} new employees created.\nThe schedule is now locked.`);
+        alert(`Schedule import complete!\n\n${updatedCount} existing employees updated.\n${createdCount} new employees created.\n\nNote: Previous attendance records have been cleared. Upload attendance CSV separately.`);
     };
 
     const handleAttendanceUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
