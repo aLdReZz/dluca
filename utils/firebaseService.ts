@@ -670,6 +670,42 @@ export const calendarService = {
     },
 };
 
+// ==================== CLEAR UTILITIES ====================
+
+/**
+ * Clear all employee schedules and attendance records
+ * This removes all weekly schedule and attendance data from Firebase
+ */
+export async function clearAttendanceData(): Promise<void> {
+    if (!isFirebaseConfigured) {
+        console.warn('Firebase is not configured. Cannot clear data.');
+        return;
+    }
+
+    try {
+        // Clear all attendance records
+        await attendanceService.clearAll();
+        console.log('✅ All attendance records cleared from Firebase');
+
+        // Clear all schedules from employees
+        const employees = await employeesService.getAll();
+        if (employees.length > 0) {
+            const batch = writeBatch(db);
+            employees.forEach(emp => {
+                batch.update(doc(db, 'employees', emp.id), {
+                    schedule: {},
+                    updatedAt: new Date(),
+                });
+            });
+            await batch.commit();
+            console.log('✅ All employee schedules cleared from Firebase');
+        }
+    } catch (error) {
+        console.error('Error clearing attendance data:', error);
+        throw error;
+    }
+}
+
 // ==================== SYNC UTILITIES ====================
 
 /**

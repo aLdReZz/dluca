@@ -13,7 +13,7 @@ import PurchaseRequest from './pages/PurchaseRequest';
 import type { Role, Page, SalesData, InventoryItem, PurchaseOrder, Employee, CalendarEvent, RecipeCosting, PayrollRecord, AttendanceRecord, ProductInventoryItem } from './types';
 import { MenuIcon, ShieldCheckIcon, UserIcon } from './components/Icons';
 import { useFirebaseData } from './hooks/useFirebase';
-import { employeesService, attendanceService } from './utils/firebaseService';
+import { employeesService, attendanceService, clearAttendanceData } from './utils/firebaseService';
 import { isFirebaseConfigured } from './utils/firebase';
 
 const ADMIN_PIN = '1234';
@@ -376,6 +376,28 @@ const App: React.FC = () => {
     const handlePinSuccess = () => {
         setRole('admin');
         setPinModalOpen(false);
+    };
+
+    // Clear all attendance data (schedule and attendance records)
+    const handleClearAttendanceData = async () => {
+        if (window.confirm('Are you sure you want to clear ALL weekly schedules and attendance records? This action cannot be undone.')) {
+            try {
+                // Clear local state
+                setEmployees([]);
+                setAttendanceRecords([]);
+                setManualPaidMinutes({});
+                setManualGhostMinutes({});
+
+                // Clear Firebase data
+                await clearAttendanceData();
+
+                console.log('✅ All attendance data cleared successfully');
+                alert('All weekly schedules and attendance records have been cleared.');
+            } catch (error) {
+                console.error('Error clearing attendance data:', error);
+                alert('Error clearing attendance data. Please try again.');
+            }
+        }
     };
 
     useEffect(() => {
