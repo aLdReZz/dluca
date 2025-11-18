@@ -346,50 +346,51 @@ const Attendance: React.FC<AttendanceProps> = ({
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleSaveEmployee = () => {
+    const handleSaveEmployee = async () => {
         if (!formData.name || !formData.position || !formData.rate) {
             alert('Please fill in Name, Position, and Rate.');
             return;
         }
+
+        let updatedEmployees: Employee[] = [];
+
         if (modalType === 'add') {
-            setEmployees([
-                ...employees,
-                {
-                    id: Date.now(),
-                    name: formData.name,
-                    position: formData.position,
-                    department: formData.department,
-                    rate: parseFloat(formData.rate) || 0,
-                    schedule: {},
-                    phone: formData.phone,
-                    email: formData.email,
-                    bankAccount: formData.bankAccount,
-                    paymentMode: formData.paymentMode,
-                },
-            ]);
+            const newEmployee: Employee = {
+                id: Date.now(),
+                name: formData.name,
+                position: formData.position,
+                department: formData.department,
+                rate: parseFloat(formData.rate) || 0,
+                schedule: {},
+                phone: formData.phone,
+                email: formData.email,
+                bankAccount: formData.bankAccount,
+                paymentMode: formData.paymentMode,
+            };
+            updatedEmployees = [...employees, newEmployee];
+            setEmployees(updatedEmployees);
         } else if (selectedEmployee) {
             const newRate = parseFloat(formData.rate) || 0;
             const oldRate = selectedEmployee.rate;
             const rateChanged = newRate !== oldRate;
 
-            setEmployees(
-                employees.map(emp =>
-                    emp.id === selectedEmployee.id
-                        ? {
-                              ...emp,
-                              name: formData.name,
-                              position: formData.position,
-                              department: formData.department,
-                              rate: newRate,
-                              phone: formData.phone,
-                              email: formData.email,
-                              bankAccount: formData.bankAccount,
-                              paymentMode: formData.paymentMode,
-                              // Preserve existing fields like schedule, approvedOvertime, salaryDeductions
-                          }
-                        : emp
-                )
+            updatedEmployees = employees.map(emp =>
+                emp.id === selectedEmployee.id
+                    ? {
+                          ...emp,
+                          name: formData.name,
+                          position: formData.position,
+                          department: formData.department,
+                          rate: newRate,
+                          phone: formData.phone,
+                          email: formData.email,
+                          bankAccount: formData.bankAccount,
+                          paymentMode: formData.paymentMode,
+                          // Preserve existing fields like schedule, approvedOvertime, salaryDeductions
+                      }
+                    : emp
             );
+            setEmployees(updatedEmployees);
 
             // Update payroll records if rate or other employee details changed
             if (payrollRecords && payrollRecords.length > 0 && setPropPayrollRecords) {
@@ -426,6 +427,18 @@ const Attendance: React.FC<AttendanceProps> = ({
                 );
             }
         }
+
+        // Save employee changes to Firebase
+        try {
+            if (updatedEmployees.length > 0) {
+                await syncEmployees(updatedEmployees);
+                console.log('✅ Employee changes saved to Firebase');
+            }
+        } catch (error) {
+            console.warn('Could not save employee changes to Firebase:', error);
+            alert('Warning: Employee was edited locally but may not have been saved to Firebase.');
+        }
+
         setIsModalOpen(false);
     };
     
