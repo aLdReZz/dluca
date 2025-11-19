@@ -1046,7 +1046,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                     </div>
                 </div>
                 <div className="relative">
-                    <div className={`bg-bg-secondary rounded-xl border overflow-hidden transition-all duration-300 ${!isScheduleLocked ? 'border-accent-blue ring-2 ring-accent-blue/30' : 'border-border-color'}`}>
+                    <div className={`bg-bg-secondary rounded-xl border overflow-hidden transition-all duration-300 ${slideDirection === 'left' ? 'table-slide-left' : slideDirection === 'right' ? 'table-slide-right' : ''} ${!isScheduleLocked ? 'border-accent-blue ring-2 ring-accent-blue/30' : 'border-border-color'}`}>
                         {/* Desktop Table View */}
                         <div className="overflow-x-auto hidden lg:block">
                             <table className="w-full border-collapse table-fixed">

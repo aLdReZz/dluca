@@ -482,12 +482,65 @@ body {
   }
 }
 
+/* Schedule table scroll slide animations */
+@keyframes tableSlideOutLeft {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+}
+
+@keyframes tableSlideOutRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+}
+
+@keyframes tableSlideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes tableSlideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 .date-slide-left {
   animation: dateSlideInFromLeft 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .date-slide-right {
   animation: dateSlideInFromRight 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.table-slide-right {
+  animation: tableSlideInFromRight 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.table-slide-left {
+  animation: tableSlideInFromLeft 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .role-select-btn {
