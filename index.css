@@ -459,11 +459,11 @@ body {
   }
 }
 
-/* Week navigation slide animations */
-@keyframes weekSlideInFromLeft {
+/* Week navigation date slide animations */
+@keyframes dateSlideInFromLeft {
   from {
     opacity: 0;
-    transform: translateX(-24px);
+    transform: translateX(-16px);
   }
   to {
     opacity: 1;
@@ -471,10 +471,10 @@ body {
   }
 }
 
-@keyframes weekSlideInFromRight {
+@keyframes dateSlideInFromRight {
   from {
     opacity: 0;
-    transform: translateX(24px);
+    transform: translateX(16px);
   }
   to {
     opacity: 1;
@@ -482,27 +482,12 @@ body {
   }
 }
 
-@keyframes weekSlideIn {
-  from {
-    opacity: 0;
-    transform: translateX(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+.date-slide-left {
+  animation: dateSlideInFromLeft 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.schedule-table-container {
-  animation: weekSlideIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.slide-from-left {
-  animation: weekSlideInFromLeft 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.slide-from-right {
-  animation: weekSlideInFromRight 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+.date-slide-right {
+  animation: dateSlideInFromRight 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .role-select-btn {

@@ -1009,7 +1009,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                                 className="flex items-center gap-1.5 bg-bg-tertiary border border-border-color rounded-lg py-2 px-3 text-xs font-medium hover:bg-hover-bg transition"
                             >
                                 <CalendarDaysIcon className="w-4 h-4 text-text-secondary" />
-                                <span>{new Date(scheduleWeekStart + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</span>
+                                <span className={slideDirection === 'left' ? 'date-slide-left' : slideDirection === 'right' ? 'date-slide-right' : ''}>{new Date(scheduleWeekStart + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</span>
                             </button>
                             {isDatePickerOpen && (
                                 <DatePickerPopup
@@ -1046,7 +1046,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                     </div>
                 </div>
                 <div className="relative">
-                    <div className={`bg-bg-secondary rounded-xl border overflow-hidden transition-all duration-300 ${slideDirection === 'left' ? 'slide-from-right' : slideDirection === 'right' ? 'slide-from-left' : 'schedule-table-container'} ${!isScheduleLocked ? 'border-accent-blue ring-2 ring-accent-blue/30' : 'border-border-color'}`}>
+                    <div className={`bg-bg-secondary rounded-xl border overflow-hidden transition-all duration-300 ${!isScheduleLocked ? 'border-accent-blue ring-2 ring-accent-blue/30' : 'border-border-color'}`}>
                         {/* Desktop Table View */}
                         <div className="overflow-x-auto hidden lg:block">
                             <table className="w-full border-collapse table-fixed">
