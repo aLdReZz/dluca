@@ -161,10 +161,8 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
     // Show loading state
     if (recipesLoading) {
         return (
-            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
-                <div className="flex flex-col items-center justify-center h-96">
-                    <LoadingSpinner message="Loading recipe costings..." />
-                </div>
+            <div className="fixed inset-0 flex items-center justify-center">
+                <LoadingSpinner message="Loading recipe costings..." />
             </div>
         );
     }

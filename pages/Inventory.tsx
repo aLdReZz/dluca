@@ -4,7 +4,7 @@ import { PlusIcon, SearchIcon, FilterIcon, PencilIcon, TrashIcon, ViewDetailsIco
 import LoadingSpinner from '../components/LoadingSpinner';
 import ProductItemModal from '../components/ProductItemModal';
 import ConfirmationModal from '../components/ConfirmationModal';
-import { useFirebaseData } from '../hooks/useFirebase';
+import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
 import { inventoryService, productInventoryService } from '../utils/firebaseService';
 
 
@@ -53,14 +53,17 @@ const StatusBadge: React.FC<{ item: InventoryItem }> = ({ item }) => {
     return <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-accent-green/20 text-accent-green">Good</span>;
 };
 
-const ProductInventoryView: React.FC<{ 
+const ProductInventoryView: React.FC<{
     products: ProductInventoryItem[];
     onUpdateProduct: (product: ProductInventoryItem) => void;
     onAddItemClick: () => void;
     productUnits: string[];
     onDeleteProduct: (product: ProductInventoryItem) => void;
     onUploadClick: () => void;
-}> = ({ products, onUpdateProduct, onAddItemClick, productUnits, onDeleteProduct, onUploadClick }) => {
+    onMigrateClick?: () => void;
+    isMigrating?: boolean;
+    migrationProgress?: { current: number; total: number };
+}> = ({ products, onUpdateProduct, onAddItemClick, productUnits, onDeleteProduct, onUploadClick, onMigrateClick, isMigrating, migrationProgress }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [editingProductId, setEditingProductId] = useState<number | null>(null);
     const [editingProductData, setEditingProductData] = useState<ProductInventoryItem | null>(null);
@@ -102,9 +105,28 @@ const ProductInventoryView: React.FC<{
     const formatPeso = (amount: number) => {
         return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(amount);
     };
-    
+
+    // Check if there are products with numeric IDs
+    const hasLocalProducts = products.some(p => typeof p.id === 'number' || !isNaN(Number(p.id)));
+
     return (
         <div className="bg-bg-secondary rounded-xl border border-border-color overflow-hidden shadow-lg">
+            {/* Migration Progress Bar */}
+            {isMigrating && migrationProgress && (
+                <div className="bg-accent-blue/10 border-b border-accent-blue/30 px-5 py-3">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-accent-blue">Migrating to Firebase...</span>
+                        <span className="text-xs text-text-secondary">{migrationProgress.current} / {migrationProgress.total}</span>
+                    </div>
+                    <div className="w-full bg-bg-primary rounded-full h-2 overflow-hidden">
+                        <div
+                            className="bg-accent-blue h-full transition-all duration-300"
+                            style={{ width: `${(migrationProgress.current / migrationProgress.total) * 100}%` }}
+                        />
+                    </div>
+                </div>
+            )}
+
             <div className="px-5 py-4 flex flex-col sm:flex-row justify-between items-center gap-3 border-b border-border-color bg-gradient-to-r from-bg-secondary to-bg-tertiary/20">
                 <h2 className="text-lg font-bold">Product Pricelist</h2>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -118,6 +140,18 @@ const ProductInventoryView: React.FC<{
                             className="bg-bg-primary border border-border-color rounded-lg py-2 pl-9 pr-3 text-sm focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue w-full sm:w-56 transition-all"
                         />
                     </div>
+                    {hasLocalProducts && onMigrateClick && (
+                        <button
+                            onClick={onMigrateClick}
+                            disabled={isMigrating}
+                            className="flex items-center gap-1.5 bg-accent-blue text-white px-3 py-2 text-xs font-semibold rounded-lg hover:bg-opacity-90 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                            </svg>
+                            <span className="hidden sm:inline">Migrate to Firebase</span>
+                        </button>
+                    )}
                     <button onClick={onUploadClick} className="flex items-center gap-1.5 bg-bg-tertiary text-text-primary px-3 py-2 text-xs font-semibold rounded-lg hover:bg-hover-bg transition-all hover:scale-102 border border-border-color">
                         <UploadIcon className="w-4 h-4" />
                         <span className="hidden sm:inline">Upload CSV</span>
@@ -148,7 +182,7 @@ const ProductInventoryView: React.FC<{
                                             <td className="px-3 py-2 text-sm font-medium"><input type="text" name="name" value={editingProductData.name} onChange={handleFieldChange} className="bg-bg-primary border border-border-color rounded-md px-2 py-1 w-full text-xs focus:ring-2 focus:ring-accent-blue/50"/></td>
                                             <td className="px-3 py-2 text-sm"><input type="text" name="brand" value={editingProductData.brand} onChange={handleFieldChange} className="bg-bg-primary border border-border-color rounded-md px-2 py-1 w-full text-xs focus:ring-2 focus:ring-accent-blue/50"/></td>
                                             <td className="px-3 py-2 text-sm">
-                                                <select name="unit" value={editingProductData.unit} onChange={handleFieldChange} className="bg-bg-primary border border-border-color rounded-md px-2 py-1 w-full text-xs focus:ring-2 focus:ring-accent-blue/50">
+                                                <select name="unit" value={editingProductData.unit} onChange={handleFieldChange} autoComplete="off" className="bg-bg-primary border border-border-color rounded-md px-2 py-1 w-full text-xs focus:ring-2 focus:ring-accent-blue/50 appearance-none">
                                                     {!productUnits.includes(editingProductData.unit) && editingProductData.unit && (
                                                         <option value={editingProductData.unit}>{editingProductData.unit}</option>
                                                     )}
@@ -393,16 +427,35 @@ const InventoryAndSuppliesView: React.FC<{ inventoryItems: InventoryItem[] }> = 
 };
 
 const Inventory: React.FC<InventoryProps> = ({ inventoryItems: propInventoryItems, setInventoryItems: setPropInventoryItems, purchaseOrders: propPurchaseOrders, setPurchaseOrders: setPropPurchaseOrders, productInventoryItems: propProductInventoryItems, setProductInventoryItems: setPropProductInventoryItems, activeView, productCategories, productBrands, productUnits, productSuppliers, onAddProduct }) => {
+    // Refresh counter to trigger data re-fetch after mutations
+    const [refreshCounter, setRefreshCounter] = useState(0);
+
     // Fetch inventory items from Firebase
     const { data: firebaseInventoryItems = [], loading: inventoryLoading, error: inventoryError } = useFirebaseData(
         () => inventoryService.getAll(),
-        []
+        [refreshCounter]
     );
 
     // Fetch product inventory items from Firebase
     const { data: firebaseProductItems = [], loading: productLoading, error: productError } = useFirebaseData(
         () => productInventoryService.getAll(),
-        []
+        [refreshCounter]
+    );
+
+    // Update product mutation
+    const { mutate: updateProduct, loading: updateLoading, error: updateError } = useFirebaseMutation(
+        (data: { id: string; product: Partial<ProductInventoryItem> }) =>
+            productInventoryService.update(data.id, data.product)
+    );
+
+    // Delete product mutation
+    const { mutate: deleteProduct, loading: deleteLoading, error: deleteError } = useFirebaseMutation(
+        (id: string) => productInventoryService.delete(id)
+    );
+
+    // Add product mutation
+    const { mutate: addProduct, loading: addLoading, error: addError } = useFirebaseMutation(
+        (product: Omit<ProductInventoryItem, 'id'>) => productInventoryService.add(product)
     );
 
     // Use Firebase data if available, otherwise use prop data (for backward compatibility)
@@ -414,6 +467,8 @@ const Inventory: React.FC<InventoryProps> = ({ inventoryItems: propInventoryItem
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<ProductInventoryItem | null>(null);
     const [operationStatus, setOperationStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+    const [isMigrating, setIsMigrating] = useState(false);
+    const [migrationProgress, setMigrationProgress] = useState({ current: 0, total: 0 });
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const formattedDate = new Intl.DateTimeFormat('en-US', {
@@ -424,10 +479,36 @@ const Inventory: React.FC<InventoryProps> = ({ inventoryItems: propInventoryItem
 
     const pageTitle = activeView === 'product' ? 'Product Pricelist' : 'Inventory Management';
 
-    const handleUpdateProduct = (updatedProduct: ProductInventoryItem) => {
-        setProductInventoryItems(prev => 
-            prev.map(p => p.id === updatedProduct.id ? updatedProduct : p)
-        );
+    const handleUpdateProduct = async (updatedProduct: ProductInventoryItem) => {
+        try {
+            const { id, ...productData } = updatedProduct;
+
+            // Check if this is a Firebase document ID (string) or a local numeric ID
+            const isFirebaseId = typeof id === 'string' && isNaN(Number(id));
+
+            if (isFirebaseId) {
+                // Update in Firebase
+                await updateProduct({ id: String(id), product: productData });
+                setOperationStatus({ type: 'success', message: 'Product updated successfully' });
+            } else {
+                // Local data only - update props
+                setOperationStatus({ type: 'success', message: 'Product updated locally (not synced to Firebase)' });
+            }
+
+            // Trigger data refresh for both Firebase and local data
+            setRefreshCounter(prev => prev + 1);
+            setTimeout(() => setOperationStatus(null), 3000);
+
+            // Update prop for backward compatibility
+            if (setPropProductInventoryItems) {
+                setPropProductInventoryItems(prev =>
+                    prev.map(p => p.id === updatedProduct.id ? updatedProduct : p)
+                );
+            }
+        } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : 'Failed to update product';
+            setOperationStatus({ type: 'error', message: errorMsg });
+        }
     };
 
     const handleDeleteProduct = (product: ProductInventoryItem) => {
@@ -435,11 +516,37 @@ const Inventory: React.FC<InventoryProps> = ({ inventoryItems: propInventoryItem
         setIsConfirmModalOpen(true);
     };
 
-    const handleConfirmDelete = () => {
+    const handleConfirmDelete = async () => {
         if (itemToDelete) {
-            setProductInventoryItems(prev => prev.filter(p => p.id !== itemToDelete.id));
-            setIsConfirmModalOpen(false);
-            setItemToDelete(null);
+            try {
+                const { id } = itemToDelete;
+
+                // Check if this is a Firebase document ID (string) or a local numeric ID
+                const isFirebaseId = typeof id === 'string' && isNaN(Number(id));
+
+                if (isFirebaseId) {
+                    // Delete from Firebase
+                    await deleteProduct(String(id));
+                    setOperationStatus({ type: 'success', message: 'Product deleted successfully' });
+                    // Trigger data refresh
+                    setRefreshCounter(prev => prev + 1);
+                } else {
+                    // Local data only - update props
+                    setOperationStatus({ type: 'success', message: 'Product deleted locally (not synced to Firebase)' });
+                }
+
+                setTimeout(() => setOperationStatus(null), 3000);
+                setIsConfirmModalOpen(false);
+                setItemToDelete(null);
+
+                // Update prop for backward compatibility
+                if (setPropProductInventoryItems) {
+                    setPropProductInventoryItems(prev => prev.filter(p => p.id !== itemToDelete.id));
+                }
+            } catch (err) {
+                const errorMsg = err instanceof Error ? err.message : 'Failed to delete product';
+                setOperationStatus({ type: 'error', message: errorMsg });
+            }
         }
     };
 
@@ -593,13 +700,70 @@ const Inventory: React.FC<InventoryProps> = ({ inventoryItems: propInventoryItem
         fileInputRef.current?.click();
     };
 
+    const handleMigrateToFirebase = async () => {
+        // Find all products with numeric IDs (CSV-imported data)
+        const productsToMigrate = productInventoryItems.filter(product => {
+            return typeof product.id === 'number' || !isNaN(Number(product.id));
+        });
+
+        if (productsToMigrate.length === 0) {
+            setOperationStatus({ type: 'success', message: 'No products to migrate. All products are already in Firebase.' });
+            setTimeout(() => setOperationStatus(null), 3000);
+            return;
+        }
+
+        const confirmed = confirm(`Found ${productsToMigrate.length} products with local IDs. Migrate them to Firebase?`);
+        if (!confirmed) return;
+
+        setIsMigrating(true);
+        setMigrationProgress({ current: 0, total: productsToMigrate.length });
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (let i = 0; i < productsToMigrate.length; i++) {
+            const product = productsToMigrate[i];
+            const { id, ...productData } = product;
+
+            try {
+                await addProduct(productData);
+                successCount++;
+            } catch (err) {
+                console.error(`Failed to migrate product ${product.name}:`, err);
+                errorCount++;
+            }
+
+            setMigrationProgress({ current: i + 1, total: productsToMigrate.length });
+        }
+
+        setIsMigrating(false);
+        setMigrationProgress({ current: 0, total: 0 });
+
+        if (successCount > 0) {
+            setOperationStatus({
+                type: 'success',
+                message: `Migration complete! ${successCount} products migrated to Firebase${errorCount > 0 ? `, ${errorCount} failed` : ''}.`
+            });
+
+            // Clear local data after successful migration
+            if (setPropProductInventoryItems) {
+                setPropProductInventoryItems([]);
+            }
+
+            // Refresh to show Firebase data
+            setRefreshCounter(prev => prev + 1);
+        } else {
+            setOperationStatus({ type: 'error', message: 'Migration failed. No products were migrated.' });
+        }
+
+        setTimeout(() => setOperationStatus(null), 5000);
+    };
+
     // Show loading state
     if (inventoryLoading || productLoading) {
         return (
-            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
-                <div className="flex flex-col items-center justify-center h-96">
-                    <LoadingSpinner message="Loading inventory items..." />
-                </div>
+            <div className="fixed inset-0 flex items-center justify-center">
+                <LoadingSpinner message="Loading inventory items..." />
             </div>
         );
     }
@@ -643,13 +807,17 @@ const Inventory: React.FC<InventoryProps> = ({ inventoryItems: propInventoryItem
             </div>
             
             {activeView === 'product' ? (
-                <ProductInventoryView 
-                    products={productInventoryItems} 
+                <ProductInventoryView
+                    key={`product-view-${refreshCounter}`}
+                    products={productInventoryItems}
                     onUpdateProduct={handleUpdateProduct}
                     onAddItemClick={() => setIsAddModalOpen(true)}
                     productUnits={productUnits}
                     onDeleteProduct={handleDeleteProduct}
                     onUploadClick={handleUploadClick}
+                    onMigrateClick={handleMigrateToFirebase}
+                    isMigrating={isMigrating}
+                    migrationProgress={migrationProgress}
                 />
             ) : (
                 <InventoryAndSuppliesView inventoryItems={inventoryItems} />

@@ -38,7 +38,9 @@ export interface PurchaseOrder {
     date: string;
     department: string;
     items: {
-        itemId: number;
+        itemId?: number;
+        itemName: string;
+        unit?: string;
         quantity: number;
         cost: number;
     }[];

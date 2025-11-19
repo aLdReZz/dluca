@@ -4,7 +4,7 @@ import { PlusIcon, SearchIcon, EllipsisHorizontalIcon } from '../components/Icon
 import LoadingSpinner from '../components/LoadingSpinner';
 import PurchaseRequestModal from '../components/PurchaseRequestModal';
 import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
-import { purchaseOrderService } from '../utils/firebaseService';
+import { purchaseOrderService, productInventoryService } from '../utils/firebaseService';
 
 interface PurchaseRequestProps {
     purchaseOrders?: PurchaseOrder[];
@@ -23,10 +23,16 @@ const StatusBadge: React.FC<{ status: PurchaseOrder['status'] }> = ({ status }) 
     return <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${statusClasses[status]}`}>{status}</span>;
 };
 
-const PurchaseRequest: React.FC<PurchaseRequestProps> = ({ purchaseOrders: propPurchaseOrders, setPurchaseOrders: setPropPurchaseOrders, productInventoryItems, onAddPurchaseOrder, departments }) => {
+const PurchaseRequest: React.FC<PurchaseRequestProps> = ({ purchaseOrders: propPurchaseOrders, setPurchaseOrders: setPropPurchaseOrders, productInventoryItems: propProductInventoryItems, onAddPurchaseOrder, departments }) => {
     // Fetch purchase orders from Firebase
     const { data: firebaseOrders = [], loading: ordersLoading, error: ordersError } = useFirebaseData(
         () => purchaseOrderService.getAll(),
+        []
+    );
+
+    // Fetch product inventory from Firebase
+    const { data: firebaseProductItems = [], loading: productsLoading, error: productsError } = useFirebaseData(
+        () => productInventoryService.getAll(),
         []
     );
 
@@ -37,6 +43,9 @@ const PurchaseRequest: React.FC<PurchaseRequestProps> = ({ purchaseOrders: propP
 
     // Use Firebase orders if available, otherwise use prop orders (for backward compatibility)
     const purchaseOrders = (Array.isArray(firebaseOrders) && firebaseOrders.length > 0) ? firebaseOrders : (propPurchaseOrders || []);
+
+    // Use Firebase product items if available, otherwise use prop data (for backward compatibility)
+    const productInventoryItems = (Array.isArray(firebaseProductItems) && firebaseProductItems.length > 0) ? firebaseProductItems : (propProductInventoryItems || []);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -71,23 +80,21 @@ const PurchaseRequest: React.FC<PurchaseRequestProps> = ({ purchaseOrders: propP
     };
     
     // Show loading state
-    if (ordersLoading) {
+    if (ordersLoading || productsLoading) {
         return (
-            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
-                <div className="flex flex-col items-center justify-center h-96">
-                    <LoadingSpinner message="Loading purchase orders..." />
-                </div>
+            <div className="fixed inset-0 flex items-center justify-center">
+                <LoadingSpinner message="Loading data..." />
             </div>
         );
     }
 
     // Show error state
-    if (ordersError) {
+    if (ordersError || productsError) {
         return (
             <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
                 <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
-                    <p className="text-red-500 font-medium">Error loading purchase orders</p>
-                    <p className="text-text-secondary text-sm mt-1">{ordersError}</p>
+                    <p className="text-red-500 font-medium">Error loading data</p>
+                    <p className="text-text-secondary text-sm mt-1">{ordersError || productsError}</p>
                 </div>
             </div>
         );

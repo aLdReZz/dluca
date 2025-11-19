@@ -325,10 +325,8 @@ const Calendar: React.FC<CalendarProps> = ({ events: propEvents, setEvents: setP
     // Show loading state
     if (eventsLoading) {
         return (
-            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
-                <div className="flex flex-col items-center justify-center h-96">
-                    <LoadingSpinner message="Loading calendar events..." />
-                </div>
+            <div className="fixed inset-0 flex items-center justify-center">
+                <LoadingSpinner message="Loading calendar events..." />
             </div>
         );
     }

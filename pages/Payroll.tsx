@@ -447,15 +447,13 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
         ) / 100;
     }, [serviceChargeEntries]);
 
-    const tableHeaders = ['Staff', 'Rate', 'Regular Hrs', 'OT Hrs', 'Gross Pay', 'Net Pay', 'Present', 'Absent', 'Late', 'Actions'];
+    const tableHeaders = ['Staff', 'Rate', 'Regular Hrs', 'OT Hrs', 'Period Earning', 'Service Charge', 'Net Pay', 'Present', 'Absent', 'Late', 'Actions'];
 
     // Show loading state
     if (payrollLoading) {
         return (
-            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
-                <div className="flex flex-col items-center justify-center h-96">
-                    <LoadingSpinner message="Loading payroll records..." />
-                </div>
+            <div className="fixed inset-0 flex items-center justify-center">
+                <LoadingSpinner message="Loading payroll records..." />
             </div>
         );
     }
@@ -533,46 +531,6 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
                 />
             </div>
 
-            <div className="bg-bg-secondary border border-border-color rounded-xl p-6 mb-8">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                        <h3 className="text-xl font-semibold text-text-primary">Service Charge Data</h3>
-                        <p className="text-sm text-text-secondary">
-                            Raw sales amounts for {formatDateForDisplay(payPeriod.start)} - {formatDateForDisplay(payPeriod.end)}
-                        </p>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-sm text-text-secondary">Total for period</p>
-                        <p className="text-2xl font-bold text-text-primary">{formatPeso(serviceChargePoolTotal)}</p>
-                    </div>
-                </div>
-                {serviceChargeEntries.length > 0 ? (
-                    <div className="mt-4 border border-border-color rounded-lg overflow-hidden">
-                        <table className="w-full">
-                            <thead className="bg-bg-tertiary/40 text-sm text-text-secondary">
-                                <tr>
-                                    <th className="p-3 text-left">Date</th>
-                                    <th className="p-3 text-right">Service Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border-color/60 text-sm">
-                                {serviceChargeEntries.map(entry => (
-                                    <tr key={`${entry.dateKey}-${entry.amount}`} className="hover:bg-hover-bg/30 transition-colors">
-                                        <td className="p-3">{formatDateForDisplay(entry.dateKey)}</td>
-                                        <td className="p-3 text-right font-medium">{formatPeso(entry.amount)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                ) : (
-                    <p className="mt-4 text-sm text-text-secondary">No service charge data found for this period.</p>
-                )}
-                <p className="text-xs text-text-secondary mt-3">
-                    These figures are reference-only. They are not automatically applied to employee pay.
-                </p>
-            </div>
-
             <div className="bg-bg-secondary rounded-xl border border-border-color overflow-hidden">
                  {/* Desktop Table View */}
                  <div className="overflow-x-auto hidden lg:block">
@@ -580,35 +538,42 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
                         <thead className="bg-bg-tertiary/40">
                             <tr>
                                 {tableHeaders.map(header => (
-                                    <th key={header} className={`p-4 text-left text-sm font-medium text-text-secondary ${header === 'Actions' ? 'text-center' : ''}`}>{header}</th>
+                                    <th key={header} className={`p-2 px-3 text-left text-xs font-medium text-text-secondary ${header === 'Actions' || header === 'Present' || header === 'Absent' || header === 'Late' ? 'text-center' : ''}`}>{header}</th>
                                 ))}
                             </tr>
                         </thead>
                          <tbody className="divide-y divide-border-color">
-                            {payrollRecords.length > 0 ? payrollRecords.map(record => (
-                                <tr key={record.id} className="hover:bg-hover-bg/50 transition-colors">
-                                    <td className="p-4">
-                                        <div className="font-medium text-text-primary">{record.employee}</div>
-                                        <div className="text-xs text-text-secondary">{record.position}</div>
-                                    </td>
-                                    <td className="p-4 text-sm text-text-secondary">{formatPeso(record.rate)}/hr</td>
-                                    <td className="p-4 text-sm text-text-secondary">{record.regularHours.toFixed(2)}</td>
-                                    <td className="p-4 text-sm text-text-secondary">{record.overtimeHours.toFixed(2)}</td>
-                                    <td className="p-4 font-medium text-text-primary">{formatPeso(record.grossPay)}</td>
-                                    <td className="p-4 font-semibold text-accent-green">{formatPeso(record.netPay)}</td>
-                                    <td className="p-4 text-sm text-text-secondary">{record.daysPresent}</td>
-                                    <td className="p-4 text-sm text-text-secondary">{record.daysAbsent}</td>
-                                    <td className="p-4 text-sm text-text-secondary">{record.daysLate}</td>
-                                    <td className="p-4 text-center">
-                                        <button 
-                                            onClick={() => setSelectedRecord(record)}
-                                            className="text-accent-blue hover:underline text-sm font-medium"
-                                        >
-                                            View Details
-                                        </button>
-                                    </td>
-                                </tr>
-                            )) : (
+                            {payrollRecords.length > 0 ? payrollRecords.map(record => {
+                                const periodEarning = record.regularPay + record.overtimePay;
+                                const serviceCharge = record.serviceCharge || 0;
+                                const netPay = periodEarning + serviceCharge;
+
+                                return (
+                                    <tr key={record.id} className="hover:bg-hover-bg/50 transition-colors">
+                                        <td className="p-2 px-3">
+                                            <div className="font-medium text-text-primary text-sm">{record.employee}</div>
+                                            <div className="text-xs text-text-secondary">{record.position}</div>
+                                        </td>
+                                        <td className="p-2 px-3 text-xs text-text-secondary">{formatPeso(record.rate)}/hr</td>
+                                        <td className="p-2 px-3 text-xs text-text-secondary">{record.regularHours.toFixed(2)}</td>
+                                        <td className="p-2 px-3 text-xs text-text-secondary">{record.overtimeHours.toFixed(2)}</td>
+                                        <td className="p-2 px-3 text-sm font-medium text-text-primary">{formatPeso(periodEarning)}</td>
+                                        <td className="p-2 px-3 text-sm font-medium text-accent-blue">{formatPeso(serviceCharge)}</td>
+                                        <td className="p-2 px-3 text-sm font-semibold text-accent-green">{formatPeso(netPay)}</td>
+                                        <td className="p-2 px-3 text-xs text-text-secondary text-center">{record.daysPresent}</td>
+                                        <td className="p-2 px-3 text-xs text-text-secondary text-center">{record.daysAbsent}</td>
+                                        <td className="p-2 px-3 text-xs text-text-secondary text-center">{record.daysLate}</td>
+                                        <td className="p-2 px-3 text-center">
+                                            <button
+                                                onClick={() => setSelectedRecord(record)}
+                                                className="text-accent-blue hover:underline text-xs font-medium"
+                                            >
+                                                View Details
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            }) : (
                                 <tr>
                                     <td colSpan={tableHeaders.length} className="text-center p-16 text-text-secondary">
                                        Payroll for the selected period will be displayed here. Ensure attendance records are uploaded.
@@ -622,52 +587,62 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
                 <div className="block lg:hidden">
                     {payrollRecords.length > 0 ? (
                         <div className="p-4 space-y-4">
-                            {payrollRecords.map(record => (
-                                <div key={record.id} className="bg-bg-tertiary/60 p-4 rounded-lg">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <h3 className="font-semibold text-text-primary">{record.employee}</h3>
-                                            <p className="text-sm text-text-secondary">{record.position}</p>
+                            {payrollRecords.map(record => {
+                                const periodEarning = record.regularPay + record.overtimePay;
+                                const serviceCharge = record.serviceCharge || 0;
+                                const netPay = periodEarning + serviceCharge;
+
+                                return (
+                                    <div key={record.id} className="bg-bg-tertiary/60 p-4 rounded-lg">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h3 className="font-semibold text-text-primary">{record.employee}</h3>
+                                                <p className="text-sm text-text-secondary">{record.position}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-semibold text-lg text-accent-green">{formatPeso(netPay)}</p>
+                                                <p className="text-xs text-text-secondary">Net Pay</p>
+                                            </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="font-semibold text-lg text-accent-green">{formatPeso(record.netPay)}</p>
-                                            <p className="text-xs text-text-secondary">Net Pay</p>
+                                        <div className="grid grid-cols-3 gap-4 text-center mt-4 pt-4 border-t border-border-color">
+                                            <div>
+                                                <p className="font-semibold">{record.daysPresent}</p>
+                                                <p className="text-xs text-text-secondary">Present</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-accent-red">{record.daysAbsent}</p>
+                                                <p className="text-xs text-text-secondary">Absent</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-accent-orange">{record.daysLate}</p>
+                                                <p className="text-xs text-text-secondary">Late</p>
+                                            </div>
+                                        </div>
+                                        <div className="mt-4 pt-4 border-t border-border-color space-y-1">
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-text-secondary">Period Earning</span>
+                                                <span className="font-medium">{formatPeso(periodEarning)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-text-secondary">Service Charge</span>
+                                                <span className="font-medium text-accent-blue">{formatPeso(serviceCharge)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-text-secondary">Total Hours</span>
+                                                <span>{record.totalHours.toFixed(2)} hrs</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-end mt-4">
+                                            <button
+                                                onClick={() => setSelectedRecord(record)}
+                                                className="text-accent-blue hover:underline text-sm font-medium"
+                                            >
+                                                View Details
+                                            </button>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-3 gap-4 text-center mt-4 pt-4 border-t border-border-color">
-                                        <div>
-                                            <p className="font-semibold">{record.daysPresent}</p>
-                                            <p className="text-xs text-text-secondary">Present</p>
-                                        </div>
-                                        <div>
-                                            <p className="font-semibold text-accent-red">{record.daysAbsent}</p>
-                                            <p className="text-xs text-text-secondary">Absent</p>
-                                        </div>
-                                        <div>
-                                            <p className="font-semibold text-accent-orange">{record.daysLate}</p>
-                                            <p className="text-xs text-text-secondary">Late</p>
-                                        </div>
-                                    </div>
-                                    <div className="mt-4 pt-4 border-t border-border-color">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-text-secondary">Gross Pay</span>
-                                            <span className="font-medium">{formatPeso(record.grossPay)}</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm mt-1">
-                                            <span className="text-text-secondary">Total Hours</span>
-                                            <span>{record.totalHours.toFixed(2)} hrs</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-end mt-4">
-                                        <button 
-                                            onClick={() => setSelectedRecord(record)}
-                                            className="text-accent-blue hover:underline text-sm font-medium"
-                                        >
-                                            View Details
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     ) : (
                         <p className="text-center p-16 text-text-secondary">

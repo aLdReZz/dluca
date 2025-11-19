@@ -154,8 +154,86 @@ const Attendance: React.FC<AttendanceProps> = ({
         (employees: Employee[]) => employeesService.batchUpsert(employees)
     );
 
-    // Use Firebase records if available, otherwise use prop records (for backward compatibility)
-    const attendanceRecords = (Array.isArray(firebaseAttendanceRecords) && firebaseAttendanceRecords.length > 0) ? firebaseAttendanceRecords : (propAttendanceRecords || []);
+    // Store pending optimistic updates separately
+    const [pendingUpdates, setPendingUpdates] = useState<Map<string, AttendanceRecord>>(new Map());
+
+    // Clean up pending updates when Firebase data includes them
+    useEffect(() => {
+        if (pendingUpdates.size === 0 || !firebaseAttendanceRecords || firebaseAttendanceRecords.length === 0) {
+            return;
+        }
+
+        const firebaseRecordKeys = new Set(
+            firebaseAttendanceRecords.map(r => `${r.employee.toLowerCase()}_${r.date}`)
+        );
+
+        setPendingUpdates(prev => {
+            const newMap = new Map(prev);
+            let removedCount = 0;
+
+            // Remove pending updates that now exist in Firebase data with matching values
+            prev.forEach((pendingRecord, key) => {
+                if (firebaseRecordKeys.has(key)) {
+                    const firebaseRecord = firebaseAttendanceRecords.find(
+                        r => `${r.employee.toLowerCase()}_${r.date}` === key
+                    );
+
+                    if (firebaseRecord &&
+                        firebaseRecord.timeIn === pendingRecord.timeIn &&
+                        firebaseRecord.timeOut === pendingRecord.timeOut) {
+                        newMap.delete(key);
+                        removedCount++;
+                        console.log('🧹 Cleaned up pending update:', key);
+                    }
+                }
+            });
+
+            if (removedCount > 0) {
+                console.log(`✨ Cleaned ${removedCount} pending updates, remaining:`, newMap.size);
+            }
+
+            return newMap.size !== prev.size ? newMap : prev;
+        });
+    }, [firebaseAttendanceRecords, pendingUpdates]);
+
+    // Merge Firebase data with pending updates for display
+    const attendanceRecords = useMemo(() => {
+        const baseRecords = (Array.isArray(firebaseAttendanceRecords) && firebaseAttendanceRecords.length > 0)
+            ? firebaseAttendanceRecords
+            : (propAttendanceRecords || []);
+
+        console.log('📊 Merging attendance records:', {
+            baseRecordsCount: baseRecords.length,
+            pendingUpdatesCount: pendingUpdates.size,
+            pendingKeys: Array.from(pendingUpdates.keys())
+        });
+
+        if (pendingUpdates.size === 0) {
+            return baseRecords;
+        }
+
+        // Create a map of existing records
+        const recordMap = new Map<string, AttendanceRecord>();
+        baseRecords.forEach(record => {
+            const key = `${record.employee.toLowerCase()}_${record.date}`;
+            recordMap.set(key, record);
+        });
+
+        // Apply pending updates
+        pendingUpdates.forEach((update, key) => {
+            console.log('🔄 Applying pending update:', key, update);
+            if (!update.timeIn && !update.timeOut) {
+                // Remove the record if times are cleared
+                recordMap.delete(key);
+            } else {
+                recordMap.set(key, update);
+            }
+        });
+
+        const merged = Array.from(recordMap.values());
+        console.log('✅ Merged records:', merged.length);
+        return merged;
+    }, [firebaseAttendanceRecords, propAttendanceRecords, pendingUpdates]);
     const salesData = (Array.isArray(firebaseSalesData) && firebaseSalesData.length > 0) ? firebaseSalesData : (propSalesData || []);
     const payrollRecords = propPayrollRecords || [];
     const [operationStatus, setOperationStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
@@ -191,7 +269,7 @@ const Attendance: React.FC<AttendanceProps> = ({
     const [scheduleWeekStart, setScheduleWeekStart] = useState(() => {
         const today = new Date();
         const dayOfWeek = today.getDay();
-        const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const daysToMonday = dayOfWeek === 0 ? 1 : 1 - dayOfWeek;
         const monday = new Date(today);
         monday.setDate(today.getDate() + daysToMonday);
         return monday.toISOString().split('T')[0];
@@ -305,7 +383,7 @@ const Attendance: React.FC<AttendanceProps> = ({
     const handleDateSelect = (dateStr: string) => {
         const selectedDate = new Date(dateStr + 'T00:00:00Z');
         const dayOfWeek = selectedDate.getUTCDay(); // Sunday = 0, Monday = 1
-        const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const daysToMonday = dayOfWeek === 0 ? 1 : 1 - dayOfWeek;
         const monday = new Date(selectedDate);
         monday.setUTCDate(selectedDate.getUTCDate() + daysToMonday);
         setScheduleWeekStart(monday.toISOString().split('T')[0]);
@@ -566,7 +644,7 @@ const Attendance: React.FC<AttendanceProps> = ({
         if (!editingScheduleContext) return;
         const { emp, dateKey } = editingScheduleContext;
 
-        // Update local state
+        // Update local state immediately
         const updatedEmployees = employees.map(e => {
             if (e.id === emp.id) {
                 const newSchedule = { ...e.schedule, [dateKey]: newScheduleData };
@@ -577,10 +655,15 @@ const Attendance: React.FC<AttendanceProps> = ({
 
         setEmployees(updatedEmployees);
 
-        // Save to Firebase
-        await syncEmployees(updatedEmployees);
-
+        // Close modal immediately
         setEditingScheduleContext(null);
+
+        // Save to Firebase in the background (don't await)
+        try {
+            await syncEmployees(updatedEmployees);
+        } catch (error) {
+            console.error('Error saving schedule:', error);
+        }
     };
     
     const handleOpenAttendanceModal = (emp: Employee, dateKey: string, date: Date) => {
@@ -591,18 +674,30 @@ const Attendance: React.FC<AttendanceProps> = ({
         if (!editingAttendanceContext) return;
         const { emp, dateKey } = editingAttendanceContext;
 
-        // Save to Firebase first
-        if (newAttendanceData.timeIn || newAttendanceData.timeOut) {
-            const recordToSave: AttendanceRecord = {
-                employee: emp.name,
-                date: dateKey,
-                timeIn: newAttendanceData.timeIn,
-                timeOut: newAttendanceData.timeOut,
-            };
-            await updateSingleAttendance(recordToSave);
-        }
+        const recordToSave: AttendanceRecord = {
+            employee: emp.name,
+            date: dateKey,
+            timeIn: newAttendanceData.timeIn,
+            timeOut: newAttendanceData.timeOut,
+        };
 
-        // Also update local state for backward compatibility
+        console.log('💾 Saving attendance:', { emp: emp.name, dateKey, recordToSave });
+
+        // Close modal immediately
+        setEditingAttendanceContext(null);
+
+        // Add to pending updates immediately for instant UI feedback
+        const updateKey = `${emp.name.toLowerCase()}_${dateKey}`;
+        console.log('🔑 Update key:', updateKey);
+
+        setPendingUpdates(prev => {
+            const newMap = new Map(prev);
+            newMap.set(updateKey, recordToSave);
+            console.log('📝 Pending updates after set:', newMap.size, Array.from(newMap.keys()));
+            return newMap;
+        });
+
+        // Also update prop state for backward compatibility
         if (setPropAttendanceRecords) {
             setPropAttendanceRecords(prevRecords => {
                 const existingRecordIndex = prevRecords.findIndex(
@@ -631,7 +726,19 @@ const Attendance: React.FC<AttendanceProps> = ({
                 return updatedRecords;
             });
         }
-        setEditingAttendanceContext(null);
+
+        // Save to Firebase in the background
+        try {
+            console.log('🔥 Starting Firebase save...');
+            await updateSingleAttendance(recordToSave);
+            console.log('✅ Firebase save complete');
+
+            // Don't remove from pending immediately - let the cleanup effect handle it
+            // This prevents the UI from reverting while Firebase refetches
+        } catch (error) {
+            console.error('❌ Error saving attendance:', error);
+            // Keep in pending updates on error so user can retry
+        }
     };
     
     const convertTo24Hour = (timeStr: string): string => {
@@ -948,10 +1055,8 @@ const Attendance: React.FC<AttendanceProps> = ({
     // Show loading state
     if (attendanceLoading) {
         return (
-            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
-                <div className="flex flex-col items-center justify-center h-96">
-                    <LoadingSpinner message="Loading attendance records..." />
-                </div>
+            <div className="fixed inset-0 flex items-center justify-center">
+                <LoadingSpinner message="Loading attendance records..." />
             </div>
         );
     }

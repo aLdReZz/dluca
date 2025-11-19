@@ -13,7 +13,7 @@ import PurchaseRequest from './pages/PurchaseRequest';
 import type { Role, Page, SalesData, InventoryItem, PurchaseOrder, Employee, CalendarEvent, RecipeCosting, PayrollRecord, AttendanceRecord, ProductInventoryItem } from './types';
 import { MenuIcon, ShieldCheckIcon, UserIcon } from './components/Icons';
 import { useFirebaseData } from './hooks/useFirebase';
-import { employeesService, attendanceService, clearAttendanceData } from './utils/firebaseService';
+import { employeesService, attendanceService, salesService, clearAttendanceData } from './utils/firebaseService';
 import { isFirebaseConfigured } from './utils/firebase';
 
 const ADMIN_PIN = '1234';
@@ -210,6 +210,12 @@ const App: React.FC = () => {
         []
     );
 
+    // Fetch sales data from Firebase
+    const { data: firebaseSalesData = [], loading: salesLoading } = useFirebaseData(
+        () => salesService.getAll(),
+        []
+    );
+
     // App Data State
     const [salesData, setSalesData] = useState<SalesData[]>(placeholderSalesData);
     const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([
@@ -231,8 +237,8 @@ const App: React.FC = () => {
             date: '2024-08-10T00:00:00Z',
             department: 'Kitchen',
             items: [
-                { itemId: 1, quantity: 50, cost: 5000 },
-                { itemId: 2, quantity: 20, cost: 8000 },
+                { itemId: 1, itemName: 'Crushed Tomato', unit: 'pcs', quantity: 50, cost: 5000 },
+                { itemId: 2, itemName: 'Corned Beef', unit: 'pcs', quantity: 20, cost: 8000 },
             ],
             totalCost: 13000,
             status: 'Completed',
@@ -242,7 +248,7 @@ const App: React.FC = () => {
             date: '2024-08-12T00:00:00Z',
             department: 'Bakery',
             items: [
-                { itemId: 6, quantity: 100, cost: 7500 },
+                { itemId: 6, itemName: 'Spanish Sardines', unit: 'pcs', quantity: 100, cost: 7500 },
             ],
             totalCost: 7500,
             status: 'Pending',
@@ -252,7 +258,7 @@ const App: React.FC = () => {
             date: '2024-08-13T00:00:00Z',
             department: 'Kitchen',
             items: [
-                { itemId: 1, quantity: 20, cost: 2000 },
+                { itemId: 1, itemName: 'Crushed Tomato', unit: 'pcs', quantity: 20, cost: 2000 },
             ],
             totalCost: 2000,
             status: 'Cancelled',
@@ -296,8 +302,9 @@ const App: React.FC = () => {
         const savedData = localStorage.getItem('cafeManagementData');
         if (savedData) {
             const data = JSON.parse(savedData);
-            const storedSales = Array.isArray(data.salesData) && data.salesData.length > 0 ? data.salesData : placeholderSalesData;
-            setSalesData(storedSales);
+            // Don't load sales data from localStorage - it comes from Firebase now
+            // const storedSales = Array.isArray(data.salesData) && data.salesData.length > 0 ? data.salesData : placeholderSalesData;
+            // setSalesData(storedSales);
             // setInventoryItems(data.inventoryItems || []); // Use hardcoded data for demo
             setProductInventoryItems(data.productInventoryItems || initialProductInventory);
             // setPurchaseOrders(data.purchaseOrders || []); // Use hardcoded data for demo
@@ -349,6 +356,13 @@ const App: React.FC = () => {
             setAttendanceRecords(firebaseAttendanceRecords);
         }
     }, [firebaseAttendanceRecords, attendanceLoading]);
+
+    // Update sales data when Firebase data loads
+    useEffect(() => {
+        if (!salesLoading && firebaseSalesData.length > 0) {
+            setSalesData(firebaseSalesData);
+        }
+    }, [firebaseSalesData, salesLoading]);
 
     useEffect(() => {
         saveData();

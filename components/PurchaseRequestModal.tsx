@@ -13,13 +13,15 @@ interface PurchaseRequestModalProps {
 type PurchaseItem = {
     itemId: number | null;
     itemName: string;
+    unit: string;
     quantity: string;
     cost: string;
+    isCustomItem: boolean; // Track if this is a custom item not in the pricelist
 };
 
 const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ isOpen, onClose, onSave, productInventoryItems, departments }) => {
     const [department, setDepartment] = useState('');
-    const [items, setItems] = useState<PurchaseItem[]>([{ itemId: null, itemName: '', quantity: '1', cost: '' }]);
+    const [items, setItems] = useState<PurchaseItem[]>([{ itemId: null, itemName: '', unit: '', quantity: '1', cost: '', isCustomItem: false }]);
     const [error, setError] = useState('');
     
     const [activeItemIndex, setActiveItemIndex] = useState<number | null>(null);
@@ -48,7 +50,7 @@ const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ isOpen, onC
     }, [isOpen]);
 
     const handleAddItem = () => {
-        setItems([...items, { itemId: null, itemName: '', quantity: '1', cost: '' }]);
+        setItems([...items, { itemId: null, itemName: '', unit: '', quantity: '1', cost: '', isCustomItem: false }]);
     };
 
     const handleRemoveItem = (index: number) => {
@@ -61,12 +63,14 @@ const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ isOpen, onC
         const currentItem = { ...newItems[index], [field]: value };
         
         if (field === 'itemName') {
-            currentItem.itemId = null; 
-            setActiveItemIndex(index);
+            currentItem.itemId = null;
+            currentItem.isCustomItem = false;
             setHighlightedIndex(-1);
             if (value) {
+                setActiveItemIndex(index);
                 setSuggestions(productInventoryItems.filter(p => p.name.toLowerCase().includes(value.toLowerCase())));
             } else {
+                setActiveItemIndex(null);
                 setSuggestions([]);
             }
         }
@@ -78,9 +82,32 @@ const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ isOpen, onC
         const newItems = [...items];
         const unitCost = String(suggestion.price);
 
-        newItems[index] = { ...newItems[index], itemId: suggestion.id, itemName: suggestion.name, cost: unitCost };
+        newItems[index] = {
+            ...newItems[index],
+            itemId: suggestion.id,
+            itemName: suggestion.name,
+            unit: suggestion.unit,
+            cost: unitCost,
+            isCustomItem: false
+        };
         setItems(newItems);
         setActiveItemIndex(null);
+    };
+
+    const handleAddCustomItem = (index: number) => {
+        const newItems = [...items];
+        const currentItem = newItems[index];
+
+        // Mark this item as custom (not from pricelist)
+        newItems[index] = {
+            ...currentItem,
+            itemId: null,
+            isCustomItem: true,
+            cost: currentItem.cost || '0'
+        };
+        setItems(newItems);
+        setActiveItemIndex(null);
+        setSuggestions([]);
     };
     
      const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
@@ -111,26 +138,28 @@ const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ isOpen, onC
             setError('Please select a department.');
             return;
         }
-        if (items.length === 0 || items.every(i => !i.itemId)) {
-            setError('At least one valid item must be added to the purchase request.');
+        if (items.length === 0 || items.every(i => !i.itemName.trim())) {
+            setError('At least one item must be added to the purchase request.');
             return;
         }
 
         const formattedItems = items
-            .filter(item => item.itemId && parseFloat(item.quantity) > 0)
+            .filter(item => item.itemName.trim() && parseFloat(item.quantity) > 0)
             .map(item => ({
-                itemId: item.itemId!,
+                itemId: item.isCustomItem ? undefined : item.itemId!,
+                itemName: item.itemName,
+                unit: item.unit,
                 quantity: parseFloat(item.quantity),
                 cost: parseFloat(item.cost) || 0,
             }));
 
         if (formattedItems.length === 0) {
-            setError('Please ensure at least one item has a valid ID and quantity.');
+            setError('Please ensure at least one item has a valid name and quantity.');
             return;
         }
-        
+
         const calculatedTotalCost = formattedItems.reduce((total, item) => total + (item.quantity * item.cost), 0);
-        
+
         onSave({
             department,
             items: formattedItems,
@@ -140,7 +169,7 @@ const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ isOpen, onC
 
     useEffect(() => {
         if (isOpen) {
-            setItems([{ itemId: null, itemName: '', quantity: '1', cost: '' }]);
+            setItems([{ itemId: null, itemName: '', unit: '', quantity: '1', cost: '', isCustomItem: false }]);
             setDepartment('');
             setError('');
         }
@@ -191,17 +220,18 @@ const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ isOpen, onC
                             </h3>
                         <div className="space-y-3 bg-bg-tertiary/20 rounded-xl p-4 border border-border-color/30">
                             <div className="grid grid-cols-12 gap-3 items-center text-xs font-semibold text-text-secondary uppercase tracking-wide px-1">
-                                <div className="col-span-4">Item Name</div>
+                                <div className="col-span-3">Item Name</div>
+                                <div className="col-span-2">Unit</div>
                                 <div className="col-span-2">Quantity</div>
                                 <div className="col-span-2">Unit Cost (₱)</div>
-                                <div className="col-span-3">Total Cost (₱)</div>
+                                <div className="col-span-2">Total Cost (₱)</div>
                                 <div className="col-span-1"></div>
                             </div>
                             {items.map((item, index) => {
                                 const itemTotal = (parseFloat(item.quantity) || 0) * (parseFloat(item.cost) || 0);
                                 return (
                                     <div key={index} className="grid grid-cols-12 gap-3 items-center bg-bg-secondary rounded-lg p-2 border border-border-color/50 hover:border-accent-blue/40 transition-all">
-                                        <div className="col-span-4 relative">
+                                        <div className="col-span-3 relative">
                                             <input
                                                 ref={index === 0 ? firstItemNameInputRef : null}
                                                 type="text"
@@ -209,12 +239,18 @@ const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ isOpen, onC
                                                 placeholder="Type to search..."
                                                 value={item.itemName}
                                                 onChange={(e) => handleItemChange(index, 'itemName', e.target.value)}
-                                                onFocus={() => setActiveItemIndex(index)}
+                                                onFocus={() => {
+                                                    if (item.itemName) {
+                                                        setActiveItemIndex(index);
+                                                    }
+                                                }}
                                                 onBlur={() => setTimeout(() => setActiveItemIndex(null), 150)}
                                                 onKeyDown={(e) => handleKeyDown(e, index)}
-                                                className="w-full bg-bg-primary border border-border-color rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue transition-all placeholder:text-text-secondary/50"
+                                                disabled={item.isCustomItem}
+                                                autoComplete="off"
+                                                className={`w-full bg-bg-primary border border-border-color rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue transition-all placeholder:text-text-secondary/50 ${item.isCustomItem ? 'bg-accent-green/10 border-accent-green/30' : ''}`}
                                             />
-                                            {activeItemIndex === index && suggestions.length > 0 && (
+                                            {activeItemIndex === index && item.itemName && suggestions.length > 0 && !item.isCustomItem && (
                                                 <div className="absolute top-full left-0 right-0 bg-bg-primary border border-border-color rounded-lg z-20 max-h-96 overflow-y-auto mt-1 shadow-xl">
                                                     {suggestions.map((s, sIndex) => (
                                                         <div
@@ -223,11 +259,34 @@ const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ isOpen, onC
                                                             onMouseEnter={() => setHighlightedIndex(sIndex)}
                                                             className={`p-3 text-sm cursor-pointer border-b border-border-color/30 last:border-0 transition-colors ${sIndex === highlightedIndex ? 'bg-accent-blue/20 text-accent-blue' : 'hover:bg-hover-bg text-text-primary'}`}
                                                         >
-                                                            {s.name}
+                                                            <div className="font-medium">{s.name}</div>
+                                                            <div className="text-xs text-text-secondary mt-0.5">{s.unit} • ₱{s.price}</div>
                                                         </div>
                                                     ))}
                                                 </div>
                                             )}
+                                            {activeItemIndex === index && item.itemName && suggestions.length === 0 && !item.isCustomItem && (
+                                                <div className="absolute top-full left-0 right-0 bg-bg-primary border border-border-color rounded-lg z-20 mt-1 shadow-xl">
+                                                    <div
+                                                        onMouseDown={() => handleAddCustomItem(index)}
+                                                        className="p-3 text-sm cursor-pointer bg-accent-green/10 hover:bg-accent-green/20 transition-colors text-accent-green font-medium flex items-center gap-2"
+                                                    >
+                                                        <PlusIcon className="w-4 h-4" />
+                                                        Add "{item.itemName}" as custom item
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="col-span-2">
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. kg, L, ml"
+                                                value={item.unit}
+                                                onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
+                                                disabled={!item.isCustomItem && item.itemId !== null}
+                                                autoComplete="off"
+                                                className={`w-full bg-bg-primary border border-border-color rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue transition-all placeholder:text-text-secondary/50 ${!item.isCustomItem && item.itemId !== null ? 'bg-bg-tertiary/50 cursor-not-allowed' : ''}`}
+                                            />
                                         </div>
                                         <div className="col-span-2">
                                             <input
@@ -242,13 +301,15 @@ const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ isOpen, onC
                                         <div className="col-span-2">
                                             <input
                                                 type="number"
+                                                step="0.01"
                                                 placeholder="Cost"
                                                 value={item.cost}
-                                                disabled
-                                                className="w-full bg-bg-tertiary/50 border border-border-color/50 rounded-lg px-3 py-2.5 text-sm text-text-secondary disabled:opacity-60 cursor-not-allowed"
+                                                onChange={(e) => handleItemChange(index, 'cost', e.target.value)}
+                                                disabled={!item.isCustomItem && item.itemId !== null}
+                                                className={`w-full border border-border-color rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue transition-all ${!item.isCustomItem && item.itemId !== null ? 'bg-bg-tertiary/50 text-text-secondary cursor-not-allowed' : 'bg-bg-primary'}`}
                                             />
                                         </div>
-                                        <div className="col-span-3">
+                                        <div className="col-span-2">
                                             <div className="w-full bg-bg-primary/50 border border-accent-blue/20 rounded-lg px-3 py-2.5 text-sm text-right text-text-primary font-semibold h-full flex items-center justify-end">
                                                 {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(itemTotal)}
                                             </div>
