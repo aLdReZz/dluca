@@ -3,10 +3,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { SalesData } from '../types';
 import { Chart, registerables } from 'chart.js';
 import StatCard from '../components/StatCard';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { CurrencyPesoIcon, ArrowTrendingUpIcon, BanknotesIcon, CalendarDaysIcon, SparklesIcon } from '../components/Icons';
 import CalendarPopup from '../components/CalendarPopup';
 import { useFirebaseData } from '../hooks/useFirebase';
-import { salesService } from '../utils/firebaseService';
+import { salesService, dashboardPreferencesService } from '../utils/firebaseService';
 import {
     parseSalesDate,
     parseNumericValue,
@@ -20,7 +21,10 @@ import {
     COGS_INCLUDE,
     COGS_EXCLUDE,
     DATE_HEADERS,
-    DATE_INCLUDE
+    DATE_INCLUDE,
+    TIME_HEADERS,
+    TIME_INCLUDE,
+    extractHourKey
 } from '../utils/salesData';
 
 Chart.register(...registerables);
@@ -84,8 +88,25 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
     const [isSalesChartVisible, setIsSalesChartVisible] = useState(false);
     
     useEffect(() => {
-        // Set initial date range to "This Month" on component mount
-        handleFilterChange('monthly');
+        // Load filter state from Firebase or default to monthly
+        const loadPreferences = async () => {
+            try {
+                const preferences = await dashboardPreferencesService.load();
+                if (preferences) {
+                    setFilter(preferences.filter);
+                    setStartDate(preferences.startDate);
+                    setEndDate(preferences.endDate);
+                } else {
+                    // Default to "This Month" if no saved state
+                    handleFilterChange('monthly');
+                }
+            } catch (error) {
+                // If Firebase fails, default to monthly
+                console.error('Error loading dashboard preferences from Firebase:', error);
+                handleFilterChange('monthly');
+            }
+        };
+        loadPreferences();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -157,44 +178,94 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
         return filteredData;
     }, [salesData, startDate, endDate]);
 
+    // Helper function to check if date range is a single day
+    const isSingleDayRange = (start: string, end: string): boolean => {
+        if (!start || !end) return false;
+        const startDate = new Date(start + 'T00:00:00');
+        const endDate = new Date(end + 'T00:00:00');
+        return startDate.getTime() === endDate.getTime();
+    };
+
     const updateChart = useCallback((data: SalesData[]) => {
         if (!chartRef.current) return;
 
         const chartCtx = chartRef.current.getContext('2d');
         if (!chartCtx) return;
-        
+
         if (chartInstanceRef.current) {
             chartInstanceRef.current.destroy();
         }
 
         chartCtx.clearRect(0, 0, chartCtx.canvas.width, chartCtx.canvas.height);
 
-        const groupedData = data.reduce((acc, row) => {
-            const dateValue = getSalesFieldValue(row, DATE_INCLUDE, [], DATE_HEADERS);
-            const parsedDate = parseSalesDate(dateValue ?? row.Date);
-            const date = parsedDate?.toLocaleDateString('en-CA') || 'Unknown'; // YYYY-MM-DD for sorting
-            const totalValue = parseNumericValue(getSalesFieldValue(row, TOTAL_INCLUDE, TOTAL_EXCLUDE, TOTAL_HEADERS));
-            const serviceChargeValue = parseNumericValue(getSalesFieldValue(row, SERVICE_INCLUDE, [], SERVICE_HEADERS));
-            const netValue = Math.max(totalValue - serviceChargeValue, 0);
-            acc[date] = (acc[date] || 0) + netValue;
-            return acc;
-        }, {} as { [key: string]: number });
+        let labels: string[] = [];
+        let chartData: number[] = [];
+        let chartTitle = 'Sales';
 
-        const sortedEntries = Object.entries(groupedData)
-            .filter(([date]) => date !== 'Unknown')
-            .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime());
+        // Check if this is a single-day range (for any filter, including custom date ranges)
+        const isSingleDay = isSingleDayRange(startDate, endDate);
 
-        const labels = sortedEntries.map(([date]) =>
-            new Date(date + 'T00:00:00').toLocaleDateString()
-        );
-        const chartData = sortedEntries.map(([, value]) => value);
+        if (isSingleDay) {
+            // Group data by hour and only show hours with sales
+            const hourlyMap = new Map<number, number>();
+            const START_HOUR = 9;
+            const END_HOUR = 23;
+
+            data.forEach(row => {
+                const hourKey = extractHourKey(row);
+                if (hourKey !== null && hourKey >= START_HOUR && hourKey <= END_HOUR) {
+                    const totalValue = parseNumericValue(getSalesFieldValue(row, TOTAL_INCLUDE, TOTAL_EXCLUDE, TOTAL_HEADERS));
+                    const serviceChargeValue = parseNumericValue(getSalesFieldValue(row, SERVICE_INCLUDE, [], SERVICE_HEADERS));
+                    const netValue = Math.max(totalValue - serviceChargeValue, 0);
+                    hourlyMap.set(hourKey, (hourlyMap.get(hourKey) || 0) + netValue);
+                }
+            });
+
+            // Only show hours that have sales, sorted by hour
+            const sortedHours = Array.from(hourlyMap.entries())
+                .sort((a, b) => a[0] - b[0]);
+
+            if (sortedHours.length > 0) {
+                // Show only hours with sales
+                labels = sortedHours.map(([hour]) => hour.toString().padStart(2, '0') + ':00');
+                chartData = sortedHours.map(([, value]) => value);
+            } else {
+                // No sales data - show empty state
+                labels = ['No Sales Data'];
+                chartData = [0];
+            }
+
+            chartTitle = 'Hourly Sales';
+        } else {
+            // Group by date (existing logic)
+            const groupedData = data.reduce((acc, row) => {
+                const dateValue = getSalesFieldValue(row, DATE_INCLUDE, [], DATE_HEADERS);
+                const parsedDate = parseSalesDate(dateValue ?? row.Date);
+                const date = parsedDate?.toLocaleDateString('en-CA') || 'Unknown'; // YYYY-MM-DD for sorting
+                const totalValue = parseNumericValue(getSalesFieldValue(row, TOTAL_INCLUDE, TOTAL_EXCLUDE, TOTAL_HEADERS));
+                const serviceChargeValue = parseNumericValue(getSalesFieldValue(row, SERVICE_INCLUDE, [], SERVICE_HEADERS));
+                const netValue = Math.max(totalValue - serviceChargeValue, 0);
+                acc[date] = (acc[date] || 0) + netValue;
+                return acc;
+            }, {} as { [key: string]: number });
+
+            const sortedEntries = Object.entries(groupedData)
+                .filter(([date]) => date !== 'Unknown')
+                .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime());
+
+            labels = sortedEntries.map(([date]) =>
+                new Date(date + 'T00:00:00').toLocaleDateString()
+            );
+            chartData = sortedEntries.map(([, value]) => value);
+            chartTitle = 'Sales';
+        }
 
         chartInstanceRef.current = new Chart(chartCtx, {
             type: 'line',
             data: {
                 labels,
                 datasets: [{
-                    label: 'Sales',
+                    label: chartTitle,
                     data: chartData,
                     borderColor: '#2563eb',
                     borderWidth: 2.5,
@@ -299,7 +370,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
                 ctx.restore();
             };
         }
-    }, []);
+    }, [filter, startDate, endDate]);
 
     useEffect(() => {
         const filteredData = calculateStats();
@@ -326,15 +397,35 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
             start = new Date(now.getFullYear(), now.getMonth(), 1);
             end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         }
-        setStartDate(formatDateForInput(start));
-        setEndDate(formatDateForInput(end));
+        const startStr = formatDateForInput(start);
+        const endStr = formatDateForInput(end);
+        setStartDate(startStr);
+        setEndDate(endStr);
+
+        // Save to Firebase
+        dashboardPreferencesService.save({
+            filter: newFilter,
+            startDate: startStr,
+            endDate: endStr
+        }).catch(error => {
+            console.error('Error saving dashboard filter to Firebase:', error);
+        });
     };
-    
+
     const handleRangeComplete = (range: { start: string; end: string }) => {
         setStartDate(range.start);
         setEndDate(range.end);
         setFilter('custom');
         setIsCalendarOpen(false);
+
+        // Save to Firebase
+        dashboardPreferencesService.save({
+            filter: 'custom',
+            startDate: range.start,
+            endDate: range.end
+        }).catch(error => {
+            console.error('Error saving dashboard filter to Firebase:', error);
+        });
     };
 
     useEffect(() => {
@@ -371,10 +462,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
         return (
             <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
                 <div className="flex flex-col items-center justify-center h-96">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-blue mx-auto mb-4"></div>
-                        <p className="text-text-secondary">Loading sales data...</p>
-                    </div>
+                    <LoadingSpinner message="Loading sales data..." />
                 </div>
             </div>
         );

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { PurchaseOrder, ProductInventoryItem } from '../types';
 import { PlusIcon, SearchIcon, EllipsisHorizontalIcon } from '../components/Icons';
+import LoadingSpinner from '../components/LoadingSpinner';
 import PurchaseRequestModal from '../components/PurchaseRequestModal';
 import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
 import { purchaseOrderService } from '../utils/firebaseService';
@@ -74,10 +75,7 @@ const PurchaseRequest: React.FC<PurchaseRequestProps> = ({ purchaseOrders: propP
         return (
             <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
                 <div className="flex flex-col items-center justify-center h-96">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-blue mx-auto mb-4"></div>
-                        <p className="text-text-secondary">Loading purchase orders...</p>
-                    </div>
+                    <LoadingSpinner message="Loading purchase orders..." />
                 </div>
             </div>
         );

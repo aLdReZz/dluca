@@ -80,10 +80,16 @@ export const employeesService = {
         return withFirebaseCheck(
             async () => {
                 const snapshot = await getDocs(collection(db, 'employees'));
-                return snapshot.docs.map(doc => ({
+                const employees = snapshot.docs.map(doc => ({
                     ...doc.data(),
                     id: doc.id,
                 })) as (Employee & { id: string })[];
+                // Sort by order field to preserve employee sequence
+                return employees.sort((a: any, b: any) => {
+                    const orderA = a.order ?? Number.MAX_VALUE;
+                    const orderB = b.order ?? Number.MAX_VALUE;
+                    return orderA - orderB;
+                });
             },
             () => [] // Fallback to empty array
         );
@@ -127,10 +133,11 @@ export const employeesService = {
         return withFirebaseCheck(
             async () => {
                 const batch = writeBatch(db);
-                employees.forEach(employee => {
+                employees.forEach((employee, index) => {
                     // Use the employee's local ID as the document ID
                     const docRef = doc(db, 'employees', String(employee.id));
-                    batch.set(docRef, { ...employee, updatedAt: new Date() }, { merge: true });
+                    // Store the order index to preserve employee sequence
+                    batch.set(docRef, { ...employee, order: index, updatedAt: new Date() }, { merge: true });
                 });
                 await batch.commit();
                 console.log(`✅ Successfully saved ${employees.length} employees with schedules to Firebase`);
@@ -789,3 +796,43 @@ export async function syncDataToFirestore(appData: {
         throw error;
     }
 }
+
+// ==================== DASHBOARD PREFERENCES ====================
+
+export interface DashboardPreference {
+    filter: 'daily' | 'weekly' | 'monthly' | 'lastMonth' | 'custom';
+    startDate: string;
+    endDate: string;
+    updatedAt?: Date;
+}
+
+export const dashboardPreferencesService = {
+    // Save dashboard preferences
+    async save(preferences: DashboardPreference): Promise<void> {
+        return withFirebaseCheck(
+            async () => {
+                const docRef = doc(db, 'userPreferences', 'dashboardFilter');
+                await setDoc(docRef, {
+                    ...preferences,
+                    updatedAt: new Date()
+                }, { merge: true });
+                console.log('✅ Dashboard preferences saved to Firebase');
+            }
+        );
+    },
+
+    // Load dashboard preferences
+    async load(): Promise<DashboardPreference | null> {
+        return withFirebaseCheck(
+            async () => {
+                const docRef = doc(db, 'userPreferences', 'dashboardFilter');
+                const snapshot = await getDoc(docRef);
+                if (snapshot.exists()) {
+                    return snapshot.data() as DashboardPreference;
+                }
+                return null;
+            },
+            () => null // Fallback to null if Firebase not available
+        );
+    }
+};

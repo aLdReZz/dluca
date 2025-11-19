@@ -155,11 +155,45 @@ export const COGS_EXCLUDE = ['service', 'discount', 'charge'];
 export const DATE_HEADERS = ['date', 'transaction date', 'sales date', 'order date'];
 export const DATE_INCLUDE = ['date'];
 
+export const TIME_HEADERS = ['time', 'transaction time', 'sales time', 'hour', 'transaction hour'];
+export const TIME_INCLUDE = ['time', 'hour'];
+
 const formatDateKey = (date: Date): string => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+};
+
+const parseTimeString = (timeStr: string): number | null => {
+    if (!timeStr) return null;
+    const trimmed = timeStr.trim();
+
+    // Try to match HH:MM or HH:MM:SS format
+    const timeMatch = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    if (timeMatch) {
+        const hour = parseInt(timeMatch[1], 10);
+        if (hour >= 0 && hour < 24) {
+            return hour;
+        }
+    }
+
+    // Try to match just hour number (0-23)
+    const hourMatch = trimmed.match(/^(\d{1,2})$/);
+    if (hourMatch) {
+        const hour = parseInt(hourMatch[1], 10);
+        if (hour >= 0 && hour < 24) {
+            return hour;
+        }
+    }
+
+    return null;
+};
+
+export const extractHourKey = (row: SalesData): number | null => {
+    const timeValue = getSalesFieldValue(row, TIME_INCLUDE, [], TIME_HEADERS);
+    if (!timeValue) return null;
+    return parseTimeString(timeValue);
 };
 
 export const extractDateKey = (row: SalesData): string | null => {

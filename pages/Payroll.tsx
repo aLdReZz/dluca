@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { PayrollRecord, Employee, AttendanceRecord, SalesData } from '../types';
 import CalendarPopup from '../components/CalendarPopup';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { CalendarDaysIcon, CurrencyPesoIcon, ClockIcon, BanknotesIcon } from '../components/Icons';
 import PayslipModal from '../components/PayslipModal';
 import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
@@ -453,10 +454,7 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
         return (
             <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
                 <div className="flex flex-col items-center justify-center h-96">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-blue mx-auto mb-4"></div>
-                        <p className="text-text-secondary">Loading payroll records...</p>
-                    </div>
+                    <LoadingSpinner message="Loading payroll records..." />
                 </div>
             </div>
         );

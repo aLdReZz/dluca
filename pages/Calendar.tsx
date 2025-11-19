@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { CalendarEvent, ContentType, ContentStatus } from '../types';
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, XMarkIcon, TagIcon, CheckCircleIcon, ClockIcon, EyeIcon, TrashIcon } from '../components/Icons';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
 import { calendarService } from '../utils/firebaseService';
 
@@ -326,10 +327,7 @@ const Calendar: React.FC<CalendarProps> = ({ events: propEvents, setEvents: setP
         return (
             <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
                 <div className="flex flex-col items-center justify-center h-96">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-blue mx-auto mb-4"></div>
-                        <p className="text-text-secondary">Loading calendar events...</p>
-                    </div>
+                    <LoadingSpinner message="Loading calendar events..." />
                 </div>
             </div>
         );

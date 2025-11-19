@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { RecipeCosting, ProductInventoryItem } from '../types';
 import { PlusIcon, PencilIcon, TrashIcon } from '../components/Icons';
+import LoadingSpinner from '../components/LoadingSpinner';
 import RecipeCostingModal from '../components/RecipeCostingModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
@@ -162,10 +163,7 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
         return (
             <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
                 <div className="flex flex-col items-center justify-center h-96">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-blue mx-auto mb-4"></div>
-                        <p className="text-text-secondary">Loading recipe costings...</p>
-                    </div>
+                    <LoadingSpinner message="Loading recipe costings..." />
                 </div>
             </div>
         );

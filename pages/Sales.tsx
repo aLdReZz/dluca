@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import type { SalesData } from '../types';
 import { UploadIcon, TrashIcon } from '../components/Icons';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
 import { salesService } from '../utils/firebaseService';
 
@@ -82,6 +83,8 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
     const [dragActive, setDragActive] = useState(false);
     const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [sortColumn, setSortColumn] = useState<string | null>(null);
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
     useEffect(() => {
         if (salesData.length === 0 && !salesLoading) {
@@ -231,15 +234,46 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
     
     const headers = salesData.length > 0 ? Object.keys(salesData[0]) : [];
 
+    // Sort data
+    const sortedData = React.useMemo(() => {
+        if (!sortColumn) return salesData;
+
+        return [...salesData].sort((a, b) => {
+            const aVal = String(a[sortColumn] || '');
+            const bVal = String(b[sortColumn] || '');
+
+            // Try numeric sort first
+            const aNum = parseFloat(aVal);
+            const bNum = parseFloat(bVal);
+
+            let comparison = 0;
+            if (!isNaN(aNum) && !isNaN(bNum)) {
+                comparison = aNum - bNum;
+            } else {
+                comparison = aVal.localeCompare(bVal);
+            }
+
+            return sortDirection === 'asc' ? comparison : -comparison;
+        });
+    }, [salesData, sortColumn, sortDirection]);
+
+    const handleSort = (column: string) => {
+        if (sortColumn === column) {
+            // Toggle direction if same column
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            // Set new column
+            setSortColumn(column);
+            setSortDirection('asc');
+        }
+    };
+
     // Show loading state
     if (salesLoading) {
         return (
             <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
                 <div className="flex flex-col items-center justify-center h-96">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-blue mx-auto mb-4"></div>
-                        <p className="text-text-secondary">Loading sales data...</p>
-                    </div>
+                    <LoadingSpinner message="Loading sales data..." />
                 </div>
             </div>
         );
@@ -287,32 +321,26 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                 </div>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-4 mb-8">
+            {/* Upload and Delete Buttons */}
+            <div className="flex gap-3 mb-8">
                 <label
                     htmlFor="salesFileInput"
-                    onDragEnter={handleDrag}
-                    onDragLeave={handleDrag}
-                    onDragOver={handleDrag}
-                    onDrop={handleDrop}
-                    className={`flex-1 flex flex-col items-center justify-center p-8 sm:p-12 text-center bg-bg-secondary border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 ${dragActive ? 'border-accent-blue bg-bg-tertiary' : 'border-border-color'}`}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-accent-blue/10 hover:bg-accent-blue/20 text-accent-blue border border-accent-blue/30 rounded-lg font-semibold cursor-pointer transition-all duration-300"
                 >
-                    <UploadIcon className="w-12 h-12 mb-4 text-text-secondary/70" />
-                    <h3 className="text-xl font-semibold">Upload Sales CSV</h3>
-                    <p className="text-text-secondary mt-2">Click to browse or drag and drop your file here</p>
+                    <UploadIcon className="w-4 h-4" />
+                    Upload CSV
                     <input type="file" id="salesFileInput" className="hidden" accept=".csv" onChange={handleFileChange} />
                 </label>
 
                 {salesData.length > 0 && (
-                    <div className="flex items-center">
-                        <button
-                            onClick={() => setShowDeleteConfirm(true)}
-                            disabled={deleteLoading}
-                            className="px-6 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 border-2 border-red-500/30 rounded-xl font-semibold transition-all duration-300 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <TrashIcon className="w-5 h-5" />
-                            Delete All Data
-                        </button>
-                    </div>
+                    <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        disabled={deleteLoading}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 rounded-lg font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <TrashIcon className="w-4 h-4" />
+                        Delete All
+                    </button>
                 )}
             </div>
 
@@ -358,36 +386,51 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
             
             {salesData.length > 0 && (
                 <div className="bg-bg-secondary rounded-xl border border-border-color overflow-hidden">
-                    <div className="p-4 sm:p-6 border-b border-border-color">
-                        <h3 className="text-lg font-semibold">Sales Transactions</h3>
+                    <div className="p-3 border-b border-border-color">
+                        <h3 className="text-lg font-semibold">Sales Transactions ({sortedData.length})</h3>
                     </div>
+
                     {/* Desktop Table View */}
                     <div className="overflow-x-auto hidden lg:block">
-                        <table className="w-full min-w-[800px]">
-                            <thead className="bg-bg-tertiary/40">
+                        <table className="w-full text-xs">
+                            <thead className="bg-bg-tertiary/60 sticky top-0">
                                 <tr>
                                     {headers.map(header => (
-                                        <th key={header} className="p-4 text-left text-sm font-medium text-text-secondary">{header}</th>
+                                        <th
+                                            key={header}
+                                            onClick={() => handleSort(header)}
+                                            className="p-2 text-left font-semibold text-text-secondary cursor-pointer hover:bg-bg-tertiary/80 transition-colors whitespace-nowrap"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <span>{header}</span>
+                                                {sortColumn === header && (
+                                                    <span className="text-accent-blue">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                                                )}
+                                            </div>
+                                        </th>
                                     ))}
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-border-color">
-                                {salesData.map((row, rowIndex) => (
-                                    <tr key={rowIndex} className="hover:bg-hover-bg/50 transition-colors">
+                            <tbody className="divide-y divide-border-color/50">
+                                {sortedData.map((row, rowIndex) => (
+                                    <tr key={rowIndex} className="hover:bg-hover-bg/30 transition-colors">
                                         {headers.map(header => (
-                                            <td key={`${rowIndex}-${header}`} className="p-4 text-sm text-text-primary">{typeof row[header] === 'string' || typeof row[header] === 'number' ? row[header] : String(row[header] || '')}</td>
+                                            <td key={`${rowIndex}-${header}`} className="p-2 text-text-primary whitespace-nowrap overflow-hidden text-ellipsis max-w-xs">
+                                                {typeof row[header] === 'string' || typeof row[header] === 'number' ? row[header] : String(row[header] || '')}
+                                            </td>
                                         ))}
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
+
                     {/* Mobile Card View */}
-                    <div className="block lg:hidden p-4 space-y-4">
-                        {salesData.map((row, rowIndex) => (
-                            <div key={rowIndex} className="bg-bg-tertiary/60 p-4 rounded-lg">
+                    <div className="block lg:hidden p-3 space-y-2">
+                        {sortedData.map((row, rowIndex) => (
+                            <div key={rowIndex} className="bg-bg-tertiary/60 p-3 rounded-lg text-xs">
                                 {headers.map(header => (
-                                    <div key={`${rowIndex}-${header}`} className="flex justify-between text-sm py-1 border-b border-border-color/50 last:border-b-0">
+                                    <div key={`${rowIndex}-${header}`} className="flex justify-between py-1 border-b border-border-color/30 last:border-b-0">
                                         <span className="font-medium text-text-secondary">{header}</span>
                                         <span className="text-text-primary text-right break-all">{typeof row[header] === 'string' || typeof row[header] === 'number' ? row[header] : String(row[header] || '')}</span>
                                     </div>

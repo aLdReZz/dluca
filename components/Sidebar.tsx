@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { Page, Role } from '../types';
-import { ChartBarIcon, CubeIcon, CalculatorIcon, ClockIcon, CreditCardIcon, CalendarIcon, HomeIcon, ChevronDownIcon, ArchiveBoxIcon, TagIcon, ShoppingCartIcon } from './Icons';
+import { ChartBarIcon, CubeIcon, CalculatorIcon, ClockIcon, CreditCardIcon, CalendarIcon, HomeIcon, ChevronDownIcon, ArchiveBoxIcon, TagIcon, ShoppingCartIcon, ShieldCheckIcon, UserIcon } from './Icons';
 
 interface SidebarProps {
     role: Role;
@@ -9,9 +9,10 @@ interface SidebarProps {
     onNavigate: (page: Page) => void;
     isOpen: boolean;
     setIsOpen: (isOpen: boolean) => void;
+    onLogout: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ role, currentPage, onNavigate, isOpen }) => {
+const Sidebar: React.FC<SidebarProps> = ({ role, currentPage, onNavigate, isOpen, onLogout }) => {
     const inventoryPages: Page[] = ['inventory-supplies', 'pricelist', 'purchase-request'];
     const [isInventoryOpen, setIsInventoryOpen] = useState(inventoryPages.includes(currentPage));
     
@@ -123,6 +124,28 @@ const Sidebar: React.FC<SidebarProps> = ({ role, currentPage, onNavigate, isOpen
                     ))}
                 </div>
             </nav>
+
+            {/* Bottom Section: Role Badge and Logout */}
+            <div className="mt-auto pt-3 border-t border-border-color/30 px-3">
+                <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-center justify-start gap-1.5 py-1.5 text-text-secondary hover:text-text-primary transition-colors">
+                        {role === 'admin' ? (
+                            <ShieldCheckIcon className="w-4 h-4 text-accent-purple flex-shrink-0" />
+                        ) : (
+                            <UserIcon className="w-4 h-4 flex-shrink-0" />
+                        )}
+                        <span className="text-xs font-medium truncate">
+                            {role === 'admin' ? 'Admin' : 'Staff'}
+                        </span>
+                    </div>
+                    <button
+                        onClick={onLogout}
+                        className="flex items-center justify-end gap-1.5 text-text-secondary hover:text-text-primary px-0 py-1.5 rounded-md transition-colors text-xs font-medium hover:bg-hover-bg/30"
+                    >
+                        <span>Logout</span>
+                    </button>
+                </div>
+            </div>
         </aside>
     );
 };

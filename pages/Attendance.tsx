@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Employee, AttendanceRecord, PayrollRecord, Schedule, SalesData } from '../types';
 import { UploadIcon, CalendarDaysIcon, PencilSquareIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon, PlusIcon, CheckIcon } from '../components/Icons';
+import LoadingSpinner from '../components/LoadingSpinner';
 import EmployeeProfile from '../components/EmployeeProfile';
 import ScheduleEditModal from '../components/ScheduleEditModal';
 import AttendanceEditModal from '../components/AttendanceEditModal';
@@ -196,7 +197,9 @@ const Attendance: React.FC<AttendanceProps> = ({
         return monday.toISOString().split('T')[0];
     });
     const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
-    
+    const [draggedEmployee, setDraggedEmployee] = useState<number | null>(null);
+    const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
     useEffect(() => {
         const isAnyModalOpen = isModalOpen || !!viewedEmployee || !!editingScheduleContext || !!editingAttendanceContext;
         if (isAnyModalOpen) {
@@ -345,6 +348,46 @@ const Attendance: React.FC<AttendanceProps> = ({
 
     const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    // Drag and drop handlers for employee reordering
+    const handleDragStart = (index: number) => {
+        setDraggedEmployee(index);
+    };
+
+    const handleDragOver = (e: React.DragEvent, index: number) => {
+        e.preventDefault();
+        setDragOverIndex(index);
+    };
+
+    const handleDragLeave = () => {
+        setDragOverIndex(null);
+    };
+
+    const handleDrop = async (e: React.DragEvent, targetIndex: number) => {
+        e.preventDefault();
+        if (draggedEmployee === null || draggedEmployee === targetIndex) {
+            setDraggedEmployee(null);
+            setDragOverIndex(null);
+            return;
+        }
+
+        // Reorder employees
+        const newEmployees = [...employees];
+        const [draggedEmp] = newEmployees.splice(draggedEmployee, 1);
+        newEmployees.splice(targetIndex, 0, draggedEmp);
+        setEmployees(newEmployees);
+
+        // Save to Firebase
+        try {
+            await syncEmployees(newEmployees);
+            console.log('✅ Employee order updated and saved to Firebase');
+        } catch (error) {
+            console.warn('Could not save employee order to Firebase:', error);
+        }
+
+        setDraggedEmployee(null);
+        setDragOverIndex(null);
     };
 
     // Navigate to previous week
@@ -907,10 +950,7 @@ const Attendance: React.FC<AttendanceProps> = ({
         return (
             <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
                 <div className="flex flex-col items-center justify-center h-96">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-blue mx-auto mb-4"></div>
-                        <p className="text-text-secondary">Loading attendance records...</p>
-                    </div>
+                    <LoadingSpinner message="Loading attendance records..." />
                 </div>
             </div>
         );
@@ -993,20 +1033,20 @@ const Attendance: React.FC<AttendanceProps> = ({
                         <h2 className="text-2xl font-bold text-text-primary">Weekly Schedule</h2>
                         <p className="text-sm text-text-secondary mt-0.5">Manage employee work schedules</p>
                     </div>
-                     <div className="flex items-center gap-2 flex-wrap justify-start w-full sm:w-auto">
+                     <div className="flex items-center gap-1.5 flex-wrap justify-start w-full sm:w-auto">
                         {/* Previous Week Button */}
                         <button
                             onClick={handlePreviousWeek}
-                            className="bg-bg-tertiary border border-border-color rounded-lg py-2 px-3 text-xs font-medium hover:bg-hover-bg transition flex items-center justify-center text-text-secondary hover:text-text-primary"
+                            className="bg-bg-tertiary border border-border-color rounded-md py-1.5 px-2.5 text-xs font-medium hover:bg-hover-bg transition flex items-center justify-center text-text-secondary hover:text-text-primary"
                             title="Previous week"
                         >
-                            <span className="text-lg leading-none">&lt;</span>
+                            <span className="text-sm leading-none">&lt;</span>
                         </button>
 
                         <div className="relative" ref={datePickerRef}>
                              <button
                                 onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                                className="flex items-center gap-1.5 bg-bg-tertiary border border-border-color rounded-lg py-2 px-3 text-xs font-medium hover:bg-hover-bg transition"
+                                className="flex items-center gap-1.5 bg-bg-tertiary border border-border-color rounded-md py-1.5 px-3 text-xs font-medium hover:bg-hover-bg transition"
                             >
                                 <CalendarDaysIcon className="w-4 h-4 text-text-secondary" />
                                 <span className={slideDirection === 'left' ? 'date-slide-left' : slideDirection === 'right' ? 'date-slide-right' : ''}>{new Date(scheduleWeekStart + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</span>
@@ -1022,12 +1062,12 @@ const Attendance: React.FC<AttendanceProps> = ({
                         {/* Next Week Button */}
                         <button
                             onClick={handleNextWeek}
-                            className="bg-bg-tertiary border border-border-color rounded-lg py-2 px-3 text-xs font-medium hover:bg-hover-bg transition flex items-center justify-center text-text-secondary hover:text-text-primary"
+                            className="bg-bg-tertiary border border-border-color rounded-md py-1.5 px-2.5 text-xs font-medium hover:bg-hover-bg transition flex items-center justify-center text-text-secondary hover:text-text-primary"
                             title="Next week"
                         >
-                            <span className="text-lg leading-none">&gt;</span>
+                            <span className="text-sm leading-none">&gt;</span>
                         </button>
-                         <label htmlFor="schedule-csv-input" className="cursor-pointer bg-bg-tertiary text-text-primary px-3 py-2 rounded-lg font-medium text-xs hover:bg-hover-bg transition flex items-center gap-1.5 border border-border-color">
+                        <label htmlFor="schedule-csv-input" className="cursor-pointer bg-bg-tertiary text-text-primary px-3 py-2 rounded-lg font-medium text-xs hover:bg-hover-bg transition flex items-center gap-1.5 border border-border-color">
                             <UploadIcon className="w-4 h-4"/>
                             <span className="hidden sm:inline">Upload CSV</span>
                         </label>
@@ -1084,7 +1124,15 @@ const Attendance: React.FC<AttendanceProps> = ({
                                             }, 0) / 60;
 
                                             return (
-                                                <tr key={employeeKey} className="group/row hover:bg-hover-bg/30 transition-colors border-b border-border-color/50">
+                                                <tr
+                                                    key={employeeKey}
+                                                    draggable={!isScheduleLocked}
+                                                    onDragStart={() => !isScheduleLocked && handleDragStart(empIndex)}
+                                                    onDragOver={(e) => !isScheduleLocked && handleDragOver(e, empIndex)}
+                                                    onDragLeave={handleDragLeave}
+                                                    onDrop={(e) => !isScheduleLocked && handleDrop(e, empIndex)}
+                                                    className={`group/row transition-colors border-b border-border-color/50 ${!isScheduleLocked ? 'employee-row-draggable' : ''} ${draggedEmployee === empIndex ? 'employee-row-dragging' : ''} ${dragOverIndex === empIndex ? 'employee-row-drag-over' : 'hover:bg-hover-bg/30'}`}
+                                                >
                                                     <td className="px-3 py-2.5 font-semibold text-sm sticky left-0 bg-bg-secondary group-hover/row:bg-hover-bg/30 z-10 w-32">{emp.name}</td>
                                                     {weekDates.map(dateInfo => {
                                                         const currentDayKey = dateToKey(dateInfo.date);
@@ -1621,7 +1669,7 @@ const Attendance: React.FC<AttendanceProps> = ({
             )}
 
             {editingScheduleContext && (
-                <ScheduleEditModal 
+                <ScheduleEditModal
                     isOpen={!!editingScheduleContext}
                     onClose={() => setEditingScheduleContext(null)}
                     onSave={handleSaveScheduleFromModal}

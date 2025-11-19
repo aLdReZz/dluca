@@ -543,6 +543,121 @@ body {
   animation: tableSlideInFromLeft 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Loading spinner logo animation */
+@keyframes logoSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.logo-pulse {
+  animation: logoSpin 2s linear infinite;
+}
+
+/* Shimmer animation for loading bar */
+@keyframes shimmer {
+  0% {
+    opacity: 0.5;
+    filter: brightness(1);
+  }
+  50% {
+    opacity: 1;
+    filter: brightness(1.3);
+  }
+  100% {
+    opacity: 0.5;
+    filter: brightness(1);
+  }
+}
+
+/* Enhanced loading spinner animations */
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(120, 120, 120, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 15px rgba(120, 120, 120, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(120, 120, 120, 0);
+  }
+}
+
+@keyframes logo-glow {
+  0%, 100% {
+    opacity: 0;
+    filter: blur-xl;
+  }
+  50% {
+    opacity: 0.8;
+    filter: blur(12px);
+  }
+}
+
+@keyframes logo-float {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-4px) scale(1.05);
+  }
+}
+
+@keyframes dot-bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes ping-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.5);
+  }
+}
+
+@keyframes flow {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(400%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+/* Employee drag and drop styling */
+.employee-row-draggable {
+  cursor: move;
+  transition: background-color 0.2s ease;
+}
+
+.employee-row-draggable:hover {
+  background-color: rgba(0, 122, 255, 0.05);
+}
+
+.employee-row-dragging {
+  opacity: 0.5;
+  background-color: rgba(0, 122, 255, 0.1);
+}
+
+.employee-row-drag-over {
+  background-color: rgba(0, 122, 255, 0.2) !important;
+  border-top: 2px solid rgba(0, 122, 255, 0.5);
+}
+
 .role-select-btn {
   position: relative;
   overflow: hidden;
@@ -561,6 +676,34 @@ body {
   transform: translate(-50%, -50%);
   transition: width 0.35s ease-out, height 0.35s ease-out, opacity 0.3s ease-out;
   pointer-events: none;
+}
+
+/* Time picker select dropdown styling */
+select {
+  padding-right: 28px;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 18px;
+}
+
+select:focus {
+  border-color: rgba(0, 122, 255, 0.8);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1), 0 0 12px rgba(0, 122, 255, 0.5);
+  transition: all 0.2s ease;
+  background-color: rgba(0, 122, 255, 0.04);
+}
+
+select:hover:not(:focus) {
+  border-color: rgba(0, 122, 255, 0.4);
+}
+
+select option {
+  background-color: #1a1a1a;
+  color: #e0e0e0;
+  padding: 10px 12px;
+  margin: 4px 0;
+  border-radius: 4px;
 }
 
 .role-select-btn:active::after {

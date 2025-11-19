@@ -65,6 +65,7 @@ export interface Employee {
     paymentMode?: string;
     approvedOvertime?: { [dateKey: string]: number }; // in minutes
     paidHoursOverride?: { [dateKey: string]: number };
+    order?: number; // Position in the employee list
 }
 
 export interface AttendanceRecord {

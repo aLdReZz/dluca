@@ -540,22 +540,7 @@ const App: React.FC = () => {
             </>
         );
     }
-    
-    const RoleBadge = ({ role }: { role: Role | null }) => {
-        if (!role) return null;
-        
-        const isAdmin = role === 'admin';
-        const Icon = isAdmin ? ShieldCheckIcon : UserIcon;
-        const text = isAdmin ? 'Admin Role' : 'Staff Role';
-        const colors = isAdmin ? 'text-accent-purple' : 'text-text-secondary';
 
-        return (
-            <div className="p-2 bg-bg-tertiary rounded-full group cursor-pointer" title={text}>
-                <Icon className={`w-5 h-5 ${colors}`} />
-            </div>
-        );
-    };
-    
     return (
         <div className="flex h-screen overflow-hidden font-sans">
             <Sidebar
@@ -564,28 +549,19 @@ const App: React.FC = () => {
                 onNavigate={handleNavigate}
                 isOpen={isSidebarOpen}
                 setIsOpen={setSidebarOpen}
+                onLogout={handleLogout}
             />
             {/* Mobile Overlay */}
             <div className={`fixed inset-0 z-20 bg-black bg-opacity-50 transition-opacity lg:hidden ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setSidebarOpen(false)}></div>
             
             <div className={`relative flex-1 flex flex-col min-w-0 ${dashboardIntro ? 'dashboard-container-intro' : ''}`}>
-                <div className="fixed top-0 left-0 right-0 z-10 lg:absolute lg:right-auto lg:w-full p-4 lg:p-8 flex justify-between items-center bg-bg-primary border-b border-border-color lg:bg-transparent lg:border-none lg:backdrop-blur-none lg:pointer-events-none">
-                    <button 
-                        onClick={() => setSidebarOpen(!isSidebarOpen)} 
-                        className="p-2 rounded-md hover:bg-hover-bg lg:hidden pointer-events-auto"
+                <div className="fixed top-0 left-0 right-0 z-10 lg:hidden p-4 flex items-center bg-bg-primary border-b border-border-color">
+                    <button
+                        onClick={() => setSidebarOpen(!isSidebarOpen)}
+                        className="p-2 rounded-md hover:bg-hover-bg pointer-events-auto"
                     >
                         <MenuIcon className="w-6 h-6" />
                     </button>
-                    <div className="hidden lg:block flex-grow" />
-                    <div className="flex items-center gap-3 pointer-events-auto">
-                        <RoleBadge role={role} />
-                        <button
-                            onClick={handleLogout}
-                            className="bg-bg-tertiary text-text-primary px-4 py-2 rounded-lg text-sm font-semibold transition-colors hover:bg-hover-bg"
-                        >
-                            Logout
-                        </button>
-                    </div>
                 </div>
                 <main className={`flex-1 overflow-y-auto bg-bg-primary pt-20 lg:pt-28 ${dashboardIntro ? 'dashboard-content-intro' : ''}`}>
                     {renderPage()}
