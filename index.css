@@ -460,6 +460,28 @@ body {
 }
 
 /* Week navigation slide animations */
+@keyframes weekSlideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes weekSlideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 @keyframes weekSlideIn {
   from {
     opacity: 0;
@@ -473,6 +495,14 @@ body {
 
 .schedule-table-container {
   animation: weekSlideIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.slide-from-left {
+  animation: weekSlideInFromLeft 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.slide-from-right {
+  animation: weekSlideInFromRight 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .role-select-btn {

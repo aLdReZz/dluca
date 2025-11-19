@@ -195,6 +195,7 @@ const Attendance: React.FC<AttendanceProps> = ({
         monday.setDate(today.getDate() + daysToMonday);
         return monday.toISOString().split('T')[0];
     });
+    const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
     
     useEffect(() => {
         const isAnyModalOpen = isModalOpen || !!viewedEmployee || !!editingScheduleContext || !!editingAttendanceContext;
@@ -348,20 +349,26 @@ const Attendance: React.FC<AttendanceProps> = ({
 
     // Navigate to previous week
     const handlePreviousWeek = () => {
+        setSlideDirection('left');
         const [year, month, day] = scheduleWeekStart.split('-').map(Number);
         const currentDate = new Date(Date.UTC(year, month - 1, day));
         currentDate.setDate(currentDate.getDate() - 7);
         const newDate = currentDate.toISOString().split('T')[0];
         setScheduleWeekStart(newDate);
+        // Reset direction after animation
+        setTimeout(() => setSlideDirection(null), 350);
     };
 
     // Navigate to next week
     const handleNextWeek = () => {
+        setSlideDirection('right');
         const [year, month, day] = scheduleWeekStart.split('-').map(Number);
         const currentDate = new Date(Date.UTC(year, month - 1, day));
         currentDate.setDate(currentDate.getDate() + 7);
         const newDate = currentDate.toISOString().split('T')[0];
         setScheduleWeekStart(newDate);
+        // Reset direction after animation
+        setTimeout(() => setSlideDirection(null), 350);
     };
 
     const handleSaveEmployee = async () => {
@@ -1039,7 +1046,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                     </div>
                 </div>
                 <div className="relative">
-                    <div className={`bg-bg-secondary rounded-xl border overflow-hidden transition-all duration-300 schedule-table-container ${!isScheduleLocked ? 'border-accent-blue ring-2 ring-accent-blue/30' : 'border-border-color'}`}>
+                    <div className={`bg-bg-secondary rounded-xl border overflow-hidden transition-all duration-300 ${slideDirection === 'left' ? 'slide-from-right' : slideDirection === 'right' ? 'slide-from-left' : 'schedule-table-container'} ${!isScheduleLocked ? 'border-accent-blue ring-2 ring-accent-blue/30' : 'border-border-color'}`}>
                         {/* Desktop Table View */}
                         <div className="overflow-x-auto hidden lg:block">
                             <table className="w-full border-collapse table-fixed">
