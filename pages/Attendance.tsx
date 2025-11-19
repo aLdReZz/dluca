@@ -346,6 +346,24 @@ const Attendance: React.FC<AttendanceProps> = ({
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    // Navigate to previous week
+    const handlePreviousWeek = () => {
+        const [year, month, day] = scheduleWeekStart.split('-').map(Number);
+        const currentDate = new Date(Date.UTC(year, month - 1, day));
+        currentDate.setDate(currentDate.getDate() - 7);
+        const newDate = currentDate.toISOString().split('T')[0];
+        setScheduleWeekStart(newDate);
+    };
+
+    // Navigate to next week
+    const handleNextWeek = () => {
+        const [year, month, day] = scheduleWeekStart.split('-').map(Number);
+        const currentDate = new Date(Date.UTC(year, month - 1, day));
+        currentDate.setDate(currentDate.getDate() + 7);
+        const newDate = currentDate.toISOString().split('T')[0];
+        setScheduleWeekStart(newDate);
+    };
+
     const handleSaveEmployee = async () => {
         if (!formData.name || !formData.position || !formData.rate) {
             alert('Please fill in Name, Position, and Rate.');
@@ -969,6 +987,15 @@ const Attendance: React.FC<AttendanceProps> = ({
                         <p className="text-sm text-text-secondary mt-0.5">Manage employee work schedules</p>
                     </div>
                      <div className="flex items-center gap-2 flex-wrap justify-start w-full sm:w-auto">
+                        {/* Previous Week Button */}
+                        <button
+                            onClick={handlePreviousWeek}
+                            className="bg-bg-tertiary border border-border-color rounded-lg py-2 px-3 text-xs font-medium hover:bg-hover-bg transition flex items-center justify-center text-text-secondary hover:text-text-primary"
+                            title="Previous week"
+                        >
+                            <span className="text-lg leading-none">&lt;</span>
+                        </button>
+
                         <div className="relative" ref={datePickerRef}>
                              <button
                                 onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
@@ -984,6 +1011,15 @@ const Attendance: React.FC<AttendanceProps> = ({
                                 />
                             )}
                         </div>
+
+                        {/* Next Week Button */}
+                        <button
+                            onClick={handleNextWeek}
+                            className="bg-bg-tertiary border border-border-color rounded-lg py-2 px-3 text-xs font-medium hover:bg-hover-bg transition flex items-center justify-center text-text-secondary hover:text-text-primary"
+                            title="Next week"
+                        >
+                            <span className="text-lg leading-none">&gt;</span>
+                        </button>
                          <label htmlFor="schedule-csv-input" className="cursor-pointer bg-bg-tertiary text-text-primary px-3 py-2 rounded-lg font-medium text-xs hover:bg-hover-bg transition flex items-center gap-1.5 border border-border-color">
                             <UploadIcon className="w-4 h-4"/>
                             <span className="hidden sm:inline">Upload CSV</span>
@@ -1003,7 +1039,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                     </div>
                 </div>
                 <div className="relative">
-                    <div className={`bg-bg-secondary rounded-xl border overflow-hidden transition-all duration-300 ${!isScheduleLocked ? 'border-accent-blue ring-2 ring-accent-blue/30' : 'border-border-color'}`}>
+                    <div className={`bg-bg-secondary rounded-xl border overflow-hidden transition-all duration-300 schedule-table-container ${!isScheduleLocked ? 'border-accent-blue ring-2 ring-accent-blue/30' : 'border-border-color'}`}>
                         {/* Desktop Table View */}
                         <div className="overflow-x-auto hidden lg:block">
                             <table className="w-full border-collapse table-fixed">
