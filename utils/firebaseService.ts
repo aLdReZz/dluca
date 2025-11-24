@@ -528,11 +528,13 @@ export const productInventoryService = {
 
 export const purchaseOrderService = {
     // Add purchase order
-    async add(order: PurchaseOrder): Promise<string> {
+    async add(order: Omit<PurchaseOrder, 'id' | 'date' | 'status'>): Promise<string> {
         return withFirebaseCheck(
             async () => {
                 const docRef = await addDoc(collection(db, 'purchaseOrders'), {
                     ...order,
+                    date: new Date().toISOString(),
+                    status: 'Pending' as const,
                     createdAt: new Date(),
                 });
                 return docRef.id;

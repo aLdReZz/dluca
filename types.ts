@@ -45,7 +45,8 @@ export interface PurchaseOrder {
         cost: number;
     }[];
     totalCost: number;
-    status: 'Pending' | 'Completed' | 'Cancelled';
+    status: 'Pending' | 'In Progress' | 'Completed' | 'Cancelled';
+    delivered?: Record<number, boolean>;
 }
 
 export interface Schedule {

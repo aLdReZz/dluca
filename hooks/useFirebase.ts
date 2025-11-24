@@ -12,6 +12,12 @@ export function useFirebaseData<T>(
     const [data, setData] = useState<T | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [refetchTrigger, setRefetchTrigger] = useState(0);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+    const refetch = useCallback(() => {
+        setRefetchTrigger(prev => prev + 1);
+    }, []);
 
     useEffect(() => {
         if (!isFirebaseConfigured) {
@@ -22,23 +28,31 @@ export function useFirebaseData<T>(
 
         const loadData = async () => {
             try {
-                setLoading(true);
+                // Only show loading state on initial load
+                if (isInitialLoad) {
+                    setLoading(true);
+                }
                 setError(null);
                 const result = await fetchFn();
                 setData(result);
+                setIsInitialLoad(false);
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'An error occurred');
-                setData(null);
+                if (isInitialLoad) {
+                    setData(null);
+                }
                 console.error('Firebase data fetch error:', err);
             } finally {
-                setLoading(false);
+                if (isInitialLoad) {
+                    setLoading(false);
+                }
             }
         };
 
         loadData();
-    }, dependencies || [fetchFn]);
+    }, [...(dependencies || [fetchFn]), refetchTrigger]);
 
-    return { data: data as T, loading, error };
+    return { data: data as T, loading, error, refetch };
 }
 
 /**

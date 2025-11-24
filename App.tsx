@@ -22,6 +22,8 @@ const COMMON_UNITS = [
     'pcs', 'kg', 'g', 'mg', 'L', 'ml', 'oz', 'lb', 'servings', 'bottles', 'pack', 'box', 'case', 'bundle'
 ];
 
+const BASE_DEPARTMENTS = ['Kitchen', 'Kitchen (Staff Meal)', 'Bakery', 'Dining', 'Bar'];
+
 const initialProductInventory: ProductInventoryItem[] = [
     { "id": 1, "name": "Crushed Tomato", "brand": "Dona Elena", "category": "Canned Goods", "unit": "pcs", "price": 85.00, "supplier": "S&R Membership Shopping" },
     { "id": 2, "name": "Corned Beef", "brand": "Delimondo", "category": "Canned Goods", "unit": "pcs", "price": 155.00, "supplier": "Puregold" },
@@ -294,7 +296,7 @@ const App: React.FC = () => {
     }, [productInventoryItems]);
 
     const departments = useMemo(() => {
-        const depts = new Set(inventoryItems.map(item => item.department));
+        const depts = new Set([...BASE_DEPARTMENTS, ...inventoryItems.map(item => item.department)]);
         return Array.from(depts).sort();
     }, [inventoryItems]);
 

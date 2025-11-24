@@ -8,6 +8,7 @@ interface PurchaseRequestModalProps {
     onSave: (data: Omit<PurchaseOrder, 'id' | 'date' | 'status'>) => void;
     productInventoryItems: ProductInventoryItem[];
     departments: string[];
+    editingOrder?: PurchaseOrder | null;
 }
 
 type PurchaseItem = {
@@ -19,15 +20,21 @@ type PurchaseItem = {
     isCustomItem: boolean; // Track if this is a custom item not in the pricelist
 };
 
-const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ isOpen, onClose, onSave, productInventoryItems, departments }) => {
+const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ isOpen, onClose, onSave, productInventoryItems, departments, editingOrder }) => {
     const [department, setDepartment] = useState('');
     const [items, setItems] = useState<PurchaseItem[]>([{ itemId: null, itemName: '', unit: '', quantity: '1', cost: '', isCustomItem: false }]);
     const [error, setError] = useState('');
-    
+
     const [activeItemIndex, setActiveItemIndex] = useState<number | null>(null);
     const [suggestions, setSuggestions] = useState<ProductInventoryItem[]>([]);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const firstItemNameInputRef = useRef<HTMLInputElement>(null);
+
+    const isEditMode = !!editingOrder;
+    const filledItemsCount = useMemo(
+        () => items.filter(item => item.itemName.trim()).length,
+        [items]
+    );
 
     const totalCost = useMemo(() => {
         return items.reduce((total, item) => {
@@ -61,14 +68,22 @@ const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ isOpen, onC
     const handleItemChange = (index: number, field: keyof PurchaseItem, value: any) => {
         const newItems = [...items];
         const currentItem = { ...newItems[index], [field]: value };
-        
+
         if (field === 'itemName') {
             currentItem.itemId = null;
             currentItem.isCustomItem = false;
             setHighlightedIndex(-1);
             if (value) {
                 setActiveItemIndex(index);
-                setSuggestions(productInventoryItems.filter(p => p.name.toLowerCase().includes(value.toLowerCase())));
+                const filteredSuggestions = productInventoryItems.filter(p => p.name.toLowerCase().includes(value.toLowerCase()));
+                setSuggestions(filteredSuggestions);
+
+                // Check if there's an exact match
+                const exactMatch = productInventoryItems.find(p => p.name.toLowerCase() === value.toLowerCase());
+                if (exactMatch && !currentItem.itemId) {
+                    // Don't show dropdown if there's an exact match but it hasn't been selected yet
+                    setActiveItemIndex(null);
+                }
             } else {
                 setActiveItemIndex(null);
                 setSuggestions([]);
@@ -169,43 +184,62 @@ const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ isOpen, onC
 
     useEffect(() => {
         if (isOpen) {
-            setItems([{ itemId: null, itemName: '', unit: '', quantity: '1', cost: '', isCustomItem: false }]);
-            setDepartment('');
+            if (editingOrder) {
+                // Populate form with editing order data
+                setDepartment(editingOrder.department);
+                setItems(editingOrder.items.map(item => ({
+                    itemId: item.itemId !== undefined ? item.itemId : null,
+                    itemName: item.itemName,
+                    unit: item.unit || '',
+                    quantity: String(item.quantity),
+                    cost: String(item.cost),
+                    isCustomItem: item.itemId === undefined,
+                })));
+            } else {
+                // Reset to empty form
+                setItems([{ itemId: null, itemName: '', unit: '', quantity: '1', cost: '', isCustomItem: false }]);
+                setDepartment('');
+            }
             setError('');
         }
-    }, [isOpen]);
+    }, [isOpen, editingOrder]);
     
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={onClose}>
-            <div className="bg-bg-secondary w-full max-w-3xl max-h-[92vh] rounded-2xl border border-border-color shadow-2xl flex flex-col animate-pop-in" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex justify-center items-center z-50 p-3" onClick={onClose}>
+            <div className="bg-bg-secondary w-full max-w-3xl max-h-[92vh] rounded-xl border border-border-color shadow-2xl flex flex-col animate-pop-in" onClick={e => e.stopPropagation()}>
                 <form onSubmit={(e) => e.preventDefault()} className="flex flex-col flex-1 min-h-0">
-                    <div className="p-6 border-b border-border-color flex justify-between items-center flex-shrink-0 bg-gradient-to-r from-bg-secondary to-bg-tertiary/30">
+                    <div className="p-4 border-b border-border-color flex justify-between items-center flex-shrink-0 bg-gradient-to-r from-bg-secondary to-bg-tertiary/30">
                         <div>
-                            <h2 className="text-2xl font-bold text-text-primary">New Purchase Request</h2>
-                            <p className="text-sm text-text-secondary mt-1">Fill in the details for your purchase request</p>
+                            <h2 className="text-xl font-bold text-text-primary">
+                                {isEditMode ? 'Edit Purchase Request' : 'New Purchase Request'}
+                            </h2>
+                            <p className="text-xs text-text-secondary mt-0.5">
+                                {isEditMode ? 'Update the details for your purchase request' : 'Fill in the details for your purchase request'}
+                            </p>
                         </div>
-                        <button type="button" onClick={onClose} className="p-2.5 rounded-full text-text-secondary hover:bg-hover-bg hover:text-text-primary transition-all">
-                            <XMarkIcon className="w-6 h-6" />
+                        <button type="button" onClick={onClose} className="p-2 rounded-full text-text-secondary hover:bg-hover-bg hover:text-text-primary transition-all">
+                            <XMarkIcon className="w-5 h-5" />
                         </button>
                     </div>
-                    <div className="p-6 space-y-6 flex-1 overflow-y-auto pb-48">
-                        <div className="bg-bg-tertiary/30 rounded-xl p-5 border border-border-color/50">
-                            <label className="block text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
+                    <div className="p-4 space-y-4 flex-1 overflow-y-auto pb-32 bg-gradient-to-b from-bg-secondary via-bg-secondary to-bg-primary/60">
+                        <div className="bg-bg-tertiary/30 rounded-lg p-3 border border-border-color/60 shadow-inner">
+                            <label className="block text-sm font-semibold text-text-primary mb-1.5 flex items-center gap-2">
                                 <span className="w-1.5 h-1.5 rounded-full bg-accent-blue"></span>
                                 Department*
                             </label>
-                            <div className="flex items-center gap-3 flex-wrap">
+                            <p className="text-xs text-text-secondary mb-2">Route this request to the right team, including staff meals.</p>
+                            <div className="flex items-center gap-1.5 flex-wrap">
                                 {departments.map(dept => (
                                     <button
                                         key={dept}
                                         type="button"
                                         onClick={() => setDepartment(dept)}
-                                        className={`px-5 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 ${
+                                        className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-all duration-150 shadow-sm ${
                                             department === dept
-                                                ? 'bg-accent-blue text-white shadow-lg shadow-accent-blue/30 scale-105'
-                                                : 'bg-bg-primary text-text-secondary hover:bg-hover-bg hover:scale-102 border border-border-color'
+                                                ? 'bg-gradient-to-r from-accent-blue to-accent-blue/90 text-white shadow-lg shadow-accent-blue/40'
+                                                : 'bg-bg-primary/80 text-text-secondary hover:text-text-primary hover:border-accent-blue/40 border border-border-color'
                                         }`}
                                     >
                                         {dept}
@@ -213,141 +247,143 @@ const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ isOpen, onC
                                 ))}
                             </div>
                         </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-text-primary mb-4 flex items-center gap-2">
+
+                        <div className="space-y-2">
+                            <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
                                 <span className="w-1.5 h-1.5 rounded-full bg-accent-blue"></span>
                                 Items
                             </h3>
-                        <div className="space-y-3 bg-bg-tertiary/20 rounded-xl p-4 border border-border-color/30">
-                            <div className="grid grid-cols-12 gap-3 items-center text-xs font-semibold text-text-secondary uppercase tracking-wide px-1">
-                                <div className="col-span-3">Item Name</div>
-                                <div className="col-span-2">Unit</div>
-                                <div className="col-span-2">Quantity</div>
-                                <div className="col-span-2">Unit Cost (₱)</div>
-                                <div className="col-span-2">Total Cost (₱)</div>
-                                <div className="col-span-1"></div>
-                            </div>
-                            {items.map((item, index) => {
-                                const itemTotal = (parseFloat(item.quantity) || 0) * (parseFloat(item.cost) || 0);
-                                return (
-                                    <div key={index} className="grid grid-cols-12 gap-3 items-center bg-bg-secondary rounded-lg p-2 border border-border-color/50 hover:border-accent-blue/40 transition-all">
-                                        <div className="col-span-3 relative">
-                                            <input
-                                                ref={index === 0 ? firstItemNameInputRef : null}
-                                                type="text"
-                                                name={`itemName-${index}`}
-                                                placeholder="Type to search..."
-                                                value={item.itemName}
-                                                onChange={(e) => handleItemChange(index, 'itemName', e.target.value)}
-                                                onFocus={() => {
-                                                    if (item.itemName) {
-                                                        setActiveItemIndex(index);
-                                                    }
-                                                }}
-                                                onBlur={() => setTimeout(() => setActiveItemIndex(null), 150)}
-                                                onKeyDown={(e) => handleKeyDown(e, index)}
-                                                disabled={item.isCustomItem}
-                                                autoComplete="off"
-                                                className={`w-full bg-bg-primary border border-border-color rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue transition-all placeholder:text-text-secondary/50 ${item.isCustomItem ? 'bg-accent-green/10 border-accent-green/30' : ''}`}
-                                            />
-                                            {activeItemIndex === index && item.itemName && suggestions.length > 0 && !item.isCustomItem && (
-                                                <div className="absolute top-full left-0 right-0 bg-bg-primary border border-border-color rounded-lg z-20 max-h-96 overflow-y-auto mt-1 shadow-xl">
-                                                    {suggestions.map((s, sIndex) => (
-                                                        <div
-                                                            key={s.id}
-                                                            onMouseDown={() => handleSuggestionClick(index, s)}
-                                                            onMouseEnter={() => setHighlightedIndex(sIndex)}
-                                                            className={`p-3 text-sm cursor-pointer border-b border-border-color/30 last:border-0 transition-colors ${sIndex === highlightedIndex ? 'bg-accent-blue/20 text-accent-blue' : 'hover:bg-hover-bg text-text-primary'}`}
-                                                        >
-                                                            <div className="font-medium">{s.name}</div>
-                                                            <div className="text-xs text-text-secondary mt-0.5">{s.unit} • ₱{s.price}</div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                            {activeItemIndex === index && item.itemName && suggestions.length === 0 && !item.isCustomItem && (
-                                                <div className="absolute top-full left-0 right-0 bg-bg-primary border border-border-color rounded-lg z-20 mt-1 shadow-xl">
-                                                    <div
-                                                        onMouseDown={() => handleAddCustomItem(index)}
-                                                        className="p-3 text-sm cursor-pointer bg-accent-green/10 hover:bg-accent-green/20 transition-colors text-accent-green font-medium flex items-center gap-2"
-                                                    >
-                                                        <PlusIcon className="w-4 h-4" />
-                                                        Add "{item.itemName}" as custom item
+                            <div className="space-y-2 bg-bg-tertiary/20 rounded-lg p-2 md:p-3 border border-border-color/30">
+                                {items.map((item, index) => {
+                                    const itemTotal = (parseFloat(item.quantity) || 0) * (parseFloat(item.cost) || 0);
+                                    const unitDisplay = item.unit || '—';
+                                    const unitCostValue = parseFloat(item.cost) || 0;
+                                    return (
+                                        <div
+                                            key={index}
+                                            className="grid grid-cols-12 gap-2 md:gap-3 bg-bg-secondary/80 rounded-lg p-2.5 border border-border-color/50 hover:border-accent-blue/50 shadow-sm transition-all"
+                                        >
+                                            <div className="col-span-12 md:col-span-4 relative flex flex-col gap-1">
+                                                <span className="text-[11px] font-semibold uppercase text-text-secondary/70">Item</span>
+                                                <input
+                                                    ref={index === 0 ? firstItemNameInputRef : null}
+                                                    type="text"
+                                                    name={`itemName-${index}`}
+                                                    placeholder="Type to search..."
+                                                    value={item.itemName}
+                                                    onChange={(e) => handleItemChange(index, 'itemName', e.target.value)}
+                                                    onFocus={() => {
+                                                        if (item.itemName) {
+                                                            setActiveItemIndex(index);
+                                                        }
+                                                    }}
+                                                    onBlur={() => setTimeout(() => setActiveItemIndex(null), 150)}
+                                                    onKeyDown={(e) => handleKeyDown(e, index)}
+                                                    disabled={item.isCustomItem}
+                                                    autoComplete="off"
+                                                    className={`w-full bg-bg-primary border border-border-color rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue transition-all placeholder:text-text-secondary/50 ${item.isCustomItem ? 'bg-accent-green/10 border-accent-green/30' : ''}`}
+                                                />
+                                                {activeItemIndex === index && item.itemName && suggestions.length > 0 && !item.isCustomItem && (
+                                                    <div className="absolute top-full left-0 right-0 bg-bg-primary border border-border-color rounded-lg z-20 max-h-96 overflow-y-auto mt-1 shadow-xl">
+                                                        {suggestions.map((s, sIndex) => (
+                                                            <div
+                                                                key={s.id}
+                                                                onMouseDown={() => handleSuggestionClick(index, s)}
+                                                                onMouseEnter={() => setHighlightedIndex(sIndex)}
+                                                                className={`p-3 text-sm cursor-pointer border-b border-border-color/30 last:border-0 transition-colors ${sIndex === highlightedIndex ? 'bg-accent-blue/20 text-accent-blue' : 'hover:bg-hover-bg text-text-primary'}`}
+                                                            >
+                                                                <div className="font-medium">{s.name}</div>
+                                                                <div className="text-xs text-text-secondary mt-0.5">{s.unit} • ₱{s.price}</div>
+                                                            </div>
+                                                        ))}
                                                     </div>
+                                                )}
+                                                {activeItemIndex === index && item.itemName && suggestions.length === 0 && !item.isCustomItem && !item.itemId && (
+                                                    <div className="absolute top-full left-0 right-0 bg-bg-primary border border-border-color rounded-lg z-20 mt-1 shadow-xl">
+                                                        <div
+                                                            onMouseDown={() => handleAddCustomItem(index)}
+                                                            className="p-3 text-sm cursor-pointer bg-accent-green/10 hover:bg-accent-green/20 transition-colors text-accent-green font-medium flex items-center gap-2"
+                                                        >
+                                                            <PlusIcon className="w-4 h-4 flex-shrink-0" />
+                                                            <span>Add "{item.itemName}" as custom item</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="col-span-6 md:col-span-2 flex flex-col gap-1">
+                                                <span className="text-[11px] font-semibold uppercase text-text-secondary/70">Qty</span>
+                                                <input
+                                                    type="number"
+                                                    name={`quantity-${index}`}
+                                                    placeholder="Qty"
+                                                    value={item.quantity}
+                                                    onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                                                    className="w-full bg-bg-primary border border-border-color rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue transition-all"
+                                                />
+                                            </div>
+                                            <div className="col-span-6 md:col-span-2 flex flex-col gap-1">
+                                                <span className="text-[11px] font-semibold uppercase text-text-secondary/70">Unit</span>
+                                                <div className="w-full rounded-md px-3 py-2 text-sm bg-transparent text-text-secondary border border-transparent">
+                                                    {unitDisplay}
                                                 </div>
-                                            )}
-                                        </div>
-                                        <div className="col-span-2">
-                                            <input
-                                                type="text"
-                                                placeholder="e.g. kg, L, ml"
-                                                value={item.unit}
-                                                onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
-                                                disabled={!item.isCustomItem && item.itemId !== null}
-                                                autoComplete="off"
-                                                className={`w-full bg-bg-primary border border-border-color rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue transition-all placeholder:text-text-secondary/50 ${!item.isCustomItem && item.itemId !== null ? 'bg-bg-tertiary/50 cursor-not-allowed' : ''}`}
-                                            />
-                                        </div>
-                                        <div className="col-span-2">
-                                            <input
-                                                type="number"
-                                                name={`quantity-${index}`}
-                                                placeholder="Qty"
-                                                value={item.quantity}
-                                                onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                                                className="w-full bg-bg-primary border border-border-color rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue transition-all"
-                                            />
-                                        </div>
-                                        <div className="col-span-2">
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                placeholder="Cost"
-                                                value={item.cost}
-                                                onChange={(e) => handleItemChange(index, 'cost', e.target.value)}
-                                                disabled={!item.isCustomItem && item.itemId !== null}
-                                                className={`w-full border border-border-color rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue transition-all ${!item.isCustomItem && item.itemId !== null ? 'bg-bg-tertiary/50 text-text-secondary cursor-not-allowed' : 'bg-bg-primary'}`}
-                                            />
-                                        </div>
-                                        <div className="col-span-2">
-                                            <div className="w-full bg-bg-primary/50 border border-accent-blue/20 rounded-lg px-3 py-2.5 text-sm text-right text-text-primary font-semibold h-full flex items-center justify-end">
-                                                {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(itemTotal)}
+                                            </div>
+                                            <div className="col-span-6 md:col-span-2 flex flex-col gap-1">
+                                                <span className="text-[11px] font-semibold uppercase text-text-secondary/70">Unit Cost (₱)</span>
+                                                <div className="w-full rounded-md px-3 py-2 text-sm bg-transparent text-text-secondary border border-transparent">
+                                                    {unitCostValue > 0 ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(unitCostValue) : '—'}
+                                                </div>
+                                            </div>
+                                            <div className="col-span-6 md:col-span-2 flex flex-col gap-1">
+                                                <span className="text-[11px] font-semibold uppercase text-text-secondary/70">Total (₱)</span>
+                                                <div className="w-full bg-transparent rounded-md px-3 py-2 text-sm text-right text-text-secondary font-semibold h-full flex items-center justify-end">
+                                                    {itemTotal > 0 ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(itemTotal) : '—'}
+                                                </div>
+                                            </div>
+                                            <div className="col-span-12 flex justify-end items-center">
+                                                {items.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveItem(index)}
+                                                        aria-label="Remove item"
+                                                        className="inline-flex items-center justify-center p-2 text-accent-red hover:bg-accent-red/10 border border-border-color/60 hover:border-accent-red/40 rounded-md transition-all"
+                                                    >
+                                                        <TrashIcon className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
-                                        <div className="col-span-1 flex justify-end">
-                                            {items.length > 1 && (
-                                                <button type="button" onClick={() => handleRemoveItem(index)} className="p-2 text-text-secondary hover:text-accent-red hover:bg-accent-red/10 rounded-lg transition-all hover:scale-110">
-                                                    <TrashIcon className="w-5 h-5" />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        <button type="button" onClick={handleAddItem} className="flex items-center gap-2 text-sm text-accent-blue font-semibold hover:bg-accent-blue/10 px-4 py-3 rounded-lg transition-all hover:scale-102 border border-accent-blue/30 hover:border-accent-blue/60">
-                            <PlusIcon className="w-5 h-5" /> Add Item
-                        </button>
-                        {error && (
-                            <div className="bg-accent-red/10 border border-accent-red/30 rounded-lg p-4 flex items-start gap-3">
-                                <svg className="w-5 h-5 text-accent-red flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                                </svg>
-                                <p className="text-sm text-accent-red font-medium">{error}</p>
+                                    );
+                                })}
                             </div>
-                        )}
+                            <button
+                                type="button"
+                                onClick={handleAddItem}
+                                className="flex items-center gap-2 text-sm text-accent-blue font-semibold hover:bg-accent-blue/10 px-4 py-2.5 rounded-md transition-all border border-accent-blue/30 hover:border-accent-blue/60 w-full sm:w-auto"
+                            >
+                                <PlusIcon className="w-5 h-5" /> Add Item
+                            </button>
+                            {error && (
+                                <div className="bg-accent-red/10 border border-accent-red/30 rounded-lg p-4 flex items-start gap-3">
+                                    <svg className="w-5 h-5 text-accent-red flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                    </svg>
+                                    <p className="text-sm text-accent-red font-medium">{error}</p>
+                                </div>
+                            )}
                         </div>
                     </div>
-                    <div className="p-5 bg-gradient-to-r from-bg-tertiary/50 to-bg-tertiary/30 border-t border-border-color flex justify-between items-center gap-4 rounded-b-2xl flex-shrink-0">
+                    <div className="p-3 bg-gradient-to-r from-bg-tertiary/50 to-bg-tertiary/30 border-t border-border-color flex justify-between items-center gap-3 rounded-b-xl flex-shrink-0">
                         <div className="flex items-baseline gap-2">
-                            <span className="text-sm font-medium text-text-secondary">Total Cost:</span>
-                            <span className="font-bold text-2xl text-accent-blue">
+                            <span className="text-sm font-medium text-text-secondary">Total:</span>
+                            <span className="font-bold text-xl text-accent-blue">
                                 {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(totalCost)}
                             </span>
                         </div>
-                        <div className="flex gap-3">
-                            <button type="button" onClick={onClose} className="px-6 py-2.5 rounded-lg font-semibold bg-bg-secondary hover:bg-hover-bg transition-all border border-border-color hover:border-text-secondary/30">Cancel</button>
-                            <button type="button" onClick={handleSaveClick} className="px-6 py-2.5 rounded-lg font-semibold bg-accent-blue text-white hover:bg-opacity-90 transition-all shadow-lg shadow-accent-blue/30 hover:shadow-accent-blue/50 hover:scale-105">Save Request</button>
+                        <div className="flex gap-2">
+                            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg font-semibold text-sm bg-bg-secondary hover:bg-hover-bg transition-all border border-border-color hover:border-text-secondary/30">Cancel</button>
+                            <button type="button" onClick={handleSaveClick} className="px-4 py-2 rounded-lg font-semibold text-sm bg-accent-blue text-white hover:bg-opacity-90 transition-all shadow-lg shadow-accent-blue/30 hover:shadow-accent-blue/50">
+                                {isEditMode ? 'Update Request' : 'Save Request'}
+                            </button>
                         </div>
                     </div>
                 </form>
@@ -357,3 +393,6 @@ const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ isOpen, onC
 };
 
 export default PurchaseRequestModal;
+
+
+

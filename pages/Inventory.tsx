@@ -253,7 +253,7 @@ const InventoryAndSuppliesView: React.FC<{ inventoryItems: InventoryItem[] }> = 
     const [activeActionMenu, setActiveActionMenu] = useState<number | null>(null);
 
     const actionMenuRef = useRef<HTMLDivElement>(null);
-    const departments = ['All', 'Kitchen', 'Bakery', 'Dining', 'Bar'];
+    const departments = ['All', 'Kitchen', 'Kitchen (Staff Meal)', 'Bakery', 'Dining', 'Bar'];
 
 
     useEffect(() => {

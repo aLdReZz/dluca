@@ -114,6 +114,16 @@ const DatePickerPopup: React.FC<{
 };
 
 
+const toISODate = (date: Date) => date.toISOString().split('T')[0];
+
+const getMondayDateString = (date: Date) => {
+    const utcDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    const day = utcDate.getUTCDay(); // 0 = Sunday, 1 = Monday
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    utcDate.setUTCDate(utcDate.getUTCDate() + diffToMonday);
+    return toISODate(utcDate);
+};
+
 const Attendance: React.FC<AttendanceProps> = ({
     employees = [],
     setEmployees,
@@ -255,7 +265,7 @@ const Attendance: React.FC<AttendanceProps> = ({
     const [isScheduleLocked, setIsScheduleLocked] = useState(true);
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
     const [isScheduleTotalHrsVisible, setScheduleTotalHrsVisible] = useState(false);
-    const [isAttendanceTotalHrsVisible, setAttendanceTotalHrsVisible] = useState(true);
+    const [isAttendanceTotalHrsVisible, setAttendanceTotalHrsVisible] = useState(false);
     const datePickerRef = useRef<HTMLDivElement>(null);
     const [editingScheduleContext, setEditingScheduleContext] = useState<{ emp: Employee, dateKey: string, date: Date } | null>(null);
     const [isAttendanceLocked, setIsAttendanceLocked] = useState(true);
@@ -266,14 +276,7 @@ const Attendance: React.FC<AttendanceProps> = ({
         return `${baseIdentifier}-${index}`;
     };
 
-    const [scheduleWeekStart, setScheduleWeekStart] = useState(() => {
-        const today = new Date();
-        const dayOfWeek = today.getDay();
-        const daysToMonday = dayOfWeek === 0 ? 1 : 1 - dayOfWeek;
-        const monday = new Date(today);
-        monday.setDate(today.getDate() + daysToMonday);
-        return monday.toISOString().split('T')[0];
-    });
+    const [scheduleWeekStart, setScheduleWeekStart] = useState(() => getMondayDateString(new Date()));
     const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
     const [draggedEmployee, setDraggedEmployee] = useState<number | null>(null);
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -350,7 +353,7 @@ const Attendance: React.FC<AttendanceProps> = ({
     }, [weekDates, employees]);
 
     const weeklyScheduleTotalHours = useMemo(() => {
-        return Object.values(dailyScheduleTotals).reduce((sum, hours) => {
+        return Object.values(dailyScheduleTotals).reduce((sum: number, hours: number) => {
             return sum + (Number.isFinite(hours) ? hours : 0);
         }, 0);
     }, [dailyScheduleTotals]);
@@ -375,18 +378,14 @@ const Attendance: React.FC<AttendanceProps> = ({
     }, [weekDates, attendanceRecordsByDate]);
 
     const weeklyAttendanceTotalHours = useMemo(() => {
-        return Object.values(dailyAttendanceTotals).reduce((sum, hours) => {
+        return Object.values(dailyAttendanceTotals).reduce((sum: number, hours: number) => {
             return sum + (Number.isFinite(hours) ? hours : 0);
         }, 0);
     }, [dailyAttendanceTotals]);
     
     const handleDateSelect = (dateStr: string) => {
         const selectedDate = new Date(dateStr + 'T00:00:00Z');
-        const dayOfWeek = selectedDate.getUTCDay(); // Sunday = 0, Monday = 1
-        const daysToMonday = dayOfWeek === 0 ? 1 : 1 - dayOfWeek;
-        const monday = new Date(selectedDate);
-        monday.setUTCDate(selectedDate.getUTCDate() + daysToMonday);
-        setScheduleWeekStart(monday.toISOString().split('T')[0]);
+        setScheduleWeekStart(getMondayDateString(selectedDate));
         setIsDatePickerOpen(false);
     };
 
@@ -473,9 +472,8 @@ const Attendance: React.FC<AttendanceProps> = ({
         setSlideDirection('left');
         const [year, month, day] = scheduleWeekStart.split('-').map(Number);
         const currentDate = new Date(Date.UTC(year, month - 1, day));
-        currentDate.setDate(currentDate.getDate() - 7);
-        const newDate = currentDate.toISOString().split('T')[0];
-        setScheduleWeekStart(newDate);
+        currentDate.setUTCDate(currentDate.getUTCDate() - 7);
+        setScheduleWeekStart(toISODate(currentDate));
         // Reset direction after animation
         setTimeout(() => setSlideDirection(null), 350);
     };
@@ -485,9 +483,8 @@ const Attendance: React.FC<AttendanceProps> = ({
         setSlideDirection('right');
         const [year, month, day] = scheduleWeekStart.split('-').map(Number);
         const currentDate = new Date(Date.UTC(year, month - 1, day));
-        currentDate.setDate(currentDate.getDate() + 7);
-        const newDate = currentDate.toISOString().split('T')[0];
-        setScheduleWeekStart(newDate);
+        currentDate.setUTCDate(currentDate.getUTCDate() + 7);
+        setScheduleWeekStart(toISODate(currentDate));
         // Reset direction after animation
         setTimeout(() => setSlideDirection(null), 350);
     };
@@ -1135,8 +1132,8 @@ const Attendance: React.FC<AttendanceProps> = ({
             <div>
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
                     <div>
-                        <h2 className="text-2xl font-bold text-text-primary">Weekly Schedule</h2>
-                        <p className="text-sm text-text-secondary mt-0.5">Manage employee work schedules</p>
+                        <h2 className="text-2xl font-bold text-text-primary">Schedule & Attendance</h2>
+                        <p className="text-sm text-text-secondary mt-0.5">View schedules and actual attendance together</p>
                     </div>
                      <div className="flex items-center gap-1.5 flex-wrap justify-start w-full sm:w-auto">
                         {/* Previous Week Button */}
@@ -1174,9 +1171,14 @@ const Attendance: React.FC<AttendanceProps> = ({
                         </button>
                         <label htmlFor="schedule-csv-input" className="cursor-pointer bg-bg-tertiary text-text-primary px-3 py-2 rounded-lg font-medium text-xs hover:bg-hover-bg transition flex items-center gap-1.5 border border-border-color">
                             <UploadIcon className="w-4 h-4"/>
-                            <span className="hidden sm:inline">Upload CSV</span>
+                            <span className="hidden sm:inline">Schedule CSV</span>
                         </label>
                         <input type="file" id="schedule-csv-input" accept=".csv" className="hidden" onChange={handleScheduleUpload} />
+                        <label htmlFor="attendance-csv-input" className="cursor-pointer bg-bg-tertiary text-text-primary px-3 py-2 rounded-lg font-medium text-xs hover:bg-hover-bg transition flex items-center gap-1.5 border border-border-color">
+                            <UploadIcon className="w-4 h-4"/>
+                            <span className="hidden sm:inline">Attendance CSV</span>
+                        </label>
+                        <input type="file" id="attendance-csv-input" accept=".csv" className="hidden" onChange={handleAttendanceUpload} />
                          {isScheduleLocked ? (
                             <button onClick={handleEditSchedules} className="bg-accent-orange text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-orange/30">
                                 <PencilSquareIcon className="w-4 h-4"/>
@@ -1186,6 +1188,17 @@ const Attendance: React.FC<AttendanceProps> = ({
                             <button onClick={handleSaveSchedules} className="bg-accent-green text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-green/30">
                                 <CheckIcon className="w-4 h-4" />
                                 Save Schedule
+                            </button>
+                        )}
+                        {isAttendanceLocked ? (
+                            <button onClick={() => setIsAttendanceLocked(false)} className="bg-accent-orange text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-orange/30">
+                                <PencilSquareIcon className="w-4 h-4"/>
+                                Edit Attendance
+                            </button>
+                        ) : (
+                            <button onClick={() => setIsAttendanceLocked(true)} className="bg-accent-green text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-green/30">
+                                <CheckIcon className="w-4 h-4" />
+                                Save Attendance
                             </button>
                         )}
                     </div>
@@ -1206,7 +1219,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                                         ))}
                                         <th className={`text-center text-xs font-bold text-text-secondary uppercase border-l border-border-color transition-all duration-300 ease-in-out ${isScheduleTotalHrsVisible ? 'w-24 px-2 py-2.5' : 'w-0 p-0'}`}>
                                             <div className={`whitespace-nowrap overflow-hidden tracking-wide ${isScheduleTotalHrsVisible ? 'opacity-100' : 'opacity-0'}`}>
-                                                Total
+                                                Total Hrs
                                             </div>
                                         </th>
                                     </tr>
@@ -1242,43 +1255,132 @@ const Attendance: React.FC<AttendanceProps> = ({
                                                     {weekDates.map(dateInfo => {
                                                         const currentDayKey = dateToKey(dateInfo.date);
                                                         const schedule = emp.schedule[currentDayKey];
+                                                        const record = attendanceRecords.find(r => r.employee.toLowerCase() === emp.name.toLowerCase() && r.date === currentDayKey);
                                                         const cellClasses = `text-center border-l border-border-color/50 ${dateInfo.isToday ? 'bg-accent-blue/5' : ''} ${dateInfo.isWeekend ? 'bg-bg-tertiary/10' : ''}`;
+                                                        const isFuture = dateInfo.date > todayUTC;
 
-                                                        const renderCellContent = () => {
+                                                        const renderCombinedContent = (editable: 'none' | 'schedule' | 'attendance' = 'none') => {
                                                             if (schedule?.off) {
-                                                                return <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-bg-tertiary/70 text-text-secondary font-bold text-[10px] uppercase">OFF</span>;
-                                                            }
-                                                            if (schedule?.timeIn && schedule?.timeOut) {
-                                                                return <span className="text-[10px] leading-tight">{`${formatTimeForDisplay(schedule.timeIn)} - ${formatTimeForDisplay(schedule.timeOut)}`}</span>;
-                                                            }
-                                                            return <span className="text-xs text-text-secondary/40">-</span>
-                                                        }
-
-                                                        if (isScheduleLocked) {
-                                                            return (
-                                                    <td key={`${emp.id}-${currentDayKey}`} className={`${cellClasses} p-0 align-middle`}>
-                                                                    <div className="flex items-center justify-center px-1 py-2 h-full">
-                                                                        {renderCellContent()}
+                                                                return (
+                                                                    <div className="flex flex-col items-center justify-center py-2">
+                                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-bg-tertiary/70 text-text-secondary font-bold text-xs uppercase">OFF</span>
                                                                     </div>
-                                                                </td>
-                                                            );
-                                                        }
+                                                                );
+                                                            }
 
-                                                        // Edit mode
+                                                            // Render schedule line
+                                                            const scheduleDisplay = schedule?.timeIn && schedule?.timeOut
+                                                                ? `${formatTimeForDisplay(schedule.timeIn)} - ${formatTimeForDisplay(schedule.timeOut)}`
+                                                                : '-';
+
+                                                            // Render attendance line
+                                                            let attendanceDisplay = '-';
+                                                            let attendanceColorClass = 'text-text-secondary/50';
+
+                                                            if (record?.timeIn) {
+                                                                const timeOutDisplay = record.timeOut ? ` - ${formatTime12Hour(record.timeOut)}` : '';
+                                                                attendanceDisplay = `${formatTime12Hour(record.timeIn)}${timeOutDisplay}`;
+
+                                                                // Color code based on punctuality
+                                                                if (record.timeIn && schedule?.timeIn) {
+                                                                    const scheduledMinutes = timeStringToMinutes(schedule.timeIn);
+                                                                    const actualMinutes = timeStringToMinutes(record.timeIn);
+                                                                    if (scheduledMinutes !== null && actualMinutes !== null) {
+                                                                        if (actualMinutes > scheduledMinutes) {
+                                                                            attendanceColorClass = 'text-accent-red';
+                                                                        } else {
+                                                                            attendanceColorClass = 'text-accent-green';
+                                                                        }
+                                                                    }
+                                                                }
+                                                            } else if (schedule?.timeIn && !isFuture) {
+                                                                // Highlight absences without adding an extra label
+                                                                attendanceColorClass = 'text-accent-red';
+                                                            }
+
+                                                            const attendanceTextClass =
+                                                                record?.timeIn || (schedule?.timeIn && !isFuture)
+                                                                    ? attendanceColorClass
+                                                                    : 'text-text-secondary/50';
+
+                                                            return (
+                                                                <div className="flex flex-col items-center justify-center py-2 gap-1">
+                                                                    <div className={`text-xs leading-tight font-semibold ${attendanceTextClass}`}>
+                                                                        {attendanceDisplay}
+                                                                    </div>
+                                                                    <div className={`text-xs leading-tight font-medium ${editable === 'schedule' ? 'text-text-primary' : 'text-text-secondary/80'}`}>
+                                                                        {scheduleDisplay}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        };
+
+                                                        const isEditing = !isScheduleLocked || !isAttendanceLocked;
+                                                        const highlightMode: 'none' | 'schedule' | 'attendance' =
+                                                            !isScheduleLocked && isAttendanceLocked
+                                                                ? 'schedule'
+                                                                : isScheduleLocked && !isAttendanceLocked
+                                                                    ? 'attendance'
+                                                                    : 'none';
+
                                                         return (
-                                                    <td key={`${emp.id}-${currentDayKey}`} className={`${cellClasses} p-1 align-middle`}>
-                                                                <button
-                                                                    onClick={() => handleOpenScheduleModal(emp, currentDayKey, dateInfo.date)}
-                                                                    className="w-full h-full text-center bg-bg-primary/50 border border-border-color/50 rounded-md hover:bg-hover-bg/50 hover:border-accent-blue/30 transition-all px-1 py-1.5 flex items-center justify-center"
-                                                                >
-                                                                    {renderCellContent()}
-                                                                </button>
+                                                            <td
+                                                                key={`${emp.id}-${currentDayKey}`}
+                                                                className={`${cellClasses} ${isEditing ? 'p-1' : 'p-0'} align-middle`}
+                                                            >
+                                                                <div className={`flex flex-col items-center justify-center h-full ${isEditing ? 'gap-1 px-1 py-1' : 'px-1 py-1'}`}>
+                                                                    {renderCombinedContent(highlightMode)}
+                                                                    {isEditing && (
+                                                                        <div className="flex flex-col gap-0.5 w-full">
+                                                                            {!isScheduleLocked && (
+                                                                                <button
+                                                                                    onClick={() => handleOpenScheduleModal(emp, currentDayKey, dateInfo.date)}
+                                                                                    className="w-full text-center bg-accent-orange/10 border border-accent-orange/30 rounded-md hover:bg-accent-orange/20 transition-all px-1 py-0.5 text-[9px] text-accent-orange"
+                                                                                >
+                                                                                    Edit Schedule
+                                                                                </button>
+                                                                            )}
+                                                                            {!isAttendanceLocked && (
+                                                                                <button
+                                                                                    onClick={() => handleOpenAttendanceModal(emp, currentDayKey, dateInfo.date)}
+                                                                                    className="w-full text-center bg-accent-blue/10 border border-accent-blue/30 rounded-md hover:bg-accent-blue/20 transition-all px-1 py-0.5 text-[9px] text-accent-blue"
+                                                                                >
+                                                                                    Edit Attendance
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
                                                             </td>
                                                         );
                                                     })}
-                                                    <td className={`text-center text-xs font-bold text-accent-blue border-l border-border-color/50 transition-all duration-300 ${isScheduleTotalHrsVisible ? 'px-2 py-2.5' : 'p-0 w-0'}`}>
+                                                    <td className={`text-center text-xs font-bold border-l border-border-color/50 transition-all duration-300 ${isScheduleTotalHrsVisible ? 'px-2 py-2.5' : 'p-0 w-0'}`}>
                                                         <div className={`transition-opacity duration-150 whitespace-nowrap overflow-hidden ${isScheduleTotalHrsVisible ? 'opacity-100' : 'opacity-0'}`}>
-                                                            {totalScheduledHours > 0 ? `${totalScheduledHours.toFixed(1)}h` : '-'}
+                                                            {(() => {
+                                                                const totalAttendedHours = weekDates.reduce((total, dateInfo) => {
+                                                                    const currentDayKey = dateToKey(dateInfo.date);
+                                                                    const record = attendanceRecords.find((r: AttendanceRecord) => r.employee.toLowerCase() === emp.name.toLowerCase() && r.date === currentDayKey);
+                                                                    if (record && record.timeIn && record.timeOut) {
+                                                                        const timeInMinutes = timeStringToMinutes(record.timeIn);
+                                                                        const timeOutMinutes = timeStringToMinutes(record.timeOut);
+                                                                        if (timeInMinutes !== null && timeOutMinutes !== null) {
+                                                                            total += (timeOutMinutes - timeInMinutes);
+                                                                        }
+                                                                    }
+                                                                    return total;
+                                                                }, 0) / 60;
+
+                                                                return (
+                                                                    <div className="flex flex-col items-center gap-1">
+                                                                        <div className="text-xs text-text-secondary/60">
+                                                                            {totalScheduledHours > 0 ? `${totalScheduledHours.toFixed(1)}h` : '-'}
+                                                                        </div>
+                                                                        <div className="text-xs font-bold text-accent-blue">
+                                                                            {totalAttendedHours > 0 ? `${totalAttendedHours.toFixed(1)}h` : '-'}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -1413,271 +1515,6 @@ const Attendance: React.FC<AttendanceProps> = ({
                 </div>
             </div>
 
-            <div>
-                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
-                    <div>
-                        <h2 className="text-2xl font-bold text-text-primary">Weekly Attendance</h2>
-                        <p className="text-sm text-text-secondary mt-0.5">Track actual employee attendance</p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap justify-start sm:justify-end w-full sm:w-auto">
-                        <label htmlFor="attendance-csv-input" className="cursor-pointer bg-bg-tertiary text-text-primary px-3 py-2 rounded-lg font-medium text-xs hover:bg-hover-bg transition flex items-center gap-1.5 border border-border-color">
-                            <UploadIcon className="w-4 h-4"/>
-                            <span className="hidden sm:inline">Upload</span>
-                        </label>
-                        <input type="file" id="attendance-csv-input" accept=".csv" className="hidden" onChange={handleAttendanceUpload} />
-                         {isAttendanceLocked ? (
-                            <button onClick={() => setIsAttendanceLocked(false)} className="bg-accent-orange text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-orange/30">
-                                <PencilSquareIcon className="w-4 h-4"/>
-                                Edit
-                            </button>
-                        ) : (
-                            <button onClick={() => setIsAttendanceLocked(true)} className="bg-accent-green text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-green/30">
-                                <CheckIcon className="w-4 h-4" />
-                                Save
-                            </button>
-                        )}
-                    </div>
-                </div>
-                 <div className="relative">
-                    <div className={`bg-bg-secondary rounded-xl border overflow-hidden transition-all duration-300 ${!isAttendanceLocked ? 'border-accent-blue ring-2 ring-accent-blue/30' : 'border-border-color'}`}>
-                        {/* Desktop Table View */}
-                        <div className="overflow-x-auto hidden lg:block">
-                            <table className="w-full border-collapse table-fixed">
-                                <thead>
-                                    <tr className="bg-gradient-to-r from-bg-tertiary/50 to-bg-tertiary/30">
-                                        <th className="px-3 py-2.5 text-left text-xs font-bold text-text-secondary sticky left-0 bg-gradient-to-r from-bg-tertiary/50 to-bg-tertiary/30 z-10 w-32 uppercase tracking-wide">Employee</th>
-                                        {weekDates.map(dateInfo => (
-                                            <th key={dateInfo.key} className={`px-2 py-2.5 text-center text-[10px] font-bold uppercase tracking-wider border-l border-border-color transition-colors ${dateInfo.isToday ? 'bg-accent-blue/10 text-accent-blue' : 'text-text-secondary'} ${dateInfo.isWeekend ? 'bg-bg-tertiary/40' : ''}`}>
-                                                {dateInfo.date.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }).toUpperCase()}
-                                                <div className="font-medium text-[9px] mt-0.5">{dateInfo.date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', timeZone: 'UTC' })}</div>
-                                            </th>
-                                        ))}
-                                        <th className={`text-center text-xs font-bold text-text-secondary uppercase border-l border-border-color transition-all duration-300 ease-in-out ${isAttendanceTotalHrsVisible ? 'w-24 px-2 py-2.5' : 'w-0 p-0'}`}>
-                                            <div className={`whitespace-nowrap overflow-hidden tracking-wide ${isAttendanceTotalHrsVisible ? 'opacity-100' : 'opacity-0'}`}>
-                                                Total
-                                            </div>
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border-color">
-                                   {employees.length > 0 ? (
-                                       employees.map((emp, empIndex) => {
-                                            const employeeKey = getEmployeeListKey(emp, empIndex);
-                                            const totalAttendedHours = weekDates.reduce((total, dateInfo) => {
-                                                const currentDayKey = dateToKey(dateInfo.date);
-                                                const record = attendanceRecords.find(r => r.employee.toLowerCase() === emp.name.toLowerCase() && r.date === currentDayKey);
-                                                if (record && record.timeIn && record.timeOut) {
-                                                    const timeInMinutes = timeStringToMinutes(record.timeIn);
-                                                    const timeOutMinutes = timeStringToMinutes(record.timeOut);
-                                                    if (timeInMinutes !== null && timeOutMinutes !== null) {
-                                                        total += (timeOutMinutes - timeInMinutes);
-                                                    }
-                                                }
-                                                return total;
-                                            }, 0) / 60;
-
-                                            return (
-                                                <tr key={employeeKey} className="group/row hover:bg-hover-bg/30 transition-colors border-b border-border-color/50">
-                                                    <td className="px-3 py-2.5 font-semibold text-sm sticky left-0 bg-bg-secondary group-hover/row:bg-hover-bg/30 z-10 w-32">{emp.name}</td>
-                                                    {weekDates.map(dateInfo => {
-                                                        const currentDayKey = dateToKey(dateInfo.date);
-                                                        const record = attendanceRecords.find(r => r.employee.toLowerCase() === emp.name.toLowerCase() && r.date === currentDayKey);
-                                                        const schedule = emp.schedule[currentDayKey];
-                                                        const cellClasses = `text-center border-l border-border-color/50 transition-colors ${dateInfo.isToday ? 'bg-accent-blue/5' : ''} ${dateInfo.isWeekend ? 'bg-bg-tertiary/10' : ''}`;
-
-                                                        let cellContent;
-                                                        const isFuture = dateInfo.date > todayUTC;
-
-                                                        if (schedule?.off) {
-                                                            cellContent = <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-bg-tertiary/70 text-text-secondary font-bold text-[10px] uppercase">OFF</span>;
-                                                        } else if (record?.timeIn) {
-                                                            let textColorClass = '';
-                                                            if (record.timeIn && schedule?.timeIn) {
-                                                                const scheduledMinutes = timeStringToMinutes(schedule.timeIn);
-                                                                const actualMinutes = timeStringToMinutes(record.timeIn);
-                                                                if (scheduledMinutes !== null && actualMinutes !== null) {
-                                                                    textColorClass = actualMinutes > scheduledMinutes ? 'text-accent-red' : 'text-accent-green';
-                                                                }
-                                                            }
-                                                            const timeOutDisplay = record.timeOut ? ` - ${formatTime12Hour(record.timeOut)}` : '';
-                                                            cellContent = <span className={`text-[10px] leading-tight font-medium ${textColorClass}`}>{`${formatTime12Hour(record.timeIn)}${timeOutDisplay}`}</span>;
-                                                        } else if (schedule?.timeIn) {
-                                                            if (isFuture) {
-                                                                cellContent = <span className="text-xs text-text-secondary/40">-</span>;
-                                                            } else {
-                                                                cellContent = <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-accent-red/10 text-accent-red font-bold text-[10px] uppercase">Absent</span>;
-                                                            }
-                                                        } else {
-                                                            cellContent = <span className="text-xs text-text-secondary/40">-</span>;
-                                                        }
-
-                                                        if (isAttendanceLocked) {
-                                                            return (
-                                                            <td key={`${emp.id}-${currentDayKey}`} className={`${cellClasses} p-0 align-middle`}>
-                                                                    <div className="flex items-center justify-center px-1 py-2 h-full">
-                                                                        {cellContent}
-                                                                    </div>
-                                                                </td>
-                                                            );
-                                                        }
-
-                                                        return (
-                                                            <td key={`${emp.id}-${currentDayKey}`} className={`${cellClasses} p-1 align-middle`}>
-                                                                <button onClick={() => handleOpenAttendanceModal(emp, currentDayKey, dateInfo.date)} className="w-full h-full text-center bg-bg-primary/50 border border-border-color/50 rounded-md hover:bg-hover-bg/50 hover:border-accent-blue/30 transition-all px-1 py-1.5 flex items-center justify-center">
-                                                                    {cellContent}
-                                                                </button>
-                                                            </td>
-                                                        );
-                                                    })}
-                                                    <td className={`text-center text-xs font-bold text-accent-blue border-l border-border-color/50 transition-all duration-300 ${isAttendanceTotalHrsVisible ? 'px-2 py-2.5' : 'p-0 w-0'}`}>
-                                                        <div className={`transition-opacity duration-150 whitespace-nowrap overflow-hidden ${isAttendanceTotalHrsVisible ? 'opacity-100' : 'opacity-0'}`}>
-                                                            {totalAttendedHours > 0 ? `${totalAttendedHours.toFixed(1)}h` : '-'}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )
-                                        })
-                                   ) : (
-                                    <tr>
-                                        <td colSpan={9} className="text-center p-16 text-text-secondary">
-                                            No attendance data. Upload an attendance CSV to see results.
-                                        </td>
-                                    </tr>
-                                   )}
-                                </tbody>
-                                <tfoot>
-                                    <tr className="bg-gradient-to-r from-bg-tertiary/40 to-bg-tertiary/20 border-t-2 border-border-color">
-                                        <td className="px-3 py-2.5 font-bold text-xs uppercase text-text-secondary sticky left-0 bg-gradient-to-r from-bg-tertiary/40 to-bg-tertiary/20 z-10 tracking-wide">
-                                            Total
-                                        </td>
-                                        {weekDates.map(dateInfo => {
-                                            const totalHours = dailyAttendanceTotals[dateToKey(dateInfo.date)];
-                                            return (
-                                                <td
-                                                    key={`attendance-total-${dateInfo.key}`}
-                                                    className="px-2 py-2.5 text-center text-[10px] font-bold text-text-primary border-l border-border-color/50"
-                                                >
-                                                    {totalHours && totalHours > 0 ? `${totalHours.toFixed(1)}h` : '-'}
-                                                </td>
-                                            );
-                                        })}
-                                        <td
-                                            className={`text-center text-xs font-bold text-accent-blue border-l border-border-color/50 transition-all duration-300 ${
-                                                isAttendanceTotalHrsVisible ? 'px-2 py-2.5' : 'p-0 w-0'
-                                            }`}
-                                        >
-                                            <div
-                                                className={`whitespace-nowrap overflow-hidden ${
-                                                    isAttendanceTotalHrsVisible ? 'opacity-100' : 'opacity-0'
-                                                }`}
-                                            >
-                                                {weeklyAttendanceTotalHours > 0 ? `${weeklyAttendanceTotalHours.toFixed(1)}h` : '-'}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                         {/* Mobile/Tablet Card View */}
-                        <div className="block lg:hidden p-4 space-y-4">
-                            {employees.length > 0 ? (
-                                employees.map((emp, empIndex) => {
-                                    const employeeKey = getEmployeeListKey(emp, empIndex);
-                                    const totalAttendedHours = weekDates.reduce((total, dateInfo) => {
-                                        const currentDayKey = dateToKey(dateInfo.date);
-                                        const record = attendanceRecords.find(r => r.employee.toLowerCase() === emp.name.toLowerCase() && r.date === currentDayKey);
-                                        if (record && record.timeIn && record.timeOut) {
-                                            const timeInMinutes = timeStringToMinutes(record.timeIn);
-                                            const timeOutMinutes = timeStringToMinutes(record.timeOut);
-                                            if (timeInMinutes !== null && timeOutMinutes !== null) {
-                                                total += (timeOutMinutes - timeInMinutes);
-                                            }
-                                        }
-                                        return total;
-                                    }, 0) / 60;
-                                    return (
-                                        <div key={employeeKey} className="bg-bg-tertiary/60 p-4 rounded-lg">
-                                            <div className="flex justify-between items-start">
-                                                <h3 className="font-semibold text-text-primary">{emp.name}</h3>
-                                                {totalAttendedHours > 0 &&
-                                                    <div className="text-right">
-                                                        <p className="text-sm font-medium text-text-primary">{totalAttendedHours.toFixed(2)} hrs</p>
-                                                        <p className="text-xs text-text-secondary">Attended</p>
-                                                    </div>
-                                                }
-                                            </div>
-                                            <div className="mt-3 space-y-1">
-                                                {weekDates.map(dateInfo => {
-                                                    const currentDayKey = dateToKey(dateInfo.date);
-                                                    const record = attendanceRecords.find(r => r.employee.toLowerCase() === emp.name.toLowerCase() && r.date === currentDayKey);
-                                                    const schedule = emp.schedule[currentDayKey];
-                                                    const dayClasses = `flex justify-between items-center p-2 rounded-md transition-colors ${dateInfo.isToday ? 'bg-border-color/20' : ''} ${dateInfo.isWeekend ? 'bg-black/10' : ''}`;
-                                                    
-                                                    let cellContent;
-                                                    const isFuture = dateInfo.date > todayUTC;
-
-                                                    if (schedule?.off) {
-                                                        cellContent = <span className="bg-bg-tertiary text-text-secondary font-semibold text-xs uppercase px-3 py-1 rounded-md">OFF</span>;
-                                                    } else if (record?.timeIn) {
-                                                        let textColorClass = '';
-                                                        if (record.timeIn && schedule?.timeIn) {
-                                                            const scheduledMinutes = timeStringToMinutes(schedule.timeIn);
-                                                            const actualMinutes = timeStringToMinutes(record.timeIn);
-                                                            if (scheduledMinutes !== null && actualMinutes !== null) {
-                                                                textColorClass = actualMinutes > scheduledMinutes ? 'text-accent-red' : 'text-accent-green';
-                                                            }
-                                                        }
-                                                        const timeOutDisplay = record.timeOut ? ` - ${formatTime12Hour(record.timeOut)}` : '';
-                                                        cellContent = <span className={`text-xs ${textColorClass}`}>{`${formatTime12Hour(record.timeIn)}${timeOutDisplay}`}</span>;
-                                                    } else if (schedule?.timeIn) {
-                                                        if (isFuture) {
-                                                            cellContent = <span className="text-sm text-text-secondary/60">Not Set</span>;
-                                                        } else {
-                                                            cellContent = <StatusTag text="Absent" type="absent" />;
-                                                        }
-                                                    } else {
-                                                        cellContent = <span className="text-sm text-text-secondary/60">Not Set</span>;
-                                                    }
-                                                    
-                                                    const attendanceContent = isAttendanceLocked ? (
-                                                        cellContent
-                                                    ) : (
-                                                        <button onClick={() => handleOpenAttendanceModal(emp, currentDayKey, dateInfo.date)} className="w-48 text-right p-1 -m-1 bg-bg-primary/50 border border-border-color rounded-md flex justify-end items-center">
-                                                            {cellContent}
-                                                        </button>
-                                                    );
-
-
-                                                    return (
-                                                <div key={`${emp.id}-${currentDayKey}`} className={dayClasses}>
-                                                            <div className={`text-sm font-medium ${dateInfo.isToday ? 'text-text-primary' : 'text-text-secondary'}`}>
-                                                                {dateInfo.date.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })}
-                                                                <span className="ml-2 text-text-secondary/70">{dateInfo.date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', timeZone: 'UTC' })}</span>
-                                                            </div>
-                                                            <div>{attendanceContent}</div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    );
-                                })
-                            ) : (
-                                <div className="text-center p-16 text-text-secondary">
-                                    No attendance data. Upload an attendance CSV to see results.
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                     <button 
-                        onClick={() => setAttendanceTotalHrsVisible(!isAttendanceTotalHrsVisible)}
-                        className="hidden lg:flex absolute top-1/2 -right-3 -translate-y-1/2 z-20 bg-bg-tertiary w-7 h-7 rounded-full items-center justify-center border border-border-color hover:bg-hover-bg transition"
-                        title={isAttendanceTotalHrsVisible ? 'Collapse Total Hours column' : 'Expand Total Hours column'}
-                    >
-                        {isAttendanceTotalHrsVisible ? <ChevronRightIcon className="w-4 h-4" /> : <ChevronLeftIcon className="w-4 h-4" />}
-                    </button>
-                </div>
-            </div>
 
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50">

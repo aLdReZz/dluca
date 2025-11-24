@@ -16,7 +16,9 @@
       "Bash(git rm:*)",
       "Bash(nul)",
       "Bash(del nul 2)",
-      "Bash(.gitignore)"
+      "Bash(.gitignore)",
+      "Bash(git push)",
+      "Bash(npm run dev:web:*)"
     ],
     "deny": [],
     "ask": []
