@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, DependencyList } from 'react';
 import { isFirebaseConfigured } from '../utils/firebase';
 
 /**
@@ -7,7 +7,7 @@ import { isFirebaseConfigured } from '../utils/firebase';
  */
 export function useFirebaseData<T>(
     fetchFn: () => Promise<T>,
-    dependencies?: React.DependencyList
+    dependencies?: DependencyList
 ) {
     const [data, setData] = useState<T | null>(null);
     const [loading, setLoading] = useState(true);

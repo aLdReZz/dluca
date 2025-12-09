@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Icon Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin: 10px 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        .instructions {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>PWA Icon Generator for D'Luca</h1>
+
+    <div class="instructions">
+        <h3>Instructions:</h3>
+        <ol>
+            <li>This will generate icons from your favicon.png file</li>
+            <li>Click "Generate All Icons" button below</li>
+            <li>Download each icon by clicking on them</li>
+            <li>Save them in the <code>public/icons/</code> folder with their respective names</li>
+        </ol>
+    </div>
+
+    <input type="file" id="imageInput" accept="image/*">
+    <button onclick="generateIcons()">Generate All Icons</button>
+
+    <div id="canvasContainer"></div>
+
+    <script>
+        const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
+
+        document.getElementById('imageInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(event) {
+                window.sourceImage = new Image();
+                window.sourceImage.onload = function() {
+                    console.log('Image loaded successfully');
+                };
+                window.sourceImage.src = event.target.result;
+            };
+
+            reader.readAsDataURL(file);
+        });
+
+        function generateIcons() {
+            if (!window.sourceImage) {
+                alert('Please select an image first!');
+                return;
+            }
+
+            const container = document.getElementById('canvasContainer');
+            container.innerHTML = '';
+
+            sizes.forEach(size => {
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+
+                // Draw white background
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, size, size);
+
+                // Draw the image
+                ctx.drawImage(window.sourceImage, 0, 0, size, size);
+
+                const wrapper = document.createElement('div');
+                wrapper.style.marginBottom = '20px';
+
+                const label = document.createElement('p');
+                label.textContent = `icon-${size}x${size}.png`;
+                label.style.fontWeight = 'bold';
+
+                wrapper.appendChild(label);
+                wrapper.appendChild(canvas);
+
+                const downloadBtn = document.createElement('button');
+                downloadBtn.textContent = `Download ${size}x${size}`;
+                downloadBtn.onclick = function() {
+                    canvas.toBlob(function(blob) {
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `icon-${size}x${size}.png`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    });
+                };
+
+                wrapper.appendChild(downloadBtn);
+                container.appendChild(wrapper);
+            });
+        }
+    </script>
+</body>
+</html>

@@ -168,8 +168,8 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
 
         const currentDeductions = employee.salaryDeductions || [];
         const newDeduction: SalaryDeduction = {
-            id: Date.now(),
-            reason: newDeductionReason.trim(),
+            id: Date.now().toString(),
+            description: newDeductionReason.trim(),
             amount: amount,
             date: new Date().toISOString().split('T')[0],
         };
@@ -318,7 +318,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
     }, [salesData, committedRange]);
 
     const serviceChargeTotal = useMemo(
-        () => Object.values(serviceChargesByDate).reduce((sum, amount) => sum + amount, 0),
+        () => Object.values(serviceChargesByDate).reduce((sum, amount) => (sum as number) + (amount as number), 0),
         [serviceChargesByDate],
     );
 

@@ -476,7 +476,7 @@ export const inventoryService = {
 
 export const productInventoryService = {
     // Add product
-    async add(item: ProductInventoryItem): Promise<string> {
+    async add(item: Omit<ProductInventoryItem, 'id'>): Promise<string> {
         return withFirebaseCheck(
             async () => {
                 const docRef = await addDoc(collection(db, 'productInventory'), {
@@ -582,7 +582,7 @@ export const purchaseOrderService = {
 
 export const recipesService = {
     // Add recipe
-    async add(recipe: RecipeCosting): Promise<string> {
+    async add(recipe: Omit<RecipeCosting, 'id'>): Promise<string> {
         return withFirebaseCheck(
             async () => {
                 const docRef = await addDoc(collection(db, 'recipes'), {
@@ -634,11 +634,12 @@ export const recipesService = {
 
 export const calendarService = {
     // Add event
-    async add(event: CalendarEvent): Promise<string> {
+    async add(event: Omit<CalendarEvent, 'id' | 'created'>): Promise<string> {
         return withFirebaseCheck(
             async () => {
                 const docRef = await addDoc(collection(db, 'calendarEvents'), {
                     ...event,
+                    created: new Date().toISOString(),
                     createdAt: new Date(),
                 });
                 return docRef.id;

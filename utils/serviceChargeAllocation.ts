@@ -6,6 +6,8 @@ const GHOST_EMPLOYEE_MINUTES = 12 * 60;
 const DAILY_GHOST_MINUTES = GHOST_EMPLOYEE_COUNT * GHOST_EMPLOYEE_MINUTES;
 const SERVICE_CHARGE_DEDUCTION_RATE = 0.6;
 const SERVICE_CHARGE_PAYOUT_RATE = 1 - SERVICE_CHARGE_DEDUCTION_RATE;
+const BREAK_THRESHOLD_MINUTES = 6 * 60; // 6 hours in minutes
+const DEDUCTED_BREAK_MINUTES = 60; // 1 hour break deduction
 
 const timeStringToMinutes = (timeStr?: string): number | null => {
     if (!timeStr) return null;

@@ -28,7 +28,7 @@ export interface ProductInventoryItem {
     name: string;
     brand: string;
     unit: string;
-    quantity: number;
+    quantity?: number;
     price: number;
     supplier: string;
 }
@@ -55,6 +55,13 @@ export interface Schedule {
     off: boolean;
 }
 
+export interface SalaryDeduction {
+    id: string;
+    description: string;
+    amount: number;
+    date: string;
+}
+
 export interface Employee {
     id: number;
     name: string;
@@ -69,6 +76,7 @@ export interface Employee {
     approvedOvertime?: { [dateKey: string]: number }; // in minutes
     paidHoursOverride?: { [dateKey: string]: number };
     order?: number; // Position in the employee list
+    salaryDeductions?: SalaryDeduction[];
 }
 
 export interface AttendanceRecord {

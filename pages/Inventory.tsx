@@ -655,7 +655,7 @@ const Inventory: React.FC<InventoryProps> = ({ inventoryItems: propInventoryItem
         });
         
         if (Object.keys(productsToUpdate).length > 0 || productsToAdd.length > 0) {
-            setProductInventoryItems(prevItems => {
+            setPropProductInventoryItems?.(prevItems => {
                 let maxId = prevItems.reduce((max, item) => Math.max(item.id, max), 0);
                 
                 const updatedItems = prevItems.map(item => 
