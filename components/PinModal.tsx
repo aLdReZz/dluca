@@ -115,7 +115,7 @@ const PinModal: React.FC<PinModalProps> = ({ onClose, onVerify, onSuccess }) => 
                         <div key={index} className="relative w-14 h-14">
                             <input
                                 ref={(el) => { inputsRef.current[index] = el; }}
-                                type="password"
+                                type="tel"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
                                 maxLength={1}
@@ -124,7 +124,7 @@ const PinModal: React.FC<PinModalProps> = ({ onClose, onVerify, onSuccess }) => 
                                 onBlur={() => setActiveField(null)}
                                 onChange={(e) => handleInputChange(e, index)}
                                 onKeyDown={(e) => handleKeyDown(e, index)}
-                                style={{ caretColor: 'transparent' }}
+                                style={{ caretColor: 'transparent', WebkitTextSecurity: 'disc' }}
                                 className={`w-full h-full text-2xl text-center bg-white/12 border border-white/18 text-text-primary rounded-xl transition-all duration-300 focus:outline-none focus:border-accent-blue focus:ring-2 focus:ring-accent-blue/40 backdrop-blur-lg shadow-inner shadow-black/35 ${error ? 'border-accent-red/70 animate-shake' : ''} ${success ? 'border-accent-green/70 ring-2 ring-accent-green/30' : ''}`}
                                 disabled={isCompleting}
                             />
