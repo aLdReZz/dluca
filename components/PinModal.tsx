@@ -116,6 +116,8 @@ const PinModal: React.FC<PinModalProps> = ({ onClose, onVerify, onSuccess }) => 
                             <input
                                 ref={(el) => { inputsRef.current[index] = el; }}
                                 type="password"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 maxLength={1}
                                 value={digit}
                                 onFocus={() => setActiveField(index)}
