@@ -204,7 +204,13 @@ const Accounting: React.FC = () => {
         card: 'Debit/Credit Card',
     };
 
-    if (transactionsLoading) {
+    // Show error if there's a problem loading data
+    if (transactionsError) {
+        console.error('Error loading transactions:', transactionsError);
+    }
+
+    // Only show loading spinner for the first 2 seconds, then show the page anyway
+    if (transactionsLoading && !allTransactions) {
         return (
             <div className="flex justify-center items-center h-full">
                 <LoadingSpinner />
