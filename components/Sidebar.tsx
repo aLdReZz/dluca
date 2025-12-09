@@ -14,6 +14,7 @@ import {
     ShoppingCartIcon,
     ShieldCheckIcon,
     UserIcon,
+    BookOpenIcon,
 } from './Icons';
 
 const InventoryBoxIcon: React.FC<{ className?: string }> = ({ className = '' }) => (
@@ -47,6 +48,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, currentPage, onNavigate, isOpen
         { id: 'sales', label: 'Sales Tracking', icon: ChartBarIcon, roles: ['admin', 'staff'] },
         { id: 'inventory-dropdown', label: 'Inventory', icon: CubeIcon, roles: ['admin', 'staff'], isDropdown: true },
         { id: 'costing', label: 'Costing Analysis', icon: CalculatorIcon, roles: ['admin'] },
+        { id: 'accounting', label: 'Accounting', icon: BookOpenIcon, roles: ['admin'] },
     ];
     const staffManagementItems = [
         { id: 'attendance', label: 'Attendance', icon: ClockIcon, roles: ['admin', 'staff'] },

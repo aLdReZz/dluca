@@ -2,7 +2,7 @@ import React from 'react';
 
 export type Role = 'admin' | 'staff';
 
-export type Page = 'dashboard' | 'sales' | 'pricelist' | 'inventory-supplies' | 'purchase-request' | 'costing' | 'attendance' | 'payroll' | 'calendar';
+export type Page = 'dashboard' | 'sales' | 'pricelist' | 'inventory-supplies' | 'purchase-request' | 'costing' | 'accounting' | 'attendance' | 'payroll' | 'calendar';
 
 export interface SalesData {
     [key: string]: string;
@@ -173,4 +173,25 @@ export interface CalendarEvent {
     status: ContentStatus;
     created: string;
     updated?: string;
+}
+
+export interface AccountingTransaction {
+    id: string;
+    date: string;
+    type: 'debit' | 'credit' | 'transfer';
+    account: 'cash' | 'gcash' | 'grab' | 'card';
+    description: string;
+    amount: number;
+    reference?: string;
+    notes?: string;
+    transferTo?: string;
+    runningBalance: number;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+export interface AccountBalance {
+    account: 'cash' | 'gcash' | 'grab' | 'card';
+    openingBalance: number;
+    currentBalance: number;
 }

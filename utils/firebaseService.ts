@@ -7,6 +7,7 @@ import {
     getDocs,
     query,
     where,
+    orderBy,
     QueryConstraint,
     writeBatch,
     setDoc,
@@ -15,7 +16,7 @@ import {
     DocumentData,
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './firebase';
-import type { Employee, AttendanceRecord, PayrollRecord, SalesData, InventoryItem, ProductInventoryItem, PurchaseOrder, RecipeCosting, CalendarEvent } from '../types';
+import type { Employee, AttendanceRecord, PayrollRecord, SalesData, InventoryItem, ProductInventoryItem, PurchaseOrder, RecipeCosting, CalendarEvent, AccountingTransaction, AccountBalance } from '../types';
 
 const FIRESTORE_BATCH_LIMIT = 450;
 
@@ -838,4 +839,105 @@ export const dashboardPreferencesService = {
             () => null // Fallback to null if Firebase not available
         );
     }
+};
+
+export const accountingService = {
+    // Account balances management
+    async getAccountBalance(account: string): Promise<AccountBalance | null> {
+        return withFirebaseCheck(
+            async () => {
+                const docRef = doc(db, 'accountBalances', account);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    return { ...docSnap.data(), account } as AccountBalance;
+                }
+                return null;
+            },
+            () => null
+        );
+    },
+
+    async setAccountBalance(account: string, openingBalance: number): Promise<void> {
+        return withFirebaseCheck(
+            async () => {
+                const docRef = doc(db, 'accountBalances', account);
+                await setDoc(docRef, {
+                    account,
+                    openingBalance,
+                    currentBalance: openingBalance,
+                    updatedAt: new Date().toISOString(),
+                });
+            }
+        );
+    },
+
+    // Get all transactions
+    async getAll(): Promise<(AccountingTransaction & { id: string })[]> {
+        return withFirebaseCheck(
+            async () => {
+                const snapshot = await getDocs(
+                    query(collection(db, 'accountingTransactions'), orderBy('date', 'desc'))
+                );
+                return snapshot.docs.map(doc => ({
+                    ...doc.data(),
+                    id: doc.id,
+                })) as (AccountingTransaction & { id: string })[];
+            },
+            () => []
+        );
+    },
+
+    // Get transactions by date range
+    async getByDateRange(startDate: string, endDate: string): Promise<(AccountingTransaction & { id: string })[]> {
+        return withFirebaseCheck(
+            async () => {
+                const q = query(
+                    collection(db, 'accountingTransactions'),
+                    where('date', '>=', startDate),
+                    where('date', '<=', endDate),
+                    orderBy('date', 'desc')
+                );
+                const snapshot = await getDocs(q);
+                return snapshot.docs.map(doc => ({
+                    ...doc.data(),
+                    id: doc.id,
+                })) as (AccountingTransaction & { id: string })[];
+            },
+            () => []
+        );
+    },
+
+    // Add transaction
+    async add(transaction: Omit<AccountingTransaction, 'id'>): Promise<string> {
+        return withFirebaseCheck(
+            async () => {
+                const docRef = await addDoc(collection(db, 'accountingTransactions'), {
+                    ...transaction,
+                    createdAt: new Date().toISOString(),
+                });
+                return docRef.id;
+            }
+        );
+    },
+
+    // Update transaction
+    async update(id: string, data: Partial<AccountingTransaction>): Promise<void> {
+        return withFirebaseCheck(
+            async () => {
+                await updateDoc(doc(db, 'accountingTransactions', id), {
+                    ...data,
+                    updatedAt: new Date().toISOString(),
+                });
+            }
+        );
+    },
+
+    // Delete transaction
+    async delete(id: string): Promise<void> {
+        return withFirebaseCheck(
+            async () => {
+                await deleteDoc(doc(db, 'accountingTransactions', id));
+            }
+        );
+    },
 };

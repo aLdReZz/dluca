@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Sales from './pages/Sales';
 import Inventory from './pages/Inventory';
 import Costing from './pages/Costing';
+import Accounting from './pages/Accounting';
 import Attendance from './pages/Attendance';
 import Payroll from './pages/Payroll';
 import Calendar from './pages/Calendar';
@@ -509,6 +510,8 @@ const App: React.FC = () => {
                 />;
             case 'costing':
                 return <Costing recipeCostings={recipeCostings} setRecipeCostings={setRecipeCostings} productInventoryItems={productInventoryItems} />;
+            case 'accounting':
+                return <Accounting />;
             case 'attendance':
                 return (
                     <Attendance
