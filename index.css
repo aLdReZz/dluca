@@ -11,6 +11,32 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   @apply bg-bg-primary text-text-primary;
+  /* Prevent horizontal scroll on mobile */
+  overflow-x: hidden;
+  /* iOS safe area support */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* Responsive table wrapper */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+/* Responsive utilities */
+@media (max-width: 768px) {
+  /* Make tables scrollable on mobile */
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  /* Prevent text from being too small on mobile */
+  input, select, textarea, button {
+    font-size: 16px !important;
+  }
 }
 
 .horizontal-scrollbar-hide::-webkit-scrollbar {

@@ -9,6 +9,13 @@ const config: Config = {
     './pages/**/*.{ts,tsx}'
   ],
   theme: {
+    screens: {
+      'sm': '640px',   // Mobile landscape and small tablets
+      'md': '768px',   // Tablets
+      'lg': '1024px',  // Desktop
+      'xl': '1280px',  // Large desktop
+      '2xl': '1536px', // Extra large desktop
+    },
     extend: {
       colors: {
         'bg-primary': '#161617',

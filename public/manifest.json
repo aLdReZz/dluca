@@ -1,12 +1,14 @@
 {
-  "name": "D'Luca",
+  "name": "D'Luca Restaurant Management",
   "short_name": "D'Luca",
-  "description": "D'Luca Restaurant Management System",
+  "description": "D'Luca Restaurant Management System - Track sales, inventory, attendance, and more",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000",
-  "orientation": "portrait-primary",
+  "background_color": "#161617",
+  "theme_color": "#161617",
+  "orientation": "any",
+  "categories": ["business", "productivity", "lifestyle"],
   "icons": [
     {
       "src": "/icons/icon-72x72.png",
