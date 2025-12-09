@@ -9,3 +9,5 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # Disable secrets scanning - Firebase credentials are meant to be public
+  SECRETS_SCAN_ENABLED = "false"

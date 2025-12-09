@@ -18,16 +18,16 @@ Your app requires Firebase environment variables to work properly. Follow these 
 4. **Click "Add a variable"** and add each of the following:
 
 ```env
-VITE_FIREBASE_API_KEY=AIzaSyD5O3hrOfe_OMO5ixm9TYokFYnpmjedo44
-VITE_FIREBASE_AUTH_DOMAIN=dluca-restaurant.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=dluca-restaurant
-VITE_FIREBASE_STORAGE_BUCKET=dluca-restaurant.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=381645950514
-VITE_FIREBASE_APP_ID=1:381645950514:web:ca8ea5e3072101e3e4762b
-VITE_FIREBASE_MEASUREMENT_ID=G-MBTJN95TG0
+VITE_FIREBASE_API_KEY=<your_api_key_from_.env.local>
+VITE_FIREBASE_AUTH_DOMAIN=<your_auth_domain_from_.env.local>
+VITE_FIREBASE_PROJECT_ID=<your_project_id_from_.env.local>
+VITE_FIREBASE_STORAGE_BUCKET=<your_storage_bucket_from_.env.local>
+VITE_FIREBASE_MESSAGING_SENDER_ID=<your_sender_id_from_.env.local>
+VITE_FIREBASE_APP_ID=<your_app_id_from_.env.local>
+VITE_FIREBASE_MEASUREMENT_ID=<your_measurement_id_from_.env.local>
 ```
 
-**Note**: These are your actual Firebase credentials from your project.
+**Note**: Copy these values from your `.env.local` file in the project root.
 
 5. **Save all variables**
 
