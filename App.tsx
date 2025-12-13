@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import RoleSelection from './components/RoleSelection';
 import PinModal from './components/PinModal';
 import Sidebar from './components/Sidebar';
+import BottomNav from './components/BottomNav';
 import Dashboard from './pages/Dashboard';
 import Sales from './pages/Sales';
 import Inventory from './pages/Inventory';
@@ -562,6 +563,7 @@ const App: React.FC = () => {
 
     return (
         <div className="flex h-screen overflow-hidden font-sans">
+            {/* Desktop Sidebar */}
             <Sidebar
                 role={role}
                 currentPage={page}
@@ -572,19 +574,36 @@ const App: React.FC = () => {
             />
             {/* Mobile Overlay */}
             <div className={`fixed inset-0 z-20 bg-black bg-opacity-50 transition-opacity lg:hidden ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setSidebarOpen(false)}></div>
-            
+
             <div className={`relative flex-1 flex flex-col min-w-0 ${dashboardIntro ? 'dashboard-container-intro' : ''}`}>
-                <div className="fixed top-0 left-0 right-0 z-10 lg:hidden p-4 flex items-center bg-bg-primary border-b border-border-color">
-                    <button
-                        onClick={() => setSidebarOpen(!isSidebarOpen)}
-                        className="p-2 rounded-md hover:bg-hover-bg pointer-events-auto"
-                    >
-                        <MenuIcon className="w-6 h-6" />
-                    </button>
+                {/* Mobile Top Header */}
+                <div className="fixed top-0 left-0 right-0 z-10 lg:hidden bg-bg-secondary border-b border-border-color safe-area-top">
+                    <div className="flex items-center justify-between px-4 h-14">
+                        <button
+                            onClick={() => setSidebarOpen(!isSidebarOpen)}
+                            className="p-2 rounded-md hover:bg-hover-bg"
+                        >
+                            <MenuIcon className="w-6 h-6 text-text-primary" />
+                        </button>
+                        <div className="flex items-center gap-2">
+                            <img src="/dlc-sublogo.png" alt="D'Luca" className="h-8 w-8 object-contain" />
+                            <span className="text-sm font-semibold text-text-primary tracking-wider">D'LUCA</span>
+                        </div>
+                        <div className="w-10"></div> {/* Spacer for alignment */}
+                    </div>
                 </div>
-                <main className={`flex-1 overflow-y-auto bg-bg-primary pt-20 lg:pt-28 ${dashboardIntro ? 'dashboard-content-intro' : ''}`}>
+
+                {/* Main Content */}
+                <main className={`flex-1 overflow-y-auto bg-bg-primary pt-14 pb-16 lg:pt-0 lg:pb-0 ${dashboardIntro ? 'dashboard-content-intro' : ''}`}>
                     {renderPage()}
                 </main>
+
+                {/* Mobile Bottom Navigation */}
+                <BottomNav
+                    role={role}
+                    currentPage={page}
+                    onNavigate={handleNavigate}
+                />
             </div>
         </div>
     );

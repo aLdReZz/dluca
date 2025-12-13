@@ -221,21 +221,21 @@ const Accounting: React.FC = () => {
     return (
         <div className="h-full flex flex-col bg-bg-primary">
             {/* Header */}
-            <div className="p-6 border-b border-border-color">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="p-4 lg:p-6 border-b border-border-color sticky-mobile">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
-                        <h1 className="text-3xl font-bold text-text-primary">Accounting</h1>
-                        <p className="text-text-secondary mt-1">Track transactions and balances</p>
+                        <h1 className="text-2xl lg:text-3xl font-bold text-text-primary">Accounting</h1>
+                        <p className="text-sm text-text-secondary mt-1">Track transactions and balances</p>
                     </div>
                     <button
                         onClick={() => {
                             setEditingTransaction(null);
                             setIsTransactionModalOpen(true);
                         }}
-                        className="flex items-center gap-2 px-4 py-2 bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 transition-colors"
+                        className="flex items-center justify-center gap-2 px-4 py-3 bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 transition-colors tap-target w-full sm:w-auto"
                     >
                         <PlusIcon className="w-5 h-5" />
-                        Add Transaction
+                        <span className="font-medium">Add Transaction</span>
                     </button>
                 </div>
             </div>
@@ -250,13 +250,13 @@ const Accounting: React.FC = () => {
             )}
 
             {/* Tab Navigation */}
-            <div className="px-6 pt-4 border-b border-border-color overflow-x-auto">
-                <div className="flex gap-4 min-w-max">
+            <div className="px-4 lg:px-6 pt-4 border-b border-border-color overflow-x-auto mobile-scroll">
+                <div className="flex gap-2 lg:gap-4 min-w-max">
                     {(['cash', 'gcash', 'grab', 'card'] as const).map(account => (
                         <button
                             key={account}
                             onClick={() => setActiveAccount(account)}
-                            className={`px-4 py-2 border-b-2 transition-colors whitespace-nowrap ${
+                            className={`px-4 py-2.5 border-b-2 transition-colors whitespace-nowrap text-sm lg:text-base tap-target ${
                                 activeAccount === account
                                     ? 'border-accent-blue text-text-primary font-medium'
                                     : 'border-transparent text-text-secondary hover:text-text-primary'
@@ -269,7 +269,7 @@ const Accounting: React.FC = () => {
             </div>
 
             {/* Summary Cards */}
-            <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-4 lg:p-6 grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
                 <SummaryCard
                     title="Opening Balance"
                     value={formatPeso(stats.openingBalance)}
