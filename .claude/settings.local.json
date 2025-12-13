@@ -18,7 +18,11 @@
       "Bash(del nul 2)",
       "Bash(.gitignore)",
       "Bash(git push)",
-      "Bash(npm run dev:web:*)"
+      "Bash(npm run dev:web:*)",
+      "Bash(node:*)",
+      "Bash(git grep:*)",
+      "Bash(where:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []

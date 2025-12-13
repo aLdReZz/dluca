@@ -1,15 +1,42 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { SalesData } from '../types';
-import { UploadIcon, TrashIcon } from '../components/Icons';
+import { UploadIcon, TrashIcon, CurrencyPesoIcon, BanknotesIcon, CreditCardIcon, CalendarDaysIcon, ClipboardDocumentListIcon } from '../components/Icons';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
 import { salesService } from '../utils/firebaseService';
+import CalendarPopup from '../components/CalendarPopup';
+import { parseSalesDate } from '../utils/salesData';
 
 interface SalesProps {
     salesData?: SalesData[];
     setSalesData?: React.Dispatch<React.SetStateAction<SalesData[]>>;
 }
+
+const formatPeso = (amount: number) => {
+    const safeAmount = typeof amount === 'number' && Number.isFinite(amount) ? amount : 0;
+    return '₱' + safeAmount.toLocaleString('en-PH', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+};
+
+const formatDateForInput = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const formatDateForDisplay = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString + 'T00:00:00');
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+    });
+};
 
 const PLACEHOLDER_SALES: SalesData[] = [
     {
@@ -86,14 +113,91 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
     const [sortColumn, setSortColumn] = useState<string | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
+    // Date filter states
+    const [filter, setFilter] = useState<'daily' | 'weekly' | 'monthly' | 'lastMonth' | 'custom'>('monthly');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+    const calendarRef = useRef<HTMLDivElement>(null);
+
+    // Initialize date range for default "This Month" filter
     useEffect(() => {
-        if (salesData.length === 0 && !salesLoading) {
-            // Try to set placeholder data to prop setSalesData if available
-            if (setPropSalesData) {
-                setPropSalesData(PLACEHOLDER_SALES);
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        setStartDate(formatDateForInput(firstDay));
+        setEndDate(formatDateForInput(lastDay));
+    }, []);
+
+    // Close calendar on outside click
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
+                setIsCalendarOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleFilterChange = (newFilter: 'daily' | 'weekly' | 'monthly' | 'lastMonth') => {
+        setFilter(newFilter);
+        const now = new Date();
+
+        switch (newFilter) {
+            case 'daily':
+                setStartDate(formatDateForInput(now));
+                setEndDate(formatDateForInput(now));
+                break;
+            case 'weekly': {
+                const dayOfWeek = now.getDay();
+                const startOfWeek = new Date(now);
+                startOfWeek.setDate(now.getDate() - dayOfWeek);
+                const endOfWeek = new Date(now);
+                endOfWeek.setDate(now.getDate() + (6 - dayOfWeek));
+                setStartDate(formatDateForInput(startOfWeek));
+                setEndDate(formatDateForInput(endOfWeek));
+                break;
+            }
+            case 'monthly': {
+                const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                setStartDate(formatDateForInput(firstDay));
+                setEndDate(formatDateForInput(lastDay));
+                break;
+            }
+            case 'lastMonth': {
+                const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
+                setStartDate(formatDateForInput(firstDay));
+                setEndDate(formatDateForInput(lastDay));
+                break;
             }
         }
-    }, [salesData.length, salesLoading, setPropSalesData]);
+    };
+
+    const handleRangeComplete = (range: { start: string; end: string }) => {
+        setFilter('custom');
+        setStartDate(range.start);
+        setEndDate(range.end);
+        setIsCalendarOpen(false);
+    };
+
+    // Filter sales data by date range
+    const filteredSalesData = useMemo(() => {
+        if (!startDate || !endDate) return salesData;
+
+        const start = new Date(startDate + 'T00:00:00');
+        const end = new Date(endDate + 'T23:59:59');
+
+        return salesData.filter(row => {
+            const dateStr = row['Date'] || row['__column1'] || '';
+            const saleDate = parseSalesDate(dateStr);
+            if (!saleDate) return false;
+            return saleDate >= start && saleDate <= end;
+        });
+    }, [salesData, startDate, endDate]);
 
     const handleFile = (file: File) => {
         if (file && file.type === 'text/csv') {
@@ -155,6 +259,61 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
         }
     };
 
+    const handleExportToExcel = () => {
+        if (filteredSalesData.length === 0) {
+            setUploadStatus({ type: 'error', message: 'No data to export' });
+            setTimeout(() => setUploadStatus(null), 3000);
+            return;
+        }
+
+        try {
+            // Get headers from the first row
+            const headers = Object.keys(filteredSalesData[0]).filter(h => !h.startsWith('__'));
+
+            // Create CSV content
+            const csvRows = [];
+
+            // Add header row
+            csvRows.push(headers.map(h => `"${h}"`).join(','));
+
+            // Add data rows
+            filteredSalesData.forEach(row => {
+                const values = headers.map(header => {
+                    const value = row[header] || '';
+                    // Escape quotes in the value
+                    const escaped = String(value).replace(/"/g, '""');
+                    return `"${escaped}"`;
+                });
+                csvRows.push(values.join(','));
+            });
+
+            // Create CSV string
+            const csvContent = csvRows.join('\n');
+
+            // Create blob and download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+
+            // Generate filename with date range
+            const filename = `sales_${startDate}_to_${endDate}.csv`;
+
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            setUploadStatus({ type: 'success', message: `Exported ${filteredSalesData.length} sales records to ${filename}` });
+            setTimeout(() => setUploadStatus(null), 3000);
+        } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : 'Failed to export sales data';
+            setUploadStatus({ type: 'error', message: errorMsg });
+            setTimeout(() => setUploadStatus(null), 3000);
+        }
+    };
+
     const parseSalesCSV = async (text: string) => {
         try {
             const rows: string[][] = [];
@@ -201,19 +360,101 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
             }
 
             const headers = rows[0].map(header => header.trim().replace(/^\uFEFF/, '').replace(/"/g, ''));
-            const data: SalesData[] = [];
 
-            for (let i = 1; i < rows.length; i++) {
-                const values = rows[i];
-                if (values.every(value => !value || !value.trim())) continue;
-                const rowData: SalesData = {};
-                headers.forEach((header, index) => {
-                    const raw = values[index] ?? '';
-                    rowData[header] = raw.trim().replace(/^\uFEFF/, '').replace(/"/g, '');
+            // Detect UTAK format (item-based) vs old format (transaction-based)
+            const isUTAKFormat = headers.includes('Transaction ID') && headers.includes('Total Cost') && headers.includes('Service Amount');
+
+            let data: SalesData[] = [];
+
+            if (isUTAKFormat) {
+                // New UTAK format: Group items by Transaction ID
+                const transactionMap = new Map<string, {
+                    items: any[];
+                    date: string;
+                    time: string;
+                    receiptNo: string;
+                    paymentType: string;
+                    total: number;
+                    totalCost: number;
+                    serviceAmount: number;
+                }>();
+
+                for (let i = 1; i < rows.length; i++) {
+                    const values = rows[i];
+                    if (values.every(value => !value || !value.trim())) continue;
+
+                    const rowData: Record<string, string> = {};
+                    headers.forEach((header, index) => {
+                        const raw = values[index] ?? '';
+                        rowData[header] = raw.trim().replace(/^\uFEFF/, '').replace(/"/g, '');
+                    });
+
+                    const txnId = rowData['Transaction ID'] || '';
+                    if (!txnId) continue;
+
+                    if (!transactionMap.has(txnId)) {
+                        // Use "Total Cost" from the first row (UTAK's aggregated cost)
+                        const totalCostFromUTAK = parseFloat(rowData['Total Cost'] || '0') || 0;
+
+                        transactionMap.set(txnId, {
+                            items: [],
+                            date: rowData['Date'] || '',
+                            time: rowData['Time'] || '',
+                            receiptNo: rowData['Receipt No.'] || '',
+                            paymentType: rowData['Payment Type'] || '',
+                            total: parseFloat(rowData['Total'] || '0') || 0,
+                            totalCost: totalCostFromUTAK,
+                            serviceAmount: 0,
+                        });
+                    }
+
+                    const transaction = transactionMap.get(txnId)!;
+                    transaction.items.push(rowData);
+
+                    // Aggregate service amount from all items
+                    const itemService = parseFloat(rowData['Service Amount'] || '0') || 0;
+                    transaction.serviceAmount += itemService;
+                }
+
+                // Convert grouped transactions to SalesData format
+                transactionMap.forEach((transaction) => {
+                    const grossSales = transaction.total;
+                    const netSales = grossSales - transaction.serviceAmount;
+                    const profit = netSales - transaction.totalCost;
+
+                    data.push({
+                        Date: transaction.date,
+                        Time: transaction.time,
+                        'Transaction ID': transaction.items[0]['Transaction ID'] || '',
+                        'Receipt No.': transaction.receiptNo,
+                        'Payment Type': transaction.paymentType,
+                        Total: grossSales.toFixed(2),
+                        'Service Rate': '10',
+                        'Service Amount': transaction.serviceAmount.toFixed(2),
+                        Cost: transaction.totalCost.toFixed(2),
+                        Profit: profit.toFixed(2),
+                        Cashier: transaction.items[0]['Cashier'] || '',
+                        Customer: transaction.items[0]['Customer'] || '',
+                        'Park Tag': transaction.items[0]['Park Tag'] || '',
+                        Type: transaction.items[0]['Type'] || '',
+                        __column1: transaction.date,
+                        __column10: transaction.serviceAmount.toFixed(2),
+                    });
                 });
-                rowData.__column1 = (values[0] ?? '').trim().replace(/^\uFEFF/, '').replace(/"/g, '');
-                rowData.__column10 = (values[9] ?? '').trim().replace(/^\uFEFF/, '').replace(/"/g, '');
-                data.push(rowData);
+            } else {
+                // Old format: Direct mapping
+                for (let i = 1; i < rows.length; i++) {
+                    const values = rows[i];
+                    if (values.every(value => !value || !value.trim())) continue;
+                    const rowData: SalesData = {};
+                    headers.forEach((header, index) => {
+                        const raw = values[index] ?? '';
+                        rowData[header] = raw.trim().replace(/^\uFEFF/, '').replace(/"/g, '');
+                    });
+                    rowData.__column1 = (values[0] ?? '').trim().replace(/^\uFEFF/, '').replace(/"/g, '');
+                    rowData.__column10 = (values[9] ?? '').trim().replace(/^\uFEFF/, '').replace(/"/g, '');
+                    data.push(rowData);
+                }
             }
 
             // Upload to Firebase
@@ -224,7 +465,8 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                 setPropSalesData(data);
             }
 
-            setUploadStatus({ type: 'success', message: `Successfully uploaded ${data.length} sales records` });
+            const formatMsg = isUTAKFormat ? 'UTAK format' : 'standard format';
+            setUploadStatus({ type: 'success', message: `Successfully uploaded ${data.length} sales records (${formatMsg})` });
             setTimeout(() => setUploadStatus(null), 3000);
         } catch (err) {
             const errorMsg = err instanceof Error ? err.message : 'Failed to upload sales data';
@@ -232,13 +474,13 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
         }
     };
     
-    const headers = salesData.length > 0 ? Object.keys(salesData[0]) : [];
+    const headers = filteredSalesData.length > 0 ? Object.keys(filteredSalesData[0]) : [];
 
     // Sort data
     const sortedData = React.useMemo(() => {
-        if (!sortColumn) return salesData;
+        if (!sortColumn) return filteredSalesData;
 
-        return [...salesData].sort((a, b) => {
+        return [...filteredSalesData].sort((a, b) => {
             const aVal = String(a[sortColumn] || '');
             const bVal = String(b[sortColumn] || '');
 
@@ -255,7 +497,7 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
 
             return sortDirection === 'asc' ? comparison : -comparison;
         });
-    }, [salesData, sortColumn, sortDirection]);
+    }, [filteredSalesData, sortColumn, sortDirection]);
 
     const handleSort = (column: string) => {
         if (sortColumn === column) {
@@ -267,6 +509,151 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
             setSortDirection('asc');
         }
     };
+
+    // Calculate sales breakdown by payment system (consolidated)
+    const paymentSystemStats = useMemo(() => {
+        const stats = new Map<string, { total: number; count: number; profit: number }>();
+
+        // Helper function to categorize payment types
+        const categorizePayment = (paymentType: string): string => {
+            const type = paymentType.toLowerCase().trim();
+            if (type === 'gcredit') return 'GCredit';
+            if (type === 'gcash') return 'GCash';
+            if (type === 'paymaya') return 'PayMaya';
+            if (type === 'grabpay' || type === 'grab') return 'GrabPay';
+            if (type === 'qrph' || type === 'qr ph') return 'QR PH';
+            if (type === 'card' || type === 'credit card' || type === 'debit card') return 'Card';
+            if (type === 'cash') return 'Cash';
+            return paymentType; // Keep original if no match
+        };
+
+        // Helper function to parse split payments (e.g., "Cash 500 GCash 200" or "Cash 65 gcash 662")
+        const parseSplitPayment = (paymentType: string): { method: string; amount: number }[] => {
+            const payments: { method: string; amount: number }[] = [];
+
+            // Pattern: payment_method amount (e.g., "cash 500", "gcash 200")
+            // Using case-insensitive regex with word boundaries to match exact payment types
+            // IMPORTANT: Check gcash BEFORE cash to avoid "gcash" matching the "cash" pattern
+            const patterns = [
+                { regex: /\bgcash\s+([\d,.]+)/gi, method: 'GCash' },
+                { regex: /\bgcredit\s+([\d,.]+)/gi, method: 'GCredit' },
+                { regex: /\bcash\s+([\d,.]+)/gi, method: 'Cash' },
+                { regex: /\bpaymaya\s+([\d,.]+)/gi, method: 'PayMaya' },
+                { regex: /\bgrab(?:pay)?\s+([\d,.]+)/gi, method: 'GrabPay' },
+                { regex: /\bqr\s*ph\s+([\d,.]+)/gi, method: 'QR PH' },
+                { regex: /\bcard\s+([\d,.]+)/gi, method: 'Card' },
+            ];
+
+            let foundSplit = false;
+            patterns.forEach(({ regex, method }) => {
+                // Reset regex lastIndex before each match to ensure correct behavior
+                regex.lastIndex = 0;
+                const matches = [...paymentType.matchAll(regex)];
+                matches.forEach(match => {
+                    const amount = parseFloat(match[1].replace(/,/g, '')) || 0;
+                    if (amount > 0) {
+                        payments.push({ method, amount });
+                        foundSplit = true;
+                    }
+                });
+            });
+
+            return foundSplit ? payments : [];
+        };
+
+        filteredSalesData.forEach(row => {
+            const rawPaymentType = row['Payment Type'] || 'Unknown';
+            const total = parseFloat(row['Total'] || '0') || 0;
+            const serviceAmount = parseFloat(row['Service Amount'] || '0') || 0;
+            const netAmount = total - serviceAmount; // Exclude service charges to match UTAK
+            const profit = parseFloat(row['Profit'] || '0') || 0;
+
+            // Try to parse as split payment
+            const splitPayments = parseSplitPayment(rawPaymentType);
+
+            if (splitPayments.length > 0) {
+                // Handle split payment - use parsed amounts and deduct proportional service charges
+                const totalSplit = splitPayments.reduce((sum, p) => sum + p.amount, 0);
+
+                splitPayments.forEach((payment, index) => {
+                    if (!stats.has(payment.method)) {
+                        stats.set(payment.method, { total: 0, count: 0, profit: 0 });
+                    }
+
+                    const current = stats.get(payment.method)!;
+
+                    // Calculate proportional service charge for this payment method
+                    const proportionalService = totalSplit > 0 ? (payment.amount / totalSplit) * serviceAmount : 0;
+                    const netPaymentAmount = payment.amount - proportionalService; // Deduct service charge
+
+                    current.total += netPaymentAmount; // Add net amount (excluding service charge)
+
+                    // Only count as 1 transaction for the first payment method in the split
+                    if (index === 0) {
+                        current.count += 1;
+                    }
+
+                    // Distribute profit proportionally
+                    const profitShare = totalSplit > 0 ? (payment.amount / totalSplit) * profit : 0;
+                    current.profit += profitShare;
+                });
+            } else {
+                // Handle single payment method - use net amount (excluding service charges)
+                const paymentType = categorizePayment(rawPaymentType);
+
+                if (!stats.has(paymentType)) {
+                    stats.set(paymentType, { total: 0, count: 0, profit: 0 });
+                }
+
+                const current = stats.get(paymentType)!;
+                current.total += netAmount; // Use net amount to match UTAK reporting
+                current.count += 1;
+                current.profit += profit;
+            }
+        });
+
+        return Array.from(stats.entries())
+            .map(([name, data]) => ({ name, ...data }))
+            .sort((a, b) => b.total - a.total);
+    }, [filteredSalesData]);
+
+    // Get icon and color for payment type
+    const getPaymentIcon = (paymentType: string) => {
+        if (paymentType === 'Cash') return { icon: BanknotesIcon, color: 'green' };
+        if (paymentType === 'GCash') return { icon: CurrencyPesoIcon, color: 'blue' };
+        if (paymentType === 'GCredit') return { icon: CreditCardIcon, color: 'blue' };
+        if (paymentType === 'PayMaya') return { icon: CurrencyPesoIcon, color: 'purple' };
+        if (paymentType === 'GrabPay') return { icon: CurrencyPesoIcon, color: 'orange' };
+        if (paymentType === 'Card') return { icon: CreditCardIcon, color: 'purple' };
+        if (paymentType === 'QR PH') return { icon: CurrencyPesoIcon, color: 'blue' };
+        return { icon: CurrencyPesoIcon, color: 'yellow' };
+    };
+
+    const colorClasses = {
+        blue: { bg: 'bg-accent-blue/10', text: 'text-accent-blue', border: 'border-accent-blue/30' },
+        green: { bg: 'bg-accent-green/10', text: 'text-accent-green', border: 'border-accent-green/30' },
+        orange: { bg: 'bg-accent-orange/10', text: 'text-accent-orange', border: 'border-accent-orange/30' },
+        purple: { bg: 'bg-accent-purple/10', text: 'text-accent-purple', border: 'border-accent-purple/30' },
+        yellow: { bg: 'bg-accent-yellow/10', text: 'text-accent-yellow', border: 'border-accent-yellow/30' },
+    };
+
+    const FilterButton: React.FC<{
+        period: 'daily' | 'weekly' | 'monthly' | 'lastMonth' | 'custom';
+        label: string;
+        activeFilter: string;
+        onClick: () => void;
+    }> = ({ period, label, activeFilter, onClick }) => (
+        <button
+            onClick={onClick}
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors duration-200 ${
+                activeFilter === period
+                    ? 'bg-accent-blue text-white'
+                    : 'bg-transparent text-text-secondary hover:text-text-primary hover:bg-bg-secondary'
+            }`}
+        >
+            {label}
+        </button>
+    );
 
     // Show loading state
     if (salesLoading) {
@@ -291,6 +678,42 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+            {/* Header with Date Filters */}
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4">
+                <div>
+                    <h2 className="text-3xl font-semibold">Sales Tracking</h2>
+                    <p className="text-text-secondary mt-1">Track and analyze your sales transactions.</p>
+                </div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 p-1 bg-bg-tertiary rounded-lg">
+                        <FilterButton period="daily" label="Today" activeFilter={filter} onClick={() => handleFilterChange('daily')} />
+                        <FilterButton period="weekly" label="This Week" activeFilter={filter} onClick={() => handleFilterChange('weekly')} />
+                        <FilterButton period="monthly" label="This Month" activeFilter={filter} onClick={() => handleFilterChange('monthly')} />
+                        <FilterButton period="lastMonth" label="Last Month" activeFilter={filter} onClick={() => handleFilterChange('lastMonth')} />
+                    </div>
+                    <div className="relative w-full sm:w-auto" ref={calendarRef}>
+                        <button
+                            onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+                            className="w-full sm:w-auto bg-bg-tertiary border border-border-color rounded-lg px-3 py-2 text-sm font-medium flex items-center justify-between sm:justify-start gap-2 hover:bg-hover-bg transition"
+                            aria-label="Select date range"
+                        >
+                            <CalendarDaysIcon className="w-5 h-5 text-text-secondary" />
+                            <span className="text-text-primary">
+                                {startDate && endDate
+                                    ? `${formatDateForDisplay(startDate)} - ${formatDateForDisplay(endDate)}`
+                                    : 'Select range'}
+                            </span>
+                        </button>
+                        {isCalendarOpen && (
+                            <CalendarPopup
+                                initialRange={{ start: startDate || endDate, end: endDate || startDate }}
+                                onRangeComplete={handleRangeComplete}
+                                onClose={() => setIsCalendarOpen(false)}
+                            />
+                        )}
+                    </div>
+                </div>
+            </div>
             {/* Upload Status Messages */}
             {uploadStatus && (
                 <div className={`mb-6 p-4 rounded-lg border ${
@@ -318,29 +741,6 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                     <p className="text-red-500 text-sm">Upload error: {uploadError}</p>
                 </div>
             )}
-
-            {/* Upload and Delete Buttons */}
-            <div className="flex gap-3 mb-8">
-                <label
-                    htmlFor="salesFileInput"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-accent-blue/10 hover:bg-accent-blue/20 text-accent-blue border border-accent-blue/30 rounded-lg font-semibold cursor-pointer transition-all duration-300"
-                >
-                    <UploadIcon className="w-4 h-4" />
-                    Upload CSV
-                    <input type="file" id="salesFileInput" className="hidden" accept=".csv" onChange={handleFileChange} />
-                </label>
-
-                {salesData.length > 0 && (
-                    <button
-                        onClick={() => setShowDeleteConfirm(true)}
-                        disabled={deleteLoading}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 rounded-lg font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <TrashIcon className="w-4 h-4" />
-                        Delete All
-                    </button>
-                )}
-            </div>
 
             {/* Delete Confirmation Modal */}
             {showDeleteConfirm && (
@@ -381,7 +781,86 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                     </div>
                 </div>
             )}
-            
+
+            {/* Payment System Breakdown Cards */}
+            {salesData.length > 0 && paymentSystemStats.length > 0 && (
+                <div className="mb-8">
+                    <div className="flex justify-between items-center mb-4">
+                        <div className="flex items-baseline gap-3">
+                            <h2 className="text-xl font-bold">Sales by Payment System</h2>
+                            <p className="text-sm text-text-secondary/50">
+                                Total: {formatPeso(paymentSystemStats.reduce((sum, stat) => sum + stat.total, 0))}
+                            </p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleExportToExcel}
+                                className="p-2 bg-bg-tertiary hover:bg-hover-bg text-text-secondary hover:text-text-primary border border-border-color/50 rounded-lg transition-all duration-300"
+                                title="Export to Excel"
+                            >
+                                <ClipboardDocumentListIcon className="w-5 h-5" />
+                            </button>
+
+                            <label
+                                htmlFor="salesFileInput"
+                                className="p-2 bg-bg-tertiary hover:bg-hover-bg text-text-secondary hover:text-text-primary border border-border-color/50 rounded-lg cursor-pointer transition-all duration-300"
+                                title="Upload CSV"
+                            >
+                                <UploadIcon className="w-5 h-5" />
+                                <input type="file" id="salesFileInput" className="hidden" accept=".csv" onChange={handleFileChange} />
+                            </label>
+
+                            {salesData.length > 0 && (
+                                <button
+                                    onClick={() => setShowDeleteConfirm(true)}
+                                    disabled={deleteLoading}
+                                    className="p-2 bg-bg-tertiary hover:bg-hover-bg text-text-secondary hover:text-text-primary border border-border-color/50 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Delete All"
+                                >
+                                    <TrashIcon className="w-5 h-5" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+                        {paymentSystemStats.map((system) => {
+                            const { icon: Icon, color } = getPaymentIcon(system.name);
+                            const colors = colorClasses[color as keyof typeof colorClasses];
+
+                            return (
+                                <div
+                                    key={system.name}
+                                    className="bg-bg-secondary rounded-xl border border-border-color/50 p-5 transition-all duration-200 hover:border-border-color"
+                                >
+                                    {/* Row 1: Icon + Title */}
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className={`h-11 w-11 rounded-xl ${colors.bg} flex items-center justify-center flex-shrink-0`}>
+                                            <Icon className={`w-5 h-5 ${colors.text}`} />
+                                        </div>
+                                        <p className="text-xs font-medium text-text-secondary/70 uppercase tracking-wide truncate">{system.name}</p>
+                                    </div>
+
+                                    {/* Row 2: Value */}
+                                    <p className="text-2xl font-bold text-text-primary whitespace-nowrap">{formatPeso(system.total)}</p>
+
+                                    {/* Additional stats (small text) */}
+                                    <div className="mt-3 pt-3 border-t border-border-color/30 space-y-1">
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-text-secondary">Transactions</span>
+                                            <span className="text-text-primary font-medium">{system.count}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-text-secondary">Avg Sale</span>
+                                            <span className="text-text-primary font-medium">{formatPeso(system.total / system.count)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
             {salesData.length > 0 && (
                 <div className="bg-bg-secondary rounded-xl border border-border-color overflow-hidden">
                     <div className="p-3 border-b border-border-color">

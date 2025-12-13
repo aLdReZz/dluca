@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { Page, Role } from '../types';
 import {
@@ -64,14 +63,17 @@ const Sidebar: React.FC<SidebarProps> = ({ role, currentPage, onNavigate, isOpen
             <button
                 type="button"
                 onClick={() => onNavigate(id as Page)}
-                className={`flex w-full items-center gap-3 px-4 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200 ${
+                className={`group flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative ${
                     isActive
-                        ? 'bg-bg-tertiary text-text-primary shadow-[0_4px_12px_rgba(0,0,0,0.35)]'
+                        ? 'bg-bg-tertiary text-text-primary'
                         : 'text-text-secondary hover:text-text-primary hover:bg-hover-bg'
                 }`}
             >
-                <Icon className={`w-5 h-5 ${isActive ? 'text-text-primary' : 'text-text-secondary'}`} />
-                <span>{label}</span>
+                {isActive && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-accent-blue rounded-r-full" />
+                )}
+                <Icon className={`w-5 h-5 transition-colors ${isActive ? 'text-accent-blue' : 'text-text-secondary group-hover:text-text-primary'}`} />
+                <span className="transition-colors">{label}</span>
             </button>
         );
     };
@@ -84,56 +86,61 @@ const Sidebar: React.FC<SidebarProps> = ({ role, currentPage, onNavigate, isOpen
 
     return (
         <aside
-            className={`fixed lg:relative lg:flex-shrink-0 w-72 bg-bg-secondary text-text-primary border-r border-border-color flex flex-col h-full transition-transform duration-300 ease-in-out z-30 ${
+            className={`fixed lg:relative lg:flex-shrink-0 w-72 bg-bg-secondary text-text-primary border-r border-border-color/50 flex flex-col h-full transition-transform duration-300 ease-in-out z-30 ${
                 isOpen ? 'translate-x-0' : '-translate-x-full'
             } lg:translate-x-0`}
         >
-            <div className="p-5 pb-0">
-                <div className="flex items-center gap-3 rounded-3xl border border-border-color/60 bg-gradient-to-r from-bg-secondary to-bg-tertiary/40 px-4 py-3 shadow-[0_10px_24px_rgba(0,0,0,0.45)]">
-                    <img src="/dlc-sublogo.png" alt="D'Luca Icon" className="h-11 w-11 object-contain" />
-                    <div className="leading-tight">
-                        <p className="text-lg font-semibold text-text-primary tracking-[0.15em] uppercase">D'Luca</p>
-                        <p className="text-[0.6rem] uppercase tracking-[0.24em] text-text-secondary">Bistro x Cafe</p>
+            {/* Logo Header */}
+            <div className="p-6 border-b border-border-color/30">
+                <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-bg-tertiary rounded-xl flex items-center justify-center border border-border-color/30">
+                        <img src="/dlc-sublogo.png" alt="D'Luca" className="w-8 h-8 object-contain" />
+                    </div>
+                    <div>
+                        <h1 className="text-lg font-bold text-text-primary">D'LUCA</h1>
+                        <p className="text-xs text-text-secondary">Bistro & Cafe</p>
                     </div>
                 </div>
             </div>
 
-            <nav className="flex-1 overflow-y-auto px-5 mt-7 space-y-7">
-                <div>
-                    <h3 className="text-xs font-semibold uppercase tracking-[0.65em] text-text-primary mb-4">Main Menu</h3>
+            {/* Navigation */}
+            <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
+                {/* Main Menu */}
+                <div className="space-y-1">
+                    <h3 className="px-3 text-[11px] font-semibold uppercase tracking-wider text-text-secondary/60 mb-3">Main Menu</h3>
                     {navItems.filter(item => item.roles.includes(role)).map(item => {
                         if (item.isDropdown) {
                             const isInventoryActive = inventoryPages.includes(currentPage);
                             return (
-                                <div key={item.id}>
+                                <div key={item.id} className="space-y-1">
                                     <button
                                         type="button"
                                         onClick={() => setIsInventoryOpen(!isInventoryOpen)}
-                                        className={`flex w-full items-center justify-between gap-3 px-4 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200 ${
+                                        className={`group flex w-full items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative ${
                                             isInventoryActive
-                                                ? 'bg-bg-tertiary text-text-primary shadow-[0_6px_18px_rgba(0,0,0,0.4)]'
+                                                ? 'bg-bg-tertiary text-text-primary'
                                                 : 'text-text-secondary hover:text-text-primary hover:bg-hover-bg'
                                         }`}
                                     >
+                                        {isInventoryActive && (
+                                            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-accent-blue rounded-r-full" />
+                                        )}
                                         <div className="flex items-center gap-3">
-                                            <item.icon className={`w-5 h-5 ${isInventoryActive ? 'text-text-primary' : 'text-text-secondary'}`} />
+                                            <item.icon className={`w-5 h-5 ${isInventoryActive ? 'text-accent-blue' : 'text-text-secondary group-hover:text-text-primary'}`} />
                                             <span>{item.label}</span>
                                         </div>
                                         <ChevronDownIcon
-                                            className={`w-4 h-4 transition-transform ${isInventoryOpen ? 'rotate-180' : ''} ${
-                                                isInventoryActive ? 'text-text-primary' : 'text-text-secondary'
+                                            className={`w-4 h-4 transition-transform duration-200 ${isInventoryOpen ? 'rotate-180' : ''} ${
+                                                isInventoryActive ? 'text-accent-blue' : 'text-text-secondary group-hover:text-text-primary'
                                             }`}
                                         />
                                     </button>
                                     <div
-                                        className={`pl-4 pr-2 transition-all duration-300 ${
-                                            isInventoryOpen ? 'max-h-96 opacity-100 pt-3' : 'max-h-0 opacity-0 pt-0'
+                                        className={`transition-all duration-300 ${
+                                            isInventoryOpen ? 'max-h-96 opacity-100 mt-1' : 'max-h-0 opacity-0'
                                         } overflow-hidden`}
                                     >
-                                        <div className="relative ml-3 pl-5 pb-2 space-y-1">
-                                            {isInventoryOpen && (
-                                                <span className="pointer-events-none absolute left-1 top-2 bottom-2 w-px bg-border-color/40 rounded-full" aria-hidden="true" />
-                                            )}
+                                        <div className="ml-7 space-y-1 py-1">
                                             {inventorySubItems.map(subItem => {
                                                 const SubIcon = subItem.icon;
                                                 const isActive = currentPage === subItem.id;
@@ -142,14 +149,14 @@ const Sidebar: React.FC<SidebarProps> = ({ role, currentPage, onNavigate, isOpen
                                                         type="button"
                                                         key={subItem.id}
                                                         onClick={() => onNavigate(subItem.id as Page)}
-                                                        className={`group flex w-full items-center gap-3 rounded-2xl pl-4 pr-4 py-2 text-sm transition-all duration-200 ${
+                                                        className={`group flex w-full items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
                                                             isActive
-                                                                ? 'text-text-primary bg-hover-bg shadow-[0_3px_10px_rgba(0,0,0,0.25)]'
+                                                                ? 'text-accent-blue bg-accent-blue/10 font-medium'
                                                                 : 'text-text-secondary hover:text-text-primary hover:bg-hover-bg'
                                                         }`}
                                                     >
-                                                        <SubIcon className={`relative z-10 w-4 h-4 ${isActive ? 'text-text-primary' : 'text-text-secondary'}`} />
-                                                        <span className="whitespace-nowrap">{subItem.label}</span>
+                                                        <SubIcon className={`w-4 h-4 ${isActive ? 'text-accent-blue' : 'text-text-secondary group-hover:text-text-primary'}`} />
+                                                        <span className="text-xs">{subItem.label}</span>
                                                     </button>
                                                 );
                                             })}
@@ -161,33 +168,49 @@ const Sidebar: React.FC<SidebarProps> = ({ role, currentPage, onNavigate, isOpen
                         return <MenuItem key={item.id} id={item.id as Page} label={item.label} icon={item.icon} />
                     })}
                 </div>
-                <div>
-                    <h3 className="text-xs font-semibold uppercase tracking-[0.65em] text-text-primary mb-4">Staff</h3>
-                    {staffManagementItems.filter(item => item.roles.includes(role)).map(item => (
-                        <MenuItem key={item.id} id={item.id as Page} label={item.label} icon={item.icon} />
-                    ))}
-                </div>
-                <div>
-                    <h3 className="text-xs font-semibold uppercase tracking-[0.65em] text-text-primary mb-4">Content</h3>
-                    {contentItems.filter(item => item.roles.includes(role)).map(item => (
-                        <MenuItem key={item.id} id={item.id as Page} label={item.label} icon={item.icon} />
-                    ))}
-                </div>
+
+                {/* Staff Section */}
+                {staffManagementItems.filter(item => item.roles.includes(role)).length > 0 && (
+                    <div className="space-y-1">
+                        <h3 className="px-3 text-[11px] font-semibold uppercase tracking-wider text-text-secondary/60 mb-3">Staff</h3>
+                        {staffManagementItems.filter(item => item.roles.includes(role)).map(item => (
+                            <MenuItem key={item.id} id={item.id as Page} label={item.label} icon={item.icon} />
+                        ))}
+                    </div>
+                )}
+
+                {/* Content Section */}
+                {contentItems.filter(item => item.roles.includes(role)).length > 0 && (
+                    <div className="space-y-1">
+                        <h3 className="px-3 text-[11px] font-semibold uppercase tracking-wider text-text-secondary/60 mb-3">Content</h3>
+                        {contentItems.filter(item => item.roles.includes(role)).map(item => (
+                            <MenuItem key={item.id} id={item.id as Page} label={item.label} icon={item.icon} />
+                        ))}
+                    </div>
+                )}
             </nav>
 
-            <div className="mt-auto px-5 pb-6 pt-6">
-                <div className="flex items-center justify-between text-xs text-text-secondary border border-border-color/50 rounded-2xl px-4 py-3">
-                    <div className="flex items-center gap-2 text-text-primary/80 font-semibold">
-                        {role === 'admin' ? (
-                            <ShieldCheckIcon className="w-4 h-4 text-accent-blue/80" />
-                        ) : (
-                            <UserIcon className="w-4 h-4 text-accent-blue/80" />
-                        )}
-                        <span>{role === 'admin' ? 'Admin' : 'Staff'}</span>
+            {/* User Footer */}
+            <div className="mt-auto p-4 border-t border-border-color/30">
+                <div className="flex items-center justify-between p-3 bg-bg-tertiary/50 rounded-xl">
+                    <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                            role === 'admin' ? 'bg-accent-blue/20' : 'bg-accent-purple/20'
+                        }`}>
+                            {role === 'admin' ? (
+                                <ShieldCheckIcon className="w-4 h-4 text-accent-blue" />
+                            ) : (
+                                <UserIcon className="w-4 h-4 text-accent-purple" />
+                            )}
+                        </div>
+                        <div>
+                            <p className="text-sm font-medium text-text-primary">{role === 'admin' ? 'Admin' : 'Staff'}</p>
+                            <p className="text-[10px] text-text-secondary">Logged in</p>
+                        </div>
                     </div>
                     <button
                         onClick={onLogout}
-                        className="text-xs font-semibold text-text-primary/80 hover:text-white transition-colors"
+                        className="px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-hover-bg rounded-lg transition-colors"
                     >
                         Logout
                     </button>

@@ -410,12 +410,7 @@ export const salesService = {
     async deleteAll(): Promise<void> {
         return withFirebaseCheck(
             async () => {
-                const snapshot = await getDocs(collection(db, 'salesData'));
-                const batch = writeBatch(db);
-                snapshot.docs.forEach(doc => {
-                    batch.delete(doc.ref);
-                });
-                await batch.commit();
+                await deleteCollectionDocuments('salesData');
             }
         );
     },
