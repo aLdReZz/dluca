@@ -849,7 +849,7 @@ input[type="number"] {
   height: 60px;
   display: flex;
   align-items: center;
-  justify-center;
+  justify-content: center;
   background: var(--bg-secondary);
   transform: translateY(-60px);
   transition: transform 0.2s;
