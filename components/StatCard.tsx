@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface StatCardProps {
     title: string;
@@ -9,6 +9,9 @@ interface StatCardProps {
 }
 
 const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, color, tooltip }) => {
+    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    const [isHovering, setIsHovering] = useState(false);
+
     const colorClasses = {
         blue: 'text-accent-blue',
         green: 'text-accent-green',
@@ -17,24 +20,46 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, color, to
         yellow: 'text-accent-yellow',
     };
 
-    const showTooltip = Boolean(tooltip);
+    const bgClasses = {
+        blue: 'bg-accent-blue/10',
+        green: 'bg-accent-green/10',
+        orange: 'bg-accent-orange/10',
+        purple: 'bg-accent-purple/10',
+        yellow: 'bg-accent-yellow/10',
+    };
+
+    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        setMousePos({
+            x: e.clientX,
+            y: e.clientY
+        });
+    };
 
     return (
-        <div className="group relative bg-bg-secondary rounded-xl border border-border-color transition-colors duration-300 hover:border-border-color/60 px-5 pt-6 pb-5 overflow-hidden">
-            <div className="absolute right-5 top-4 h-10 w-10 rounded-lg bg-bg-tertiary/90 ring-1 ring-border-color/60 flex items-center justify-center group-hover:ring-border-color">
-                <Icon className={`w-6 h-6 ${colorClasses[color]}`} />
-            </div>
-            <div className="pr-16">
-                <div className="text-sm font-medium text-text-secondary">
-                    <span>{title}</span>
-                    {tooltip && (
-                        <span className="ml-2 text-[11px] text-text-secondary/80 font-normal block">
-                            {tooltip}
-                        </span>
-                    )}
+        <div
+            className="group relative bg-bg-secondary rounded-xl border border-border-color/50 p-5 transition-all duration-200 hover:border-border-color"
+            onMouseMove={handleMouseMove}
+            onMouseEnter={() => setIsHovering(true)}
+            onMouseLeave={() => setIsHovering(false)}
+        >
+            <div className="flex items-center gap-3 mb-3">
+                <div className={`h-11 w-11 rounded-xl ${bgClasses[color]} flex items-center justify-center flex-shrink-0`}>
+                    <Icon className={`w-5 h-5 ${colorClasses[color]}`} />
                 </div>
-                <div className="text-3xl font-semibold text-text-primary mt-3">{value}</div>
+                <p className="text-xs font-medium text-text-secondary/70 uppercase tracking-wide truncate">{title}</p>
             </div>
+            <p className="text-2xl font-bold text-text-primary whitespace-nowrap">{value}</p>
+            {tooltip && isHovering && (
+                <div
+                    className="fixed bg-bg-tertiary border border-border-color rounded-lg p-3 shadow-lg z-50 pointer-events-none whitespace-nowrap"
+                    style={{
+                        left: `${mousePos.x + 15}px`,
+                        top: `${mousePos.y + 15}px`
+                    }}
+                >
+                    {tooltip}
+                </div>
+            )}
         </div>
     );
 };

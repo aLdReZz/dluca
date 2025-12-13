@@ -520,7 +520,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
                 <StatCard title="Net Sales" value={formatPeso(stats.netSales)} icon={CurrencyPesoIcon} color="blue" />
                 <StatCard title="Gross Sales" value={formatPeso(stats.grossSales)} icon={CurrencyPesoIcon} color="purple" />
                 <StatCard title="Total Profit" value={formatPeso(stats.totalProfit)} icon={ArrowTrendingUpIcon} color="green" />
-                <StatCard title="COGS" value={formatPeso(stats.totalCOGS)} icon={BanknotesIcon} color="orange" />
+                <StatCard title="Cost of Goods" value={formatPeso(stats.totalCOGS)} icon={BanknotesIcon} color="orange" />
                 <StatCard
                     title="Service Charge"
                     value={formatPeso(stats.serviceCharge)}
