@@ -2,7 +2,7 @@ import React from 'react';
 
 export type Role = 'admin' | 'staff';
 
-export type Page = 'dashboard' | 'sales' | 'pricelist' | 'inventory-supplies' | 'purchase-request' | 'costing' | 'accounting' | 'accounting-transactions' | 'accounting-profitloss' | 'attendance' | 'payroll' | 'calendar';
+export type Page = 'dashboard' | 'sales' | 'pricelist' | 'inventory-supplies' | 'purchase-request' | 'costing' | 'accounting' | 'accounting-transactions' | 'accounting-profitloss' | 'accounting-chartofaccounts' | 'attendance' | 'payroll' | 'calendar';
 
 export interface SalesData {
     [key: string]: string;
@@ -194,4 +194,16 @@ export interface AccountBalance {
     account: 'cash' | 'gcash' | 'grab' | 'card';
     openingBalance: number;
     currentBalance: number;
+}
+
+export interface Account {
+    id: string;
+    code: string;
+    name: string;
+    type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+    description?: string;
+    parentId?: string;
+    isActive: boolean;
+    createdAt?: string;
+    updatedAt?: string;
 }

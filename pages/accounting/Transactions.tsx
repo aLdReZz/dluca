@@ -44,10 +44,19 @@ const SummaryCard: React.FC<{
 
 const Transactions: React.FC = () => {
     const [isAddingNew, setIsAddingNew] = useState(false);
-    const [editingTransaction, setEditingTransaction] = useState<AccountingTransaction | null>(null);
+    const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
     const [deletingTransaction, setDeletingTransaction] = useState<AccountingTransaction | null>(null);
     const [operationStatus, setOperationStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
     const [openingBalance, setOpeningBalance] = useState<number>(0);
+
+    // Edit transaction form state
+    const [editDate, setEditDate] = useState('');
+    const [editType, setEditType] = useState<'credit' | 'debit'>('credit');
+    const [editDescription, setEditDescription] = useState('');
+    const [editReference, setEditReference] = useState('');
+    const [editCategory, setEditCategory] = useState('');
+    const [editPaymentMethod, setEditPaymentMethod] = useState('');
+    const [editAmount, setEditAmount] = useState('');
 
     // New transaction form state
     const [newDate, setNewDate] = useState(() => {
@@ -58,6 +67,7 @@ const Transactions: React.FC = () => {
     const [newDescription, setNewDescription] = useState('');
     const [newReference, setNewReference] = useState('');
     const [newCategory, setNewCategory] = useState('');
+    const [newPaymentMethod, setNewPaymentMethod] = useState('');
     const [newAmount, setNewAmount] = useState('');
 
     // Fetch all transactions
@@ -154,6 +164,7 @@ const Transactions: React.FC = () => {
             setNewDescription('');
             setNewReference('');
             setNewCategory('');
+            setNewPaymentMethod('');
             setNewAmount('');
             setIsAddingNew(false);
         } catch (error) {
@@ -168,8 +179,58 @@ const Transactions: React.FC = () => {
         setNewDescription('');
         setNewReference('');
         setNewCategory('');
+        setNewPaymentMethod('');
         setNewAmount('');
         setIsAddingNew(false);
+    };
+
+    const handleEditTransaction = (transaction: AccountingTransaction) => {
+        setEditingTransactionId(transaction.id);
+        setEditDate(transaction.date);
+        setEditType(transaction.type);
+        setEditDescription(transaction.description);
+        setEditReference(transaction.reference || '');
+        setEditCategory((transaction as any).category || '');
+        setEditPaymentMethod((transaction as any).paymentMethod || '');
+        setEditAmount(transaction.amount.toString());
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingTransactionId || !editDate || !editDescription || !editAmount) {
+            setOperationStatus({ type: 'error', message: 'Please fill in all required fields' });
+            return;
+        }
+
+        try {
+            await updateTransaction({
+                id: editingTransactionId,
+                updates: {
+                    date: editDate,
+                    type: editType,
+                    description: editDescription,
+                    reference: editReference,
+                    category: editCategory,
+                    paymentMethod: editPaymentMethod,
+                    amount: parseFloat(editAmount),
+                }
+            });
+            setOperationStatus({ type: 'success', message: 'Transaction updated successfully' });
+            await refetch();
+            setEditingTransactionId(null);
+        } catch (error) {
+            setOperationStatus({ type: 'error', message: 'Failed to update transaction' });
+        }
+    };
+
+    const handleCancelEdit = () => {
+        setEditingTransactionId(null);
+        setEditDate('');
+        setEditType('credit');
+        setEditDescription('');
+        setEditReference('');
+        setEditCategory('');
+        setEditPaymentMethod('');
+        setEditAmount('');
     };
 
     const handleDeleteTransaction = async () => {
@@ -283,6 +344,7 @@ const Transactions: React.FC = () => {
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Category</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Description</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Reference</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Payment Method</th>
                                         <th className="px-4 py-3 text-right text-sm font-semibold text-text-primary">Amount</th>
                                         <th className="px-4 py-3 text-center text-sm font-semibold text-text-primary">Actions</th>
                                     </tr>
@@ -301,7 +363,7 @@ const Transactions: React.FC = () => {
                                                 <select
                                                     value={newType}
                                                     onChange={(e) => setNewType(e.target.value as 'credit' | 'debit')}
-                                                    className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer"
+                                                    className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10"
                                                 >
                                                     <option value="credit">Income</option>
                                                     <option value="debit">Expense</option>
@@ -311,7 +373,7 @@ const Transactions: React.FC = () => {
                                                 <select
                                                     value={newCategory}
                                                     onChange={(e) => setNewCategory(e.target.value)}
-                                                    className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer"
+                                                    className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10"
                                                 >
                                                     <option value="">Select category</option>
                                                     <option value="Food">Food</option>
@@ -338,6 +400,19 @@ const Transactions: React.FC = () => {
                                                     placeholder="Reference (optional)"
                                                     className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
                                                 />
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <select
+                                                    value={newPaymentMethod}
+                                                    onChange={(e) => setNewPaymentMethod(e.target.value)}
+                                                    className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10"
+                                                >
+                                                    <option value="">Select method</option>
+                                                    <option value="Cash">Cash</option>
+                                                    <option value="GCash">GCash</option>
+                                                    <option value="Grab">Grab</option>
+                                                    <option value="Card">Card</option>
+                                                </select>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <input
@@ -367,41 +442,95 @@ const Transactions: React.FC = () => {
                                             </td>
                                         </tr>
                                     )}
-                                    {transactionsWithBalance.map((transaction) => (
-                                        <tr key={transaction.id} className="hover:bg-hover-bg/30 transition-colors">
-                                            <td className="px-4 py-3 text-sm text-text-primary">{formatDate(transaction.date)}</td>
-                                            <td className="px-4 py-3 text-sm">
-                                                <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                                    transaction.type === 'credit'
-                                                        ? 'bg-accent-green/20 text-accent-green'
-                                                        : transaction.type === 'transfer'
-                                                        ? 'bg-accent-blue/20 text-accent-blue'
-                                                        : 'bg-accent-red/20 text-accent-red'
-                                                }`}>
-                                                    {transaction.type === 'credit' ? 'Income' : transaction.type === 'transfer' ? 'Transfer' : 'Expense'}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-text-secondary">{(transaction as any).category || '-'}</td>
-                                            <td className="px-4 py-3 text-sm text-text-primary">{transaction.description}</td>
-                                            <td className="px-4 py-3 text-sm text-text-secondary">{transaction.reference || '-'}</td>
-                                            <td className="px-4 py-3 text-sm text-right font-medium">
-                                                <span className={transaction.type === 'credit' ? 'text-accent-green' : 'text-accent-red'}>
-                                                    {transaction.type === 'credit' ? '+' : '-'}{formatPeso(transaction.amount)}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center justify-center gap-2">
-                                                    <button
-                                                        onClick={() => setDeletingTransaction(transaction)}
-                                                        className="p-1 text-accent-red hover:bg-accent-red/20 rounded transition-colors"
-                                                        title="Delete"
-                                                    >
-                                                        <TrashIcon className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {transactionsWithBalance.map((transaction) => {
+                                        const isEditing = editingTransactionId === transaction.id;
+
+                                        if (isEditing) {
+                                            return (
+                                                <tr key={transaction.id} className="bg-accent-purple/10 border-2 border-accent-purple">
+                                                    <td className="px-4 py-3 relative overflow-visible">
+                                                        <DatePickerInput value={editDate} onChange={setEditDate} />
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <select value={editType} onChange={(e) => setEditType(e.target.value as 'credit' | 'debit')} className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10">
+                                                            <option value="credit">Income</option>
+                                                            <option value="debit">Expense</option>
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10">
+                                                            <option value="">Select category</option>
+                                                            <option value="Food">Food</option>
+                                                            <option value="Transportation">Transportation</option>
+                                                            <option value="Utilities">Utilities</option>
+                                                            <option value="Salary">Salary</option>
+                                                            <option value="Other">Other</option>
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <input type="text" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} placeholder="Description" className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue" />
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <input type="text" value={editReference} onChange={(e) => setEditReference(e.target.value)} placeholder="Reference (optional)" className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue" />
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <select value={editPaymentMethod} onChange={(e) => setEditPaymentMethod(e.target.value)} className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10">
+                                                            <option value="">Select method</option>
+                                                            <option value="Cash">Cash</option>
+                                                            <option value="GCash">GCash</option>
+                                                            <option value="Grab">Grab</option>
+                                                            <option value="Card">Card</option>
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <input type="number" step="0.01" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} placeholder="0.00" className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm text-right focus:ring-2 focus:ring-accent-blue focus:border-accent-blue" />
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            <button onClick={handleSaveEdit} className="px-3 py-1.5 bg-accent-green text-white rounded-lg hover:bg-accent-green/80 transition-colors text-sm font-medium">Save</button>
+                                                            <button onClick={handleCancelEdit} className="px-3 py-1.5 bg-bg-tertiary text-text-secondary rounded-lg hover:bg-hover-bg transition-colors text-sm font-medium">Cancel</button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }
+
+                                        return (
+                                            <tr key={transaction.id} className="hover:bg-hover-bg/30 transition-colors">
+                                                <td className="px-4 py-3 text-sm text-text-primary">{formatDate(transaction.date)}</td>
+                                                <td className="px-4 py-3 text-sm">
+                                                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                                        transaction.type === 'credit'
+                                                            ? 'bg-accent-green/20 text-accent-green'
+                                                            : transaction.type === 'transfer'
+                                                            ? 'bg-accent-blue/20 text-accent-blue'
+                                                            : 'bg-accent-red/20 text-accent-red'
+                                                    }`}>
+                                                        {transaction.type === 'credit' ? 'Income' : transaction.type === 'transfer' ? 'Transfer' : 'Expense'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-text-secondary">{(transaction as any).category || '-'}</td>
+                                                <td className="px-4 py-3 text-sm text-text-primary">{transaction.description}</td>
+                                                <td className="px-4 py-3 text-sm text-text-secondary">{transaction.reference || '-'}</td>
+                                                <td className="px-4 py-3 text-sm text-text-secondary">{(transaction as any).paymentMethod || '-'}</td>
+                                                <td className="px-4 py-3 text-sm text-right font-medium">
+                                                    <span className={transaction.type === 'credit' ? 'text-accent-green' : 'text-accent-red'}>
+                                                        {transaction.type === 'credit' ? '+' : '-'}{formatPeso(transaction.amount)}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <button onClick={() => handleEditTransaction(transaction)} className="p-1 text-accent-blue hover:bg-accent-blue/20 rounded transition-colors" title="Edit">
+                                                            <PencilIcon className="w-4 h-4" />
+                                                        </button>
+                                                        <button onClick={() => setDeletingTransaction(transaction)} className="p-1 text-accent-red hover:bg-accent-red/20 rounded transition-colors" title="Delete">
+                                                            <TrashIcon className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -424,7 +553,7 @@ const Transactions: React.FC = () => {
                                             <select
                                                 value={newType}
                                                 onChange={(e) => setNewType(e.target.value as 'credit' | 'debit')}
-                                                className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer"
+                                                className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10"
                                             >
                                                 <option value="credit">Income</option>
                                                 <option value="debit">Expense</option>
@@ -435,7 +564,7 @@ const Transactions: React.FC = () => {
                                             <select
                                                 value={newCategory}
                                                 onChange={(e) => setNewCategory(e.target.value)}
-                                                className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer"
+                                                className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10"
                                             >
                                                 <option value="">Select category</option>
                                                 <option value="Food">Food</option>
@@ -464,6 +593,20 @@ const Transactions: React.FC = () => {
                                                 placeholder="Reference"
                                                 className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
                                             />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-text-secondary mb-1">Payment Method</label>
+                                            <select
+                                                value={newPaymentMethod}
+                                                onChange={(e) => setNewPaymentMethod(e.target.value)}
+                                                className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10"
+                                            >
+                                                <option value="">Select method</option>
+                                                <option value="Cash">Cash</option>
+                                                <option value="GCash">GCash</option>
+                                                <option value="Grab">Grab</option>
+                                                <option value="Card">Card</option>
+                                            </select>
                                         </div>
                                         <div>
                                             <label className="block text-xs font-medium text-text-secondary mb-1">Amount</label>
@@ -521,6 +664,12 @@ const Transactions: React.FC = () => {
                                             <div className="flex justify-between">
                                                 <span className="text-text-secondary">Category:</span>
                                                 <span className="text-text-primary">{(transaction as any).category}</span>
+                                            </div>
+                                        )}
+                                        {(transaction as any).paymentMethod && (
+                                            <div className="flex justify-between">
+                                                <span className="text-text-secondary">Payment Method:</span>
+                                                <span className="text-text-primary">{(transaction as any).paymentMethod}</span>
                                             </div>
                                         )}
                                         <div className="flex justify-between">

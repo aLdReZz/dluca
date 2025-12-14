@@ -14,6 +14,7 @@ import {
     ShieldCheckIcon,
     UserIcon,
     BookOpenIcon,
+    ClipboardDocumentListIcon,
 } from './Icons';
 
 const InventoryBoxIcon: React.FC<{ className?: string }> = ({ className = '' }) => (
@@ -34,7 +35,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ role, currentPage, onNavigate, isOpen, onLogout }) => {
     const inventoryPages: Page[] = ['inventory-supplies', 'pricelist', 'purchase-request'];
-    const accountingPages: Page[] = ['accounting-transactions', 'accounting-profitloss'];
+    const accountingPages: Page[] = ['accounting-transactions', 'accounting-profitloss', 'accounting-chartofaccounts'];
     const [isInventoryOpen, setIsInventoryOpen] = useState(inventoryPages.includes(currentPage));
     const [isAccountingOpen, setIsAccountingOpen] = useState(accountingPages.includes(currentPage));
 
@@ -92,6 +93,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, currentPage, onNavigate, isOpen
     const accountingSubItems = [
         { id: 'accounting-transactions', label: 'Transactions', icon: CreditCardIcon },
         { id: 'accounting-profitloss', label: 'Profit and Loss', icon: ChartBarIcon },
+        { id: 'accounting-chartofaccounts', label: 'Chart of Accounts', icon: ClipboardDocumentListIcon },
     ];
 
     return (

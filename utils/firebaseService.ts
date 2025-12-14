@@ -16,7 +16,7 @@ import {
     DocumentData,
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './firebase';
-import type { Employee, AttendanceRecord, PayrollRecord, SalesData, InventoryItem, ProductInventoryItem, PurchaseOrder, RecipeCosting, CalendarEvent, AccountingTransaction, AccountBalance } from '../types';
+import type { Employee, AttendanceRecord, PayrollRecord, SalesData, InventoryItem, ProductInventoryItem, PurchaseOrder, RecipeCosting, CalendarEvent, AccountingTransaction, AccountBalance, Account } from '../types';
 
 const FIRESTORE_BATCH_LIMIT = 450;
 
@@ -932,6 +932,60 @@ export const accountingService = {
         return withFirebaseCheck(
             async () => {
                 await deleteDoc(doc(db, 'accountingTransactions', id));
+            }
+        );
+    },
+};
+
+// ==================== CHART OF ACCOUNTS ====================
+
+export const chartOfAccountsService = {
+    // Get all accounts
+    async getAll(): Promise<(Account & { id: string })[]> {
+        return withFirebaseCheck(
+            async () => {
+                const snapshot = await getDocs(
+                    query(collection(db, 'chartOfAccounts'), orderBy('code', 'asc'))
+                );
+                return snapshot.docs.map(doc => ({
+                    ...doc.data(),
+                    id: doc.id,
+                })) as (Account & { id: string })[];
+            },
+            () => []
+        );
+    },
+
+    // Add account
+    async add(account: Omit<Account, 'id'>): Promise<string> {
+        return withFirebaseCheck(
+            async () => {
+                const docRef = await addDoc(collection(db, 'chartOfAccounts'), {
+                    ...account,
+                    createdAt: new Date().toISOString(),
+                });
+                return docRef.id;
+            }
+        );
+    },
+
+    // Update account
+    async update(id: string, data: Partial<Account>): Promise<void> {
+        return withFirebaseCheck(
+            async () => {
+                await updateDoc(doc(db, 'chartOfAccounts', id), {
+                    ...data,
+                    updatedAt: new Date().toISOString(),
+                });
+            }
+        );
+    },
+
+    // Delete account
+    async delete(id: string): Promise<void> {
+        return withFirebaseCheck(
+            async () => {
+                await deleteDoc(doc(db, 'chartOfAccounts', id));
             }
         );
     },

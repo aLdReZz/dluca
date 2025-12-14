@@ -14,6 +14,7 @@ const DatePickerInput: React.FC<DatePickerInputProps> = ({ value, onChange, clas
     const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
     const containerRef = useRef<HTMLDivElement>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
+    const calendarRef = useRef<HTMLDivElement>(null);
 
     const formatDisplayDate = (dateStr: string) => {
         if (!dateStr) return 'Select date';
@@ -95,7 +96,12 @@ const DatePickerInput: React.FC<DatePickerInputProps> = ({ value, onChange, clas
     // Close on click outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+            if (
+                containerRef.current &&
+                !containerRef.current.contains(event.target as Node) &&
+                calendarRef.current &&
+                !calendarRef.current.contains(event.target as Node)
+            ) {
                 setIsOpen(false);
             }
         };
@@ -111,6 +117,7 @@ const DatePickerInput: React.FC<DatePickerInputProps> = ({ value, onChange, clas
 
     const calendarDropdown = isOpen && (
         <div
+            ref={calendarRef}
             className="fixed bg-[#2a2a2a] border-2 border-white/20 rounded-2xl shadow-2xl p-4 z-[9999] w-80 animate-fade-in-up"
             style={{
                 top: `${dropdownPosition.top}px`,
@@ -203,7 +210,7 @@ const DatePickerInput: React.FC<DatePickerInputProps> = ({ value, onChange, clas
                 ref={buttonRef}
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className={`w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer text-left ${className}`}
+                className={`w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer text-left whitespace-nowrap ${className}`}
             >
                 {formatDisplayDate(value)}
             </button>

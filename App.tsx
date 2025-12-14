@@ -514,7 +514,12 @@ const App: React.FC = () => {
             case 'accounting':
             case 'accounting-transactions':
             case 'accounting-profitloss':
-                return <Accounting activeView={page === 'accounting-profitloss' ? 'profitloss' : 'transactions'} />;
+            case 'accounting-chartofaccounts':
+                return <Accounting activeView={
+                    page === 'accounting-profitloss' ? 'profitloss'
+                    : page === 'accounting-chartofaccounts' ? 'chartofaccounts'
+                    : 'transactions'
+                } />;
             case 'attendance':
                 return (
                     <Attendance
