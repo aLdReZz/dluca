@@ -23,7 +23,7 @@ const StatusBadge: React.FC<{ status: PurchaseOrder['status'] }> = ({ status }) 
         Completed: 'bg-accent-green/20 text-accent-green',
         Cancelled: 'bg-accent-red/20 text-accent-red',
     };
-    return <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${statusClasses[status]}`}>{status}</span>;
+    return <span className={`inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium ${statusClasses[status]}`}>{status}</span>;
 };
 
 const PurchaseRequest: React.FC<PurchaseRequestProps> = ({ purchaseOrders: propPurchaseOrders, setPurchaseOrders: setPropPurchaseOrders, productInventoryItems: propProductInventoryItems, onAddPurchaseOrder, departments }) => {
@@ -216,10 +216,10 @@ const PurchaseRequest: React.FC<PurchaseRequestProps> = ({ purchaseOrders: propP
     }
 
     return (
-        <div className="p-3 sm:p-4 lg:p-6 max-w-7xl mx-auto w-full">
+        <div className="p-3 sm:p-4 lg:p-6 xl:p-8 max-w-7xl mx-auto w-full">
             {/* Operation Status Messages */}
             {operationStatus && (
-                <div className={`mb-3 p-2.5 rounded-lg border text-sm ${
+                <div className={`mb-3 sm:mb-4 p-2.5 sm:p-3 rounded-lg border text-xs sm:text-sm ${
                     operationStatus.type === 'success'
                         ? 'bg-green-500/10 border-green-500/30'
                         : 'bg-red-500/10 border-red-500/30'
@@ -230,31 +230,31 @@ const PurchaseRequest: React.FC<PurchaseRequestProps> = ({ purchaseOrders: propP
                 </div>
             )}
 
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-5 lg:mb-6 gap-2 sm:gap-3">
                  <div>
-                    <h1 className="text-2xl font-bold text-text-primary">Purchase Requests</h1>
-                    <p className="text-sm text-text-secondary">Manage and track your purchase orders.</p>
+                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-text-primary">Purchase Requests</h1>
+                    <p className="text-xs sm:text-sm text-text-secondary mt-0.5">Manage and track your purchase orders.</p>
                 </div>
                 <button
                     onClick={handleNewOrder}
-                    className="flex items-center gap-2 bg-accent-blue text-white px-3 py-1.5 text-sm font-medium rounded-lg shadow-md hover:bg-opacity-80 transition w-full sm:w-auto"
+                    className="flex items-center justify-center gap-1.5 sm:gap-2 bg-accent-blue text-white px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg shadow-md hover:bg-opacity-80 transition w-full sm:w-auto"
                 >
-                     <PlusIcon className="w-4 h-4" />
+                     <PlusIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     <span>New Purchase Request</span>
                 </button>
             </div>
-            
-            <div className="bg-bg-secondary rounded-xl border border-border-color">
-                <div className="p-3 flex flex-col sm:flex-row justify-between items-center gap-3 border-b border-border-color">
-                    <h2 className="text-lg font-semibold">Order History</h2>
+
+            <div className="bg-bg-secondary rounded-lg sm:rounded-xl border border-border-color">
+                <div className="p-2.5 sm:p-3 flex flex-col sm:flex-row justify-between items-center gap-2 sm:gap-3 border-b border-border-color">
+                    <h2 className="text-sm sm:text-base lg:text-lg font-semibold">Order History</h2>
                     <div className="relative w-full sm:w-auto">
-                        <SearchIcon className="w-4 h-4 text-text-secondary absolute top-1/2 left-2.5 -translate-y-1/2" />
+                        <SearchIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-text-secondary absolute top-1/2 left-2 sm:left-2.5 -translate-y-1/2" />
                         <input
                             type="text"
                             placeholder="Search by department or PO#..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="bg-bg-primary border border-border-color rounded-lg py-1.5 pl-9 pr-3 text-sm focus:ring-accent-blue focus:border-accent-blue w-full sm:w-56"
+                            className="bg-bg-primary border border-border-color rounded-lg py-1.5 pl-7 sm:pl-9 pr-2 sm:pr-3 text-xs sm:text-sm focus:ring-accent-blue focus:border-accent-blue w-full sm:w-48 lg:w-56"
                         />
                     </div>
                 </div>
@@ -262,24 +262,24 @@ const PurchaseRequest: React.FC<PurchaseRequestProps> = ({ purchaseOrders: propP
                 {/* Mobile Card View */}
                 <div className="block md:hidden divide-y divide-border-color">
                     {filteredOrders.length > 0 ? filteredOrders.map(order => (
-                        <div key={order.id} className="p-3 hover:bg-hover-bg/50 transition-colors">
-                            <div className="flex justify-between items-start mb-2">
+                        <div key={order.id} className="p-2.5 sm:p-3 hover:bg-hover-bg/50 transition-colors">
+                            <div className="flex justify-between items-start mb-1.5 sm:mb-2">
                                 <div className="flex-1">
-                                    <div className="text-xs text-text-secondary mb-1">
+                                    <div className="text-[10px] sm:text-xs text-text-secondary mb-0.5 sm:mb-1">
                                         {new Date(order.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                     </div>
-                                    <div className="font-semibold text-text-primary">{order.department}</div>
+                                    <div className="text-sm sm:text-base font-semibold text-text-primary">{order.department}</div>
                                 </div>
                                 <button
                                     ref={(el) => (dropdownButtonRefs.current[order.id] = el)}
                                     onClick={() => toggleDropdown(order.id)}
-                                    className="text-text-secondary hover:text-text-primary p-1"
+                                    className="text-text-secondary hover:text-text-primary p-0.5 sm:p-1"
                                 >
-                                    <EllipsisHorizontalIcon className="w-5 h-5"/>
+                                    <EllipsisHorizontalIcon className="w-4 h-4 sm:w-5 sm:h-5"/>
                                 </button>
                             </div>
                             <div className="flex justify-between items-center">
-                                <div className="text-lg font-bold text-accent-blue">
+                                <div className="text-base sm:text-lg font-bold text-accent-blue">
                                     {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(order.totalCost)}
                                 </div>
                                 <StatusBadge status={order.status} />

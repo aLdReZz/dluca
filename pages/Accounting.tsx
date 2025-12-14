@@ -29,12 +29,12 @@ const Accounting: React.FC<AccountingProps> = ({ activeView }) => {
     return (
         <div className="h-full flex flex-col bg-bg-primary">
             {/* Header */}
-            <div className="p-4 lg:p-6 border-b border-border-color sticky-mobile">
+            <div className="p-3 sm:p-4 lg:p-6 border-b border-border-color sticky-mobile">
                 <div>
-                    <h1 className="text-2xl lg:text-3xl font-bold text-text-primary">
+                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-text-primary">
                         {getTitle()}
                     </h1>
-                    <p className="text-sm text-text-secondary mt-1">
+                    <p className="text-xs sm:text-sm text-text-secondary mt-0.5 sm:mt-1">
                         {getDescription()}
                     </p>
                 </div>

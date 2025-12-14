@@ -345,10 +345,10 @@ const Calendar: React.FC<CalendarProps> = ({ events: propEvents, setEvents: setP
 
     return (
         <div className="min-h-screen w-full bg-bg-primary">
-            <div className="p-4 sm:p-8 lg:p-12 max-w-7xl mx-auto w-full space-y-8">
+            <div className="p-3 sm:p-4 lg:p-6 xl:p-8 max-w-7xl mx-auto w-full space-y-4 sm:space-y-6 lg:space-y-8">
                 {/* Operation Status Messages */}
                 {operationStatus && (
-                    <div className={`p-4 rounded-lg border ${
+                    <div className={`p-3 sm:p-4 rounded-lg border text-xs sm:text-sm ${
                         operationStatus.type === 'success'
                             ? 'bg-green-500/10 border-green-500/30'
                             : 'bg-red-500/10 border-red-500/30'
@@ -359,30 +359,30 @@ const Calendar: React.FC<CalendarProps> = ({ events: propEvents, setEvents: setP
                     </div>
                 )}
 
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
                     <div>
-                        <h2 className="text-3xl font-semibold text-text-primary">Content Calendar</h2>
-                        <p className="text-text-secondary mt-1">Plan and schedule your social media content.</p>
+                        <h2 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-text-primary">Content Calendar</h2>
+                        <p className="text-text-secondary mt-0.5 sm:mt-1 text-xs sm:text-sm">Plan and schedule your social media content.</p>
                     </div>
-                    <button onClick={() => handleDayClick(new Date().toISOString().split('T')[0])} className="bg-accent-blue text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg hover:bg-accent-blue/80 transition flex items-center gap-2">
-                        <PlusIcon className="w-5 h-5"/>
+                    <button onClick={() => handleDayClick(new Date().toISOString().split('T')[0])} className="bg-accent-blue text-white px-3 sm:px-4 lg:px-5 py-1.5 sm:py-2 lg:py-2.5 rounded-lg sm:rounded-xl font-semibold text-xs sm:text-sm shadow-lg hover:bg-accent-blue/80 transition flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-center">
+                        <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5"/>
                         Add Event
                     </button>
                 </div>
-                <div className="bg-bg-secondary p-6 sm:p-8 rounded-3xl border border-border-color shadow-2xl">
-                    <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
-                        <div className="flex items-center gap-3">
-                             <button onClick={() => changeMonth(-1)} className="p-2 rounded-full border border-border-color text-text-secondary hover:bg-hover-bg transition"><ChevronLeftIcon className="w-6 h-6" /></button>
-                             <button onClick={() => changeMonth(1)} className="p-2 rounded-full border border-border-color text-text-secondary hover:bg-hover-bg transition"><ChevronRightIcon className="w-6 h-6" /></button>
-                             <h3 className="text-xl font-semibold text-text-primary ml-2">{monthName}</h3>
+                <div className="bg-bg-secondary p-3 sm:p-4 lg:p-6 xl:p-8 rounded-xl sm:rounded-2xl lg:rounded-3xl border border-border-color shadow-2xl">
+                    <div className="flex flex-col sm:flex-row justify-between items-center mb-4 sm:mb-6 lg:mb-8 gap-3 sm:gap-4">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                             <button onClick={() => changeMonth(-1)} className="p-1.5 sm:p-2 rounded-full border border-border-color text-text-secondary hover:bg-hover-bg transition"><ChevronLeftIcon className="w-5 h-5 sm:w-6 sm:h-6" /></button>
+                             <button onClick={() => changeMonth(1)} className="p-1.5 sm:p-2 rounded-full border border-border-color text-text-secondary hover:bg-hover-bg transition"><ChevronRightIcon className="w-5 h-5 sm:w-6 sm:h-6" /></button>
+                             <h3 className="text-base sm:text-lg lg:text-xl font-semibold text-text-primary ml-1 sm:ml-2">{monthName}</h3>
                         </div>
-                        <button onClick={goToToday} className="px-4 py-2 text-sm font-medium rounded-xl bg-bg-primary border border-border-color text-text-primary hover:bg-hover-bg transition">
+                        <button onClick={goToToday} className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg sm:rounded-xl bg-bg-primary border border-border-color text-text-primary hover:bg-hover-bg transition">
                             Today
                         </button>
                     </div>
-                    <div className="grid grid-cols-7 gap-4">
+                    <div className="grid grid-cols-7 gap-1 sm:gap-2 lg:gap-4">
                          {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
-                            <div key={day} className="p-3 text-center text-xs font-semibold uppercase tracking-wide text-text-secondary">{day}</div>
+                            <div key={day} className="p-1 sm:p-2 lg:p-3 text-center text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-text-secondary">{day}</div>
                         ))}
                         {calendarGrid}
                     </div>

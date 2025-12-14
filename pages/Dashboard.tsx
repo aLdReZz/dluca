@@ -447,7 +447,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
     }> = ({ period, label, activeFilter, onClick }) => (
         <button
             onClick={onClick}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors duration-200 ${
+            className={`px-2 sm:px-2.5 lg:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs lg:text-sm font-medium rounded-md transition-colors duration-200 whitespace-nowrap ${
                 activeFilter === period
                     ? 'bg-accent-blue text-white'
                     : 'bg-bg-tertiary text-text-secondary hover:bg-hover-bg'
@@ -479,14 +479,14 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
     }
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
-             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4">
+        <div className="p-3 sm:p-4 lg:p-6 xl:p-8 max-w-7xl mx-auto w-full">
+             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 sm:mb-6 lg:mb-8 gap-3 sm:gap-4">
                 <div>
-                    <h2 className="text-3xl font-semibold">Overview</h2>
-                    <p className="text-text-secondary mt-1">A snapshot of your cafe's performance.</p>
+                    <h2 className="text-xl sm:text-2xl lg:text-3xl font-semibold">Overview</h2>
+                    <p className="text-text-secondary mt-0.5 sm:mt-1 text-xs sm:text-sm">A snapshot of your cafe's performance.</p>
                 </div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 flex-wrap">
-                    <div className="flex items-center gap-2 p-1 bg-bg-tertiary rounded-lg">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 flex-wrap w-full sm:w-auto">
+                    <div className="flex items-center gap-1 sm:gap-1.5 p-0.5 sm:p-1 bg-bg-tertiary rounded-lg w-full sm:w-auto overflow-x-auto">
                         <FilterButton period="daily" label="Today" activeFilter={filter} onClick={() => handleFilterChange('daily')} />
                         <FilterButton period="weekly" label="This Week" activeFilter={filter} onClick={() => handleFilterChange('weekly')} />
                         <FilterButton period="monthly" label="This Month" activeFilter={filter} onClick={() => handleFilterChange('monthly')} />
@@ -495,11 +495,11 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
                     <div className="relative w-full sm:w-auto" ref={calendarRef}>
                         <button
                             onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-                            className="w-full sm:w-auto bg-bg-tertiary border border-border-color rounded-lg px-3 py-2 text-sm font-medium flex items-center justify-between sm:justify-start gap-2 hover:bg-hover-bg transition"
+                            className="w-full sm:w-auto bg-bg-tertiary border border-border-color rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center justify-between sm:justify-start gap-2 hover:bg-hover-bg transition"
                             aria-label="Select date range"
                         >
-                            <CalendarDaysIcon className="w-5 h-5 text-text-secondary" />
-                            <span className="text-text-primary">
+                            <CalendarDaysIcon className="w-4 h-4 sm:w-5 sm:h-5 text-text-secondary flex-shrink-0" />
+                            <span className="text-text-primary truncate">
                                 {startDate && endDate
                                     ? `${formatDateForDisplay(startDate)} - ${formatDateForDisplay(endDate)}`
                                     : 'Select range'}
@@ -516,7 +516,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 lg:gap-4 xl:gap-6 mb-4 sm:mb-6 lg:mb-8">
                 <StatCard title="Net Sales" value={formatPeso(stats.netSales)} icon={CurrencyPesoIcon} color="blue" />
                 <StatCard title="Gross Sales" value={formatPeso(stats.grossSales)} icon={CurrencyPesoIcon} color="purple" />
                 <StatCard title="Total Profit" value={formatPeso(stats.totalProfit)} icon={ArrowTrendingUpIcon} color="green" />
@@ -542,15 +542,15 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
             </div>
 
             <div
-                className={`bg-bg-secondary p-6 rounded-xl border border-border-color transition-all duration-500 ease-out transform ${
+                className={`bg-bg-secondary p-3 sm:p-4 lg:p-6 rounded-lg sm:rounded-xl border border-border-color transition-all duration-500 ease-out transform ${
                     isSalesContainerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
                 }`}
             >
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold">Sales Overview</h3>
+                <div className="flex justify-between items-center mb-3 sm:mb-4">
+                    <h3 className="text-base sm:text-lg font-semibold">Sales Overview</h3>
                 </div>
                 <div
-                    className={`h-80 transition-all duration-500 ease-out transform ${
+                    className={`h-64 sm:h-72 lg:h-80 transition-all duration-500 ease-out transform ${
                         isSalesChartVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
                     }`}
                 >

@@ -14,9 +14,9 @@ interface CostingProps {
 }
 
 const StatCard: React.FC<{title: string, value: string}> = ({title, value}) => (
-    <div className="bg-bg-secondary p-5 rounded-xl border border-border-color">
-        <div className="text-sm font-medium text-text-secondary">{title}</div>
-        <div className="text-3xl font-semibold text-text-primary mt-2">{value}</div>
+    <div className="bg-bg-secondary p-3 sm:p-4 lg:p-5 rounded-lg sm:rounded-xl border border-border-color">
+        <div className="text-xs sm:text-sm font-medium text-text-secondary">{title}</div>
+        <div className="text-xl sm:text-2xl lg:text-3xl font-semibold text-text-primary mt-1 sm:mt-2">{value}</div>
     </div>
 );
 
@@ -24,10 +24,10 @@ const RecipeCard: React.FC<{ recipe: RecipeCosting; onEdit: () => void; onDelete
     const formatPeso = (amount: number) => `₱${amount.toFixed(2)}`;
     
     return (
-        <div className="bg-bg-secondary rounded-xl border border-border-color p-5 flex flex-col justify-between transition-shadow hover:shadow-lg hover:border-border-color/80">
+        <div className="bg-bg-secondary rounded-lg sm:rounded-xl border border-border-color p-3 sm:p-4 lg:p-5 flex flex-col justify-between transition-shadow hover:shadow-lg hover:border-border-color/80">
             <div>
-                <h3 className="text-lg font-semibold text-text-primary truncate">{recipe.name}</h3>
-                <div className="mt-4 space-y-2 text-sm">
+                <h3 className="text-base sm:text-lg font-semibold text-text-primary truncate">{recipe.name}</h3>
+                <div className="mt-3 sm:mt-4 space-y-1.5 sm:space-y-2 text-xs sm:text-sm">
                     <div className="flex justify-between">
                         <span className="text-text-secondary">Ingredient Cost:</span>
                         <span className="font-medium">{formatPeso(recipe.totalCost)}</span>
@@ -180,10 +180,10 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
     }
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+        <div className="p-3 sm:p-4 lg:p-6 xl:p-8 max-w-7xl mx-auto w-full">
             {/* Operation Status Messages */}
             {operationStatus && (
-                <div className={`mb-6 p-4 rounded-lg border ${
+                <div className={`mb-4 sm:mb-6 p-3 sm:p-4 rounded-lg border text-xs sm:text-sm ${
                     operationStatus.type === 'success'
                         ? 'bg-green-500/10 border-green-500/30'
                         : 'bg-red-500/10 border-red-500/30'
@@ -194,17 +194,17 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
                 </div>
             )}
 
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 lg:mb-8 gap-3 sm:gap-4">
                  <div>
-                    <h2 className="text-3xl font-semibold">Costing Analysis</h2>
-                    <p className="text-text-secondary mt-1">Analyze the cost and profitability of your recipes.</p>
+                    <h2 className="text-xl sm:text-2xl lg:text-3xl font-semibold">Costing Analysis</h2>
+                    <p className="text-text-secondary mt-0.5 sm:mt-1 text-xs sm:text-sm">Analyze the cost and profitability of your recipes.</p>
                 </div>
-                <button onClick={handleOpenAddModal} className="flex items-center gap-2 bg-accent-blue text-white px-4 py-2 rounded-lg font-medium text-sm shadow-md hover:bg-opacity-80 transition w-full sm:w-auto">
-                    <PlusIcon className="w-5 h-5"/>
+                <button onClick={handleOpenAddModal} className="flex items-center gap-1.5 sm:gap-2 bg-accent-blue text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm shadow-md hover:bg-opacity-80 transition w-full sm:w-auto">
+                    <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5"/>
                     Add Recipe Costing
                 </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4 xl:gap-6 mb-4 sm:mb-6 lg:mb-8">
                 <StatCard title="Avg. Final Cost %" value={`${averageFinalCost.toFixed(2)}%`} />
                 <StatCard title="Beverage Cost %" value="0.00%" />
                 <StatCard title="Pastry Cost %" value="0.00%" />
@@ -212,7 +212,7 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
             </div>
             
             {recipeCostings.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
                     {recipeCostings.map(recipe => (
                         <RecipeCard 
                             key={recipe.id} 

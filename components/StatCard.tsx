@@ -37,18 +37,18 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, color, to
 
     return (
         <div
-            className="group relative bg-bg-secondary rounded-xl border border-border-color/50 p-5 transition-all duration-200 hover:border-border-color"
+            className="group relative bg-bg-secondary rounded-lg sm:rounded-xl border border-border-color/50 p-3 sm:p-4 lg:p-5 transition-all duration-200 hover:border-border-color"
             onMouseMove={handleMouseMove}
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
         >
-            <div className="flex items-center gap-3 mb-3">
-                <div className={`h-11 w-11 rounded-xl ${bgClasses[color]} flex items-center justify-center flex-shrink-0`}>
-                    <Icon className={`w-5 h-5 ${colorClasses[color]}`} />
+            <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                <div className={`h-8 w-8 sm:h-10 sm:w-10 lg:h-11 lg:w-11 rounded-lg sm:rounded-xl ${bgClasses[color]} flex items-center justify-center flex-shrink-0`}>
+                    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${colorClasses[color]}`} />
                 </div>
-                <p className="text-xs font-medium text-text-secondary/70 uppercase tracking-wide truncate">{title}</p>
+                <p className="text-[10px] sm:text-xs font-medium text-text-secondary/70 uppercase tracking-wide truncate">{title}</p>
             </div>
-            <p className="text-2xl font-bold text-text-primary whitespace-nowrap">{value}</p>
+            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-text-primary whitespace-nowrap">{value}</p>
             {tooltip && isHovering && (
                 <div
                     className="fixed bg-bg-tertiary border border-border-color rounded-lg p-3 shadow-lg z-50 pointer-events-none whitespace-nowrap"

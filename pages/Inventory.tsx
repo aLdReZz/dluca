@@ -26,15 +26,15 @@ interface InventoryProps {
 const StatCard: React.FC<{ title: string; value: string | number; description: string; icon: React.FC<{ className?: string }>; iconClasses: string }> = ({ title, value, description, icon: Icon, iconClasses }) => {
     const [bgColor, textColor] = iconClasses.split(' ');
     return (
-        <div className="bg-bg-secondary p-4 rounded-xl border border-border-color">
-            <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${bgColor}`}>
-                    <Icon className={`w-5 h-5 ${textColor}`} />
+        <div className="bg-bg-secondary p-3 sm:p-4 rounded-lg sm:rounded-xl border border-border-color">
+            <div className="flex items-center gap-2 sm:gap-3">
+                <div className={`p-1.5 sm:p-2 rounded-lg ${bgColor}`}>
+                    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${textColor}`} />
                 </div>
-                <h3 className="font-semibold">{title}</h3>
+                <h3 className="text-sm sm:text-base font-semibold">{title}</h3>
             </div>
-            <p className="text-3xl font-bold mt-4">{value}</p>
-            <p className="text-xs text-text-secondary">{description}</p>
+            <p className="text-xl sm:text-2xl lg:text-3xl font-bold mt-2 sm:mt-4">{value}</p>
+            <p className="text-[10px] sm:text-xs text-text-secondary">{description}</p>
         </div>
     );
 };
@@ -110,15 +110,15 @@ const ProductInventoryView: React.FC<{
     const hasLocalProducts = products.some(p => typeof p.id === 'number' || !isNaN(Number(p.id)));
 
     return (
-        <div className="bg-bg-secondary rounded-xl border border-border-color overflow-hidden shadow-lg">
+        <div className="bg-bg-secondary rounded-lg sm:rounded-xl border border-border-color overflow-hidden shadow-lg">
             {/* Migration Progress Bar */}
             {isMigrating && migrationProgress && (
-                <div className="bg-accent-blue/10 border-b border-accent-blue/30 px-5 py-3">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-accent-blue">Migrating to Firebase...</span>
-                        <span className="text-xs text-text-secondary">{migrationProgress.current} / {migrationProgress.total}</span>
+                <div className="bg-accent-blue/10 border-b border-accent-blue/30 px-3 sm:px-5 py-2 sm:py-3">
+                    <div className="flex items-center justify-between mb-1 sm:mb-2">
+                        <span className="text-xs sm:text-sm font-medium text-accent-blue">Migrating to Firebase...</span>
+                        <span className="text-[10px] sm:text-xs text-text-secondary">{migrationProgress.current} / {migrationProgress.total}</span>
                     </div>
-                    <div className="w-full bg-bg-primary rounded-full h-2 overflow-hidden">
+                    <div className="w-full bg-bg-primary rounded-full h-1.5 sm:h-2 overflow-hidden">
                         <div
                             className="bg-accent-blue h-full transition-all duration-300"
                             style={{ width: `${(migrationProgress.current / migrationProgress.total) * 100}%` }}
@@ -127,38 +127,38 @@ const ProductInventoryView: React.FC<{
                 </div>
             )}
 
-            <div className="px-5 py-4 flex flex-col sm:flex-row justify-between items-center gap-3 border-b border-border-color bg-gradient-to-r from-bg-secondary to-bg-tertiary/20">
-                <h2 className="text-lg font-bold">Product Pricelist</h2>
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <div className="relative w-full sm:w-auto">
-                        <SearchIcon className="w-4 h-4 text-text-secondary absolute top-1/2 left-3 -translate-y-1/2" />
+            <div className="px-3 sm:px-4 lg:px-5 py-3 sm:py-4 flex flex-col sm:flex-row justify-between items-center gap-2 sm:gap-3 border-b border-border-color bg-gradient-to-r from-bg-secondary to-bg-tertiary/20">
+                <h2 className="text-sm sm:text-base lg:text-lg font-bold">Product Pricelist</h2>
+                <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:flex-initial">
+                        <SearchIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-text-secondary absolute top-1/2 left-2 sm:left-3 -translate-y-1/2" />
                         <input
                             type="text"
                             placeholder="Search item..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="bg-bg-primary border border-border-color rounded-lg py-2 pl-9 pr-3 text-sm focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue w-full sm:w-56 transition-all"
+                            className="bg-bg-primary border border-border-color rounded-lg py-1.5 sm:py-2 pl-7 sm:pl-9 pr-2 sm:pr-3 text-xs sm:text-sm focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue w-full sm:w-48 lg:w-56 transition-all"
                         />
                     </div>
                     {hasLocalProducts && onMigrateClick && (
                         <button
                             onClick={onMigrateClick}
                             disabled={isMigrating}
-                            className="flex items-center gap-1.5 bg-accent-blue text-white px-3 py-2 text-xs font-semibold rounded-lg hover:bg-opacity-90 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex items-center gap-1 sm:gap-1.5 bg-accent-blue text-white px-2 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold rounded-lg hover:bg-opacity-90 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                         >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                             </svg>
-                            <span className="hidden sm:inline">Migrate to Firebase</span>
+                            <span className="hidden md:inline">Migrate</span>
                         </button>
                     )}
-                    <button onClick={onUploadClick} className="flex items-center gap-1.5 bg-bg-tertiary text-text-primary px-3 py-2 text-xs font-semibold rounded-lg hover:bg-hover-bg transition-all hover:scale-102 border border-border-color">
-                        <UploadIcon className="w-4 h-4" />
-                        <span className="hidden sm:inline">Upload CSV</span>
+                    <button onClick={onUploadClick} className="flex items-center gap-1 sm:gap-1.5 bg-bg-tertiary text-text-primary px-2 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold rounded-lg hover:bg-hover-bg transition-all hover:scale-102 border border-border-color">
+                        <UploadIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span className="hidden md:inline">Upload</span>
                     </button>
-                    <button onClick={onAddItemClick} className="flex items-center gap-1.5 bg-accent-green text-white px-3 py-2 text-xs font-semibold rounded-lg shadow-md hover:bg-opacity-90 transition-all hover:scale-105">
-                        <PlusIcon className="w-4 h-4" />
-                        <span className="hidden sm:inline">Add Item</span>
+                    <button onClick={onAddItemClick} className="flex items-center gap-1 sm:gap-1.5 bg-accent-green text-white px-2 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold rounded-lg shadow-md hover:bg-opacity-90 transition-all hover:scale-105">
+                        <PlusIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span className="hidden md:inline">Add</span>
                     </button>
                 </div>
             </div>
@@ -781,29 +781,29 @@ const Inventory: React.FC<InventoryProps> = ({ inventoryItems: propInventoryItem
     }
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+        <div className="p-3 sm:p-4 lg:p-6 xl:p-8 max-w-7xl mx-auto w-full">
             {/* Operation Status Messages */}
             {operationStatus && (
-                <div className={`mb-6 p-4 rounded-lg border ${
+                <div className={`mb-4 sm:mb-6 p-3 sm:p-4 rounded-lg border ${
                     operationStatus.type === 'success'
                         ? 'bg-green-500/10 border-green-500/30'
                         : 'bg-red-500/10 border-red-500/30'
                 }`}>
-                    <p className={operationStatus.type === 'success' ? 'text-green-500' : 'text-red-500'}>
+                    <p className={`text-xs sm:text-sm ${operationStatus.type === 'success' ? 'text-green-500' : 'text-red-500'}`}>
                         {operationStatus.message}
                     </p>
                 </div>
             )}
-            <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
+            <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
                 accept=".csv"
                 onChange={handleFileUpload}
             />
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-text-primary">{pageTitle}</h1>
-                <p className="text-text-secondary">Today, {formattedDate}</p>
+            <div className="mb-4 sm:mb-6 lg:mb-8">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-text-primary">{pageTitle}</h1>
+                <p className="text-text-secondary text-xs sm:text-sm mt-0.5 sm:mt-1">Today, {formattedDate}</p>
             </div>
             
             {activeView === 'product' ? (

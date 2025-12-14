@@ -645,7 +645,7 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
     }> = ({ period, label, activeFilter, onClick }) => (
         <button
             onClick={onClick}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors duration-200 ${
+            className={`px-2 sm:px-2.5 lg:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs lg:text-sm font-medium rounded-md transition-colors duration-200 whitespace-nowrap ${
                 activeFilter === period
                     ? 'bg-accent-blue text-white'
                     : 'bg-transparent text-text-secondary hover:text-text-primary hover:bg-bg-secondary'
@@ -677,15 +677,15 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
     }
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+        <div className="p-3 sm:p-4 lg:p-6 xl:p-8 max-w-7xl mx-auto w-full">
             {/* Header with Date Filters */}
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 sm:mb-6 lg:mb-8 gap-3 sm:gap-4">
                 <div>
-                    <h2 className="text-3xl font-semibold">Sales Tracking</h2>
-                    <p className="text-text-secondary mt-1">Track and analyze your sales transactions.</p>
+                    <h2 className="text-xl sm:text-2xl lg:text-3xl font-semibold">Sales Tracking</h2>
+                    <p className="text-text-secondary mt-0.5 sm:mt-1 text-xs sm:text-sm">Track and analyze your sales transactions.</p>
                 </div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 flex-wrap">
-                    <div className="flex items-center gap-2 p-1 bg-bg-tertiary rounded-lg">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 flex-wrap w-full sm:w-auto">
+                    <div className="flex items-center gap-1 sm:gap-1.5 p-0.5 sm:p-1 bg-bg-tertiary rounded-lg w-full sm:w-auto overflow-x-auto">
                         <FilterButton period="daily" label="Today" activeFilter={filter} onClick={() => handleFilterChange('daily')} />
                         <FilterButton period="weekly" label="This Week" activeFilter={filter} onClick={() => handleFilterChange('weekly')} />
                         <FilterButton period="monthly" label="This Month" activeFilter={filter} onClick={() => handleFilterChange('monthly')} />
@@ -694,11 +694,11 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                     <div className="relative w-full sm:w-auto" ref={calendarRef}>
                         <button
                             onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-                            className="w-full sm:w-auto bg-bg-tertiary border border-border-color rounded-lg px-3 py-2 text-sm font-medium flex items-center justify-between sm:justify-start gap-2 hover:bg-hover-bg transition"
+                            className="w-full sm:w-auto bg-bg-tertiary border border-border-color rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center justify-between sm:justify-start gap-2 hover:bg-hover-bg transition"
                             aria-label="Select date range"
                         >
-                            <CalendarDaysIcon className="w-5 h-5 text-text-secondary" />
-                            <span className="text-text-primary">
+                            <CalendarDaysIcon className="w-4 h-4 sm:w-5 sm:h-5 text-text-secondary flex-shrink-0" />
+                            <span className="text-text-primary truncate">
                                 {startDate && endDate
                                     ? `${formatDateForDisplay(startDate)} - ${formatDateForDisplay(endDate)}`
                                     : 'Select range'}
@@ -784,29 +784,29 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
 
             {/* Payment System Breakdown Cards */}
             {salesData.length > 0 && paymentSystemStats.length > 0 && (
-                <div className="mb-8">
-                    <div className="flex justify-between items-center mb-4">
-                        <div className="flex items-baseline gap-3">
-                            <h2 className="text-xl font-bold">Sales by Payment System</h2>
-                            <p className="text-sm text-text-secondary/50">
+                <div className="mb-4 sm:mb-6 lg:mb-8">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-4 gap-2">
+                        <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
+                            <h2 className="text-base sm:text-lg lg:text-xl font-bold">Sales by Payment System</h2>
+                            <p className="text-[11px] sm:text-xs lg:text-sm text-text-secondary/50">
                                 Total: {formatPeso(paymentSystemStats.reduce((sum, stat) => sum + stat.total, 0))}
                             </p>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1.5 sm:gap-2">
                             <button
                                 onClick={handleExportToExcel}
-                                className="p-2 bg-bg-tertiary hover:bg-hover-bg text-text-secondary hover:text-text-primary border border-border-color/50 rounded-lg transition-all duration-300"
+                                className="p-1.5 sm:p-2 bg-bg-tertiary hover:bg-hover-bg text-text-secondary hover:text-text-primary border border-border-color/50 rounded-lg transition-all duration-300"
                                 title="Export to Excel"
                             >
-                                <ClipboardDocumentListIcon className="w-5 h-5" />
+                                <ClipboardDocumentListIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                             </button>
 
                             <label
                                 htmlFor="salesFileInput"
-                                className="p-2 bg-bg-tertiary hover:bg-hover-bg text-text-secondary hover:text-text-primary border border-border-color/50 rounded-lg cursor-pointer transition-all duration-300"
+                                className="p-1.5 sm:p-2 bg-bg-tertiary hover:bg-hover-bg text-text-secondary hover:text-text-primary border border-border-color/50 rounded-lg cursor-pointer transition-all duration-300"
                                 title="Upload CSV"
                             >
-                                <UploadIcon className="w-5 h-5" />
+                                <UploadIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                                 <input type="file" id="salesFileInput" className="hidden" accept=".csv" onChange={handleFileChange} />
                             </label>
 
@@ -814,15 +814,15 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                                 <button
                                     onClick={() => setShowDeleteConfirm(true)}
                                     disabled={deleteLoading}
-                                    className="p-2 bg-bg-tertiary hover:bg-hover-bg text-text-secondary hover:text-text-primary border border-border-color/50 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="p-1.5 sm:p-2 bg-bg-tertiary hover:bg-hover-bg text-text-secondary hover:text-text-primary border border-border-color/50 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                                     title="Delete All"
                                 >
-                                    <TrashIcon className="w-5 h-5" />
+                                    <TrashIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                                 </button>
                             )}
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-2 sm:gap-3 lg:gap-4">
                         {paymentSystemStats.map((system) => {
                             const { icon: Icon, color } = getPaymentIcon(system.name);
                             const colors = colorClasses[color as keyof typeof colorClasses];
@@ -830,26 +830,26 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                             return (
                                 <div
                                     key={system.name}
-                                    className="bg-bg-secondary rounded-xl border border-border-color/50 p-5 transition-all duration-200 hover:border-border-color"
+                                    className="bg-bg-secondary rounded-lg sm:rounded-xl border border-border-color/50 p-3 sm:p-4 lg:p-5 transition-all duration-200 hover:border-border-color lg:flex-1 lg:min-w-0"
                                 >
                                     {/* Row 1: Icon + Title */}
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <div className={`h-11 w-11 rounded-xl ${colors.bg} flex items-center justify-center flex-shrink-0`}>
-                                            <Icon className={`w-5 h-5 ${colors.text}`} />
+                                    <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                                        <div className={`h-8 w-8 sm:h-10 sm:w-10 lg:h-11 lg:w-11 rounded-lg sm:rounded-xl ${colors.bg} flex items-center justify-center flex-shrink-0`}>
+                                            <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${colors.text}`} />
                                         </div>
-                                        <p className="text-xs font-medium text-text-secondary/70 uppercase tracking-wide truncate">{system.name}</p>
+                                        <p className="text-[10px] sm:text-xs font-medium text-text-secondary/70 uppercase tracking-wide truncate">{system.name}</p>
                                     </div>
 
                                     {/* Row 2: Value */}
-                                    <p className="text-2xl font-bold text-text-primary whitespace-nowrap">{formatPeso(system.total)}</p>
+                                    <p className="text-lg sm:text-xl lg:text-2xl font-bold text-text-primary whitespace-nowrap">{formatPeso(system.total)}</p>
 
                                     {/* Additional stats (small text) */}
-                                    <div className="mt-3 pt-3 border-t border-border-color/30 space-y-1">
-                                        <div className="flex justify-between text-xs">
+                                    <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-border-color/30 space-y-0.5 sm:space-y-1">
+                                        <div className="flex justify-between text-[10px] sm:text-xs">
                                             <span className="text-text-secondary">Transactions</span>
                                             <span className="text-text-primary font-medium">{system.count}</span>
                                         </div>
-                                        <div className="flex justify-between text-xs">
+                                        <div className="flex justify-between text-[10px] sm:text-xs">
                                             <span className="text-text-secondary">Avg Sale</span>
                                             <span className="text-text-primary font-medium">{formatPeso(system.total / system.count)}</span>
                                         </div>
@@ -862,9 +862,9 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
             )}
 
             {salesData.length > 0 && (
-                <div className="bg-bg-secondary rounded-xl border border-border-color overflow-hidden">
-                    <div className="p-3 border-b border-border-color">
-                        <h3 className="text-lg font-semibold">Sales Transactions ({sortedData.length})</h3>
+                <div className="bg-bg-secondary rounded-lg sm:rounded-xl border border-border-color overflow-hidden">
+                    <div className="p-2.5 sm:p-3 border-b border-border-color">
+                        <h3 className="text-sm sm:text-base lg:text-lg font-semibold">Sales Transactions ({sortedData.length})</h3>
                     </div>
 
                     {/* Desktop Table View */}
@@ -903,12 +903,12 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                     </div>
 
                     {/* Mobile Card View */}
-                    <div className="block lg:hidden p-3 space-y-2">
+                    <div className="block lg:hidden p-2 sm:p-3 space-y-1.5 sm:space-y-2">
                         {sortedData.map((row, rowIndex) => (
-                            <div key={rowIndex} className="bg-bg-tertiary/60 p-3 rounded-lg text-xs">
+                            <div key={rowIndex} className="bg-bg-tertiary/60 p-2.5 sm:p-3 rounded-lg text-[11px] sm:text-xs">
                                 {headers.map(header => (
-                                    <div key={`${rowIndex}-${header}`} className="flex justify-between py-1 border-b border-border-color/30 last:border-b-0">
-                                        <span className="font-medium text-text-secondary">{header}</span>
+                                    <div key={`${rowIndex}-${header}`} className="flex justify-between py-0.5 sm:py-1 border-b border-border-color/30 last:border-b-0">
+                                        <span className="font-medium text-text-secondary truncate mr-2">{header}</span>
                                         <span className="text-text-primary text-right break-all">{typeof row[header] === 'string' || typeof row[header] === 'number' ? row[header] : String(row[header] || '')}</span>
                                     </div>
                                 ))}
