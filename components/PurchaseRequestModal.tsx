@@ -412,14 +412,25 @@ const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ isOpen, onC
                                                             </td>
                                                         </tr>
                                                         {/* Category Items */}
-                                                        {isExpanded && categoryItems.map((item) => {
+                                                        {categoryItems.map((item, itemIndex) => {
                                                             const index = items.indexOf(item);
                                                             const itemTotal = (parseFloat(item.quantity) || 0) * (parseFloat(item.cost) || 0);
                                                             const unitDisplay = item.unit || '—';
                                                             const unitCostValue = parseFloat(item.cost) || 0;
 
                                                             return (
-                                                                <tr key={index} className={`transition-colors ${item.isSelected ? 'bg-accent-blue/10' : 'hover:bg-bg-tertiary/30'}`}>
+                                                                <tr
+                                                                    key={index}
+                                                                    className={`transition-all duration-200 ease-out ${item.isSelected ? 'bg-accent-blue/10' : 'hover:bg-bg-tertiary/30'}`}
+                                                                    style={{
+                                                                        display: isExpanded ? 'table-row' : 'none',
+                                                                        animationName: isExpanded ? 'slideDown' : 'none',
+                                                                        animationDuration: isExpanded ? '0.2s' : '0s',
+                                                                        animationTimingFunction: 'ease-out',
+                                                                        animationFillMode: 'forwards',
+                                                                        animationDelay: isExpanded ? `${itemIndex * 20}ms` : '0ms'
+                                                                    }}
+                                                                >
                                                                     {/* Checkbox */}
                                                                     <td className="px-4 py-1.5 text-center">
                                                                         <input
@@ -603,16 +614,31 @@ const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ isOpen, onC
                                                 </button>
 
                                                 {/* Category Items */}
-                                                {isExpanded && (
-                                                    <div className="space-y-1.5">
-                                                        {categoryItems.map((item) => {
-                                                            const index = items.indexOf(item);
-                                                            const itemTotal = (parseFloat(item.quantity) || 0) * (parseFloat(item.cost) || 0);
-                                                            const unitDisplay = item.unit || '—';
-                                                            const unitCostValue = parseFloat(item.cost) || 0;
+                                                <div
+                                                    className="space-y-1.5 overflow-hidden transition-all duration-200 ease-out"
+                                                    style={{
+                                                        maxHeight: isExpanded ? '10000px' : '0',
+                                                        opacity: isExpanded ? 1 : 0
+                                                    }}
+                                                >
+                                                    {categoryItems.map((item, itemIndex) => {
+                                                        const index = items.indexOf(item);
+                                                        const itemTotal = (parseFloat(item.quantity) || 0) * (parseFloat(item.cost) || 0);
+                                                        const unitDisplay = item.unit || '—';
+                                                        const unitCostValue = parseFloat(item.cost) || 0;
 
-                                                            return (
-                                                                <div key={index} className={`bg-bg-secondary rounded-lg border p-2 ${item.isSelected ? 'border-accent-blue bg-accent-blue/5' : 'border-border-color'}`}>
+                                                        return (
+                                                            <div
+                                                                key={index}
+                                                                className={`bg-bg-secondary rounded-lg border p-2 transition-all duration-200 ease-out ${item.isSelected ? 'border-accent-blue bg-accent-blue/5' : 'border-border-color'}`}
+                                                                style={{
+                                                                    animationName: isExpanded ? 'slideDown' : 'none',
+                                                                    animationDuration: isExpanded ? '0.2s' : '0s',
+                                                                    animationTimingFunction: 'ease-out',
+                                                                    animationFillMode: 'forwards',
+                                                                    animationDelay: isExpanded ? `${itemIndex * 20}ms` : '0ms'
+                                                                }}
+                                                            >
                                                                     {/* Single Row: Checkbox, Item Info, Quantity Controls, and Total */}
                                                                     <div className="flex items-center gap-2">
                                                                         <input
@@ -677,8 +703,7 @@ const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ isOpen, onC
                                                                 </div>
                                                             );
                                                         })}
-                                                    </div>
-                                                )}
+                                                </div>
                                             </div>
                                         );
                                     })

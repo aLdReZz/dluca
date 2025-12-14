@@ -912,3 +912,38 @@ input[type="number"] {
     background: var(--bg-primary);
   }
 }
+
+/* Slide down animation for category items */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Slide up animation for category items when collapsing */
+@keyframes slideUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 200px;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+    max-height: 0;
+  }
+}
+
+/* Smooth height transition for category containers */
+.category-items-enter {
+  animation: slideDown 0.2s ease-out forwards;
+}
+
+.category-items-exit {
+  animation: slideUp 0.15s ease-in forwards;
+}
