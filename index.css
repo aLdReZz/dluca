@@ -732,6 +732,43 @@ select option {
   border-radius: 4px;
 }
 
+/* Date input calendar popup styling - Dark rounded theme */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+/* Webkit/Chrome date picker dropdown */
+input[type="date"]::-webkit-datetime-edit {
+  color: white;
+}
+
+input[type="date"]::-webkit-datetime-edit-fields-wrapper {
+  color: white;
+}
+
+input[type="date"]::-webkit-datetime-edit-text {
+  color: white;
+  opacity: 0.7;
+}
+
+input[type="date"]::-webkit-datetime-edit-month-field {
+  color: white;
+}
+
+input[type="date"]::-webkit-datetime-edit-day-field {
+  color: white;
+}
+
+input[type="date"]::-webkit-datetime-edit-year-field {
+  color: white;
+}
+
 .role-select-btn:active::after {
   width: 260px;
   height: 260px;

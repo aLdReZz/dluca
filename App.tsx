@@ -512,7 +512,9 @@ const App: React.FC = () => {
             case 'costing':
                 return <Costing recipeCostings={recipeCostings} setRecipeCostings={setRecipeCostings} productInventoryItems={productInventoryItems} />;
             case 'accounting':
-                return <Accounting />;
+            case 'accounting-transactions':
+            case 'accounting-profitloss':
+                return <Accounting activeView={page === 'accounting-profitloss' ? 'profitloss' : 'transactions'} />;
             case 'attendance':
                 return (
                     <Attendance

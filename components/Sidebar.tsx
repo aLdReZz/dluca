@@ -34,11 +34,16 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ role, currentPage, onNavigate, isOpen, onLogout }) => {
     const inventoryPages: Page[] = ['inventory-supplies', 'pricelist', 'purchase-request'];
+    const accountingPages: Page[] = ['accounting-transactions', 'accounting-profitloss'];
     const [isInventoryOpen, setIsInventoryOpen] = useState(inventoryPages.includes(currentPage));
+    const [isAccountingOpen, setIsAccountingOpen] = useState(accountingPages.includes(currentPage));
 
     useEffect(() => {
         if (inventoryPages.includes(currentPage)) {
             setIsInventoryOpen(true);
+        }
+        if (accountingPages.includes(currentPage)) {
+            setIsAccountingOpen(true);
         }
     }, [currentPage]);
 
@@ -47,7 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, currentPage, onNavigate, isOpen
         { id: 'sales', label: 'Sales Tracking', icon: ChartBarIcon, roles: ['admin', 'staff'] },
         { id: 'inventory-dropdown', label: 'Inventory', icon: CubeIcon, roles: ['admin', 'staff'], isDropdown: true },
         { id: 'costing', label: 'Costing Analysis', icon: CalculatorIcon, roles: ['admin'] },
-        { id: 'accounting', label: 'Accounting', icon: BookOpenIcon, roles: ['admin'] },
+        { id: 'accounting-dropdown', label: 'Accounting', icon: BookOpenIcon, roles: ['admin'], isDropdown: true },
     ];
     const staffManagementItems = [
         { id: 'attendance', label: 'Attendance', icon: ClockIcon, roles: ['admin', 'staff'] },
@@ -84,6 +89,11 @@ const Sidebar: React.FC<SidebarProps> = ({ role, currentPage, onNavigate, isOpen
         { id: 'purchase-request', label: 'Purchase Request', icon: ShoppingCartIcon },
     ];
 
+    const accountingSubItems = [
+        { id: 'accounting-transactions', label: 'Transactions', icon: CreditCardIcon },
+        { id: 'accounting-profitloss', label: 'Profit and Loss', icon: ChartBarIcon },
+    ];
+
     return (
         <aside
             className={`fixed lg:relative lg:flex-shrink-0 w-72 bg-bg-secondary text-text-primary border-r border-border-color/50 flex flex-col h-full transition-transform duration-300 ease-in-out z-30 ${
@@ -110,38 +120,48 @@ const Sidebar: React.FC<SidebarProps> = ({ role, currentPage, onNavigate, isOpen
                     <h3 className="px-3 text-[11px] font-semibold uppercase tracking-wider text-text-secondary/60 mb-3">Main Menu</h3>
                     {navItems.filter(item => item.roles.includes(role)).map(item => {
                         if (item.isDropdown) {
-                            const isInventoryActive = inventoryPages.includes(currentPage);
+                            const isInventoryDropdown = item.id === 'inventory-dropdown';
+                            const isAccountingDropdown = item.id === 'accounting-dropdown';
+                            const isActive = isInventoryDropdown
+                                ? inventoryPages.includes(currentPage)
+                                : accountingPages.includes(currentPage);
+                            const isOpen = isInventoryDropdown ? isInventoryOpen : isAccountingOpen;
+                            const subItems = isInventoryDropdown ? inventorySubItems : accountingSubItems;
+                            const toggleOpen = isInventoryDropdown
+                                ? () => setIsInventoryOpen(!isInventoryOpen)
+                                : () => setIsAccountingOpen(!isAccountingOpen);
+
                             return (
                                 <div key={item.id} className="space-y-1">
                                     <button
                                         type="button"
-                                        onClick={() => setIsInventoryOpen(!isInventoryOpen)}
+                                        onClick={toggleOpen}
                                         className={`group flex w-full items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative ${
-                                            isInventoryActive
+                                            isActive
                                                 ? 'bg-bg-tertiary text-text-primary'
                                                 : 'text-text-secondary hover:text-text-primary hover:bg-hover-bg'
                                         }`}
                                     >
-                                        {isInventoryActive && (
+                                        {isActive && (
                                             <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-accent-blue rounded-r-full" />
                                         )}
                                         <div className="flex items-center gap-3">
-                                            <item.icon className={`w-5 h-5 ${isInventoryActive ? 'text-accent-blue' : 'text-text-secondary group-hover:text-text-primary'}`} />
+                                            <item.icon className={`w-5 h-5 ${isActive ? 'text-accent-blue' : 'text-text-secondary group-hover:text-text-primary'}`} />
                                             <span>{item.label}</span>
                                         </div>
                                         <ChevronDownIcon
-                                            className={`w-4 h-4 transition-transform duration-200 ${isInventoryOpen ? 'rotate-180' : ''} ${
-                                                isInventoryActive ? 'text-accent-blue' : 'text-text-secondary group-hover:text-text-primary'
+                                            className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} ${
+                                                isActive ? 'text-accent-blue' : 'text-text-secondary group-hover:text-text-primary'
                                             }`}
                                         />
                                     </button>
                                     <div
                                         className={`transition-all duration-300 ${
-                                            isInventoryOpen ? 'max-h-96 opacity-100 mt-1' : 'max-h-0 opacity-0'
+                                            isOpen ? 'max-h-96 opacity-100 mt-1' : 'max-h-0 opacity-0'
                                         } overflow-hidden`}
                                     >
                                         <div className="ml-7 space-y-1 py-1">
-                                            {inventorySubItems.map(subItem => {
+                                            {subItems.map(subItem => {
                                                 const SubIcon = subItem.icon;
                                                 const isActive = currentPage === subItem.id;
                                                 return (
