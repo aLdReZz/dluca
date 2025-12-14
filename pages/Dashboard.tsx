@@ -4,7 +4,7 @@ import type { SalesData } from '../types';
 import { Chart, registerables } from 'chart.js';
 import StatCard from '../components/StatCard';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { CurrencyPesoIcon, ArrowTrendingUpIcon, BanknotesIcon, CalendarDaysIcon, SparklesIcon } from '../components/Icons';
+import { CurrencyPesoIcon, ArrowTrendingUpIcon, BanknotesIcon, CalendarDaysIcon, SparklesIcon, ChevronDownIcon } from '../components/Icons';
 import CalendarPopup from '../components/CalendarPopup';
 import { useFirebaseData } from '../hooks/useFirebase';
 import { salesService, dashboardPreferencesService } from '../utils/firebaseService';
@@ -83,7 +83,9 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
     const chartRef = useRef<HTMLCanvasElement>(null);
     const chartInstanceRef = useRef<Chart | null>(null);
     const calendarRef = useRef<HTMLDivElement>(null);
+    const filterDropdownRef = useRef<HTMLDivElement>(null);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+    const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
     const [isSalesContainerVisible, setIsSalesContainerVisible] = useState(false);
     const [isSalesChartVisible, setIsSalesChartVisible] = useState(false);
     
@@ -433,29 +435,25 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
             if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
                 setIsCalendarOpen(false);
             }
+            if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+                setIsFilterDropdownOpen(false);
+            }
         };
 
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const FilterButton: React.FC<{
-      period: 'daily' | 'weekly' | 'monthly' | 'lastMonth' | 'custom';
-      label: string;
-      activeFilter: string;
-      onClick: () => void;
-    }> = ({ period, label, activeFilter, onClick }) => (
-        <button
-            onClick={onClick}
-            className={`px-2 sm:px-2.5 lg:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs lg:text-sm font-medium rounded-md transition-colors duration-200 whitespace-nowrap ${
-                activeFilter === period
-                    ? 'bg-accent-blue text-white'
-                    : 'bg-bg-tertiary text-text-secondary hover:bg-hover-bg'
-            }`}
-        >
-            {label}
-        </button>
-    );
+    const getFilterLabel = (filterPeriod: string) => {
+        switch (filterPeriod) {
+            case 'daily': return 'Today';
+            case 'weekly': return 'This Week';
+            case 'monthly': return 'This Month';
+            case 'lastMonth': return 'Last Month';
+            case 'custom': return 'Custom Range';
+            default: return 'Select Period';
+        }
+    };
 
     // Show loading state
     if (salesLoading) {
@@ -486,11 +484,42 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
                     <p className="text-text-secondary mt-0.5 sm:mt-1 text-xs sm:text-sm">A snapshot of your cafe's performance.</p>
                 </div>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 flex-wrap w-full sm:w-auto">
-                    <div className="flex items-center gap-1 sm:gap-1.5 p-0.5 sm:p-1 bg-bg-tertiary rounded-lg w-full sm:w-auto overflow-x-auto">
-                        <FilterButton period="daily" label="Today" activeFilter={filter} onClick={() => handleFilterChange('daily')} />
-                        <FilterButton period="weekly" label="This Week" activeFilter={filter} onClick={() => handleFilterChange('weekly')} />
-                        <FilterButton period="monthly" label="This Month" activeFilter={filter} onClick={() => handleFilterChange('monthly')} />
-                        <FilterButton period="lastMonth" label="Last Month" activeFilter={filter} onClick={() => handleFilterChange('lastMonth')} />
+                    <div className="relative w-full sm:w-auto" ref={filterDropdownRef}>
+                        <button
+                            onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+                            className="w-full sm:w-auto bg-bg-tertiary border border-border-color rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center justify-between gap-2 hover:bg-hover-bg transition"
+                        >
+                            <span className="text-text-primary">{getFilterLabel(filter)}</span>
+                            <ChevronDownIcon className={`w-4 h-4 text-text-secondary transition-transform ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                        {isFilterDropdownOpen && (
+                            <div className="absolute top-full mt-1 left-0 w-full sm:w-48 bg-bg-secondary border border-border-color rounded-lg shadow-lg z-10 overflow-hidden">
+                                <button
+                                    onClick={() => { handleFilterChange('daily'); setIsFilterDropdownOpen(false); }}
+                                    className={`w-full text-left px-3 py-2 text-xs sm:text-sm hover:bg-hover-bg transition ${filter === 'daily' ? 'bg-accent-blue/10 text-accent-blue font-medium' : 'text-text-primary'}`}
+                                >
+                                    Today
+                                </button>
+                                <button
+                                    onClick={() => { handleFilterChange('weekly'); setIsFilterDropdownOpen(false); }}
+                                    className={`w-full text-left px-3 py-2 text-xs sm:text-sm hover:bg-hover-bg transition ${filter === 'weekly' ? 'bg-accent-blue/10 text-accent-blue font-medium' : 'text-text-primary'}`}
+                                >
+                                    This Week
+                                </button>
+                                <button
+                                    onClick={() => { handleFilterChange('monthly'); setIsFilterDropdownOpen(false); }}
+                                    className={`w-full text-left px-3 py-2 text-xs sm:text-sm hover:bg-hover-bg transition ${filter === 'monthly' ? 'bg-accent-blue/10 text-accent-blue font-medium' : 'text-text-primary'}`}
+                                >
+                                    This Month
+                                </button>
+                                <button
+                                    onClick={() => { handleFilterChange('lastMonth'); setIsFilterDropdownOpen(false); }}
+                                    className={`w-full text-left px-3 py-2 text-xs sm:text-sm hover:bg-hover-bg transition ${filter === 'lastMonth' ? 'bg-accent-blue/10 text-accent-blue font-medium' : 'text-text-primary'}`}
+                                >
+                                    Last Month
+                                </button>
+                            </div>
+                        )}
                     </div>
                     <div className="relative w-full sm:w-auto" ref={calendarRef}>
                         <button
