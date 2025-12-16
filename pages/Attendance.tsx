@@ -935,19 +935,15 @@ const Attendance: React.FC<AttendanceProps> = ({
             }
         });
 
-        // Save to Firebase
+        // Save to Firebase (only adds new records, skips duplicates)
         try {
             await batchUploadAttendance(newRecords);
 
-            // Also save to prop for backward compatibility
-            if (setPropAttendanceRecords) {
-                setPropAttendanceRecords(newRecords);
-            }
-
-            // Refresh Firebase data to ensure persistence
+            // Refresh Firebase data to get the updated records
             setAttendanceDataVersion(prev => prev + 1);
 
-            alert(`${newRecords.length} attendance records have been successfully imported and saved to database.`);
+            // Show success message (actual count logged in console by service)
+            alert(`Attendance records processed successfully. Check console for details on new vs existing records.`);
         } catch (error) {
             console.error('Error uploading attendance records:', error);
             alert('Failed to save attendance records to database. Please try again.');

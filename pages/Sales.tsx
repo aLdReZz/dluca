@@ -457,17 +457,14 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                 }
             }
 
-            // Upload to Firebase
+            // Get existing data count before upload
+            const existingCount = salesData.length;
+
+            // Upload to Firebase (only adds new records)
             await batchUpload(data);
 
-            // Also update prop data for backward compatibility
-            if (setPropSalesData) {
-                setPropSalesData(data);
-            }
-
-            const formatMsg = isUTAKFormat ? 'UTAK format' : 'standard format';
-            setUploadStatus({ type: 'success', message: `Successfully uploaded ${data.length} sales records (${formatMsg})` });
-            setTimeout(() => setUploadStatus(null), 3000);
+            // Refresh to get updated data
+            window.location.reload();
         } catch (err) {
             const errorMsg = err instanceof Error ? err.message : 'Failed to upload sales data';
             setUploadStatus({ type: 'error', message: errorMsg });
@@ -782,45 +779,47 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                 </div>
             )}
 
+            {/* Action Buttons - Always Visible */}
+            <div className="mb-4 sm:mb-6 lg:mb-8 flex justify-end gap-1.5 sm:gap-2">
+                {salesData.length > 0 && (
+                    <button
+                        onClick={handleExportToExcel}
+                        className="p-1.5 sm:p-2 bg-bg-tertiary hover:bg-hover-bg text-text-secondary hover:text-text-primary border border-border-color/50 rounded-lg transition-all duration-300"
+                        title="Export to Excel"
+                    >
+                        <ClipboardDocumentListIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </button>
+                )}
+
+                <label
+                    htmlFor="salesFileInput"
+                    className="p-1.5 sm:p-2 bg-bg-tertiary hover:bg-hover-bg text-text-secondary hover:text-text-primary border border-border-color/50 rounded-lg cursor-pointer transition-all duration-300"
+                    title="Upload CSV"
+                >
+                    <UploadIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <input type="file" id="salesFileInput" className="hidden" accept=".csv" onChange={handleFileChange} />
+                </label>
+
+                {salesData.length > 0 && (
+                    <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        disabled={deleteLoading}
+                        className="p-1.5 sm:p-2 bg-bg-tertiary hover:bg-hover-bg text-text-secondary hover:text-text-primary border border-border-color/50 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Delete All"
+                    >
+                        <TrashIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </button>
+                )}
+            </div>
+
             {/* Payment System Breakdown Cards */}
             {salesData.length > 0 && paymentSystemStats.length > 0 && (
                 <div className="mb-4 sm:mb-6 lg:mb-8">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-4 gap-2">
-                        <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
-                            <h2 className="text-base sm:text-lg lg:text-xl font-bold">Sales by Payment System</h2>
-                            <p className="text-[11px] sm:text-xs lg:text-sm text-text-secondary/50">
-                                Total: {formatPeso(paymentSystemStats.reduce((sum, stat) => sum + stat.total, 0))}
-                            </p>
-                        </div>
-                        <div className="flex gap-1.5 sm:gap-2">
-                            <button
-                                onClick={handleExportToExcel}
-                                className="p-1.5 sm:p-2 bg-bg-tertiary hover:bg-hover-bg text-text-secondary hover:text-text-primary border border-border-color/50 rounded-lg transition-all duration-300"
-                                title="Export to Excel"
-                            >
-                                <ClipboardDocumentListIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                            </button>
-
-                            <label
-                                htmlFor="salesFileInput"
-                                className="p-1.5 sm:p-2 bg-bg-tertiary hover:bg-hover-bg text-text-secondary hover:text-text-primary border border-border-color/50 rounded-lg cursor-pointer transition-all duration-300"
-                                title="Upload CSV"
-                            >
-                                <UploadIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                                <input type="file" id="salesFileInput" className="hidden" accept=".csv" onChange={handleFileChange} />
-                            </label>
-
-                            {salesData.length > 0 && (
-                                <button
-                                    onClick={() => setShowDeleteConfirm(true)}
-                                    disabled={deleteLoading}
-                                    className="p-1.5 sm:p-2 bg-bg-tertiary hover:bg-hover-bg text-text-secondary hover:text-text-primary border border-border-color/50 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Delete All"
-                                >
-                                    <TrashIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                                </button>
-                            )}
-                        </div>
+                    <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3 mb-3 sm:mb-4">
+                        <h2 className="text-base sm:text-lg lg:text-xl font-bold">Sales by Payment System</h2>
+                        <p className="text-[11px] sm:text-xs lg:text-sm text-text-secondary/50">
+                            Total: {formatPeso(paymentSystemStats.reduce((sum, stat) => sum + stat.total, 0))}
+                        </p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-2 sm:gap-3 lg:gap-4">
                         {paymentSystemStats.map((system) => {

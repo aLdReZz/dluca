@@ -249,14 +249,43 @@ export const attendanceService = {
     async batch(records: AttendanceRecord[]): Promise<void> {
         return withFirebaseCheck(
             async () => {
-                const batch = writeBatch(db);
-                records.forEach((record, index) => {
+                // Get existing attendance record IDs
+                const existingSnapshot = await getDocs(collection(db, 'attendanceRecords'));
+                const existingIds = new Set(existingSnapshot.docs.map(doc => doc.id));
+
+                // Separate new records from existing ones
+                const newRecords = records.filter(record => {
+                    const docId = `${record.employee}-${record.date}`;
+                    return !existingIds.has(docId);
+                });
+
+                if (newRecords.length === 0) {
+                    console.log('ℹ️ No new attendance records to add (all already exist)');
+                    return;
+                }
+
+                // Add only new records
+                let batch = writeBatch(db);
+                let operationCount = 0;
+
+                for (const record of newRecords) {
                     const docId = `${record.employee}-${record.date}`;
                     const docRef = doc(db, 'attendanceRecords', docId);
-                    batch.set(docRef, { ...record, updatedAt: new Date() }, { merge: true });
-                });
-                await batch.commit();
-                console.log(`✅ Successfully saved ${records.length} attendance records to Firebase`);
+                    batch.set(docRef, { ...record, createdAt: new Date() });
+                    operationCount++;
+
+                    if (operationCount >= FIRESTORE_BATCH_LIMIT) {
+                        await batch.commit();
+                        batch = writeBatch(db);
+                        operationCount = 0;
+                    }
+                }
+
+                if (operationCount > 0) {
+                    await batch.commit();
+                }
+
+                console.log(`✅ Added ${newRecords.length} new attendance records (skipped ${records.length - newRecords.length} duplicates)`);
             }
         );
     },
@@ -393,15 +422,45 @@ export const salesService = {
     async batch(records: SalesData[]): Promise<void> {
         return withFirebaseCheck(
             async () => {
-                const batch = writeBatch(db);
-                records.forEach(record => {
-                    // Use Transaction ID as the document ID to prevent duplicates
+                // Get existing transaction IDs
+                const existingSnapshot = await getDocs(collection(db, 'salesData'));
+                const existingIds = new Set(existingSnapshot.docs.map(doc => doc.id));
+
+                // Filter out records that already exist
+                const newRecords = records.filter(record => {
+                    const transactionId = record['Transaction ID'];
+                    return transactionId && !existingIds.has(transactionId);
+                });
+
+                if (newRecords.length === 0) {
+                    console.log('ℹ️ No new sales records to add (all already exist)');
+                    return;
+                }
+
+                // Add new records in batches
+                let batch = writeBatch(db);
+                let operationCount = 0;
+
+                for (const record of newRecords) {
                     const transactionId = record['Transaction ID'] || `transaction-${Date.now()}-${Math.random()}`;
                     const docRef = doc(db, 'salesData', transactionId);
-                    // Use set with merge to avoid overwriting if it already exists
-                    batch.set(docRef, { ...record, createdAt: new Date() }, { merge: true });
-                });
-                await batch.commit();
+                    batch.set(docRef, { ...record, createdAt: new Date() });
+                    operationCount++;
+
+                    // Commit batch if we hit the limit
+                    if (operationCount >= FIRESTORE_BATCH_LIMIT) {
+                        await batch.commit();
+                        batch = writeBatch(db);
+                        operationCount = 0;
+                    }
+                }
+
+                // Commit remaining operations
+                if (operationCount > 0) {
+                    await batch.commit();
+                }
+
+                console.log(`✅ Added ${newRecords.length} new sales records (skipped ${records.length - newRecords.length} duplicates)`);
             }
         );
     },

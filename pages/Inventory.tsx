@@ -605,8 +605,8 @@ const Inventory: React.FC<InventoryProps> = ({ inventoryItems: propInventoryItem
             return firstCell && firstCell.toUpperCase() !== 'ITEM';
         });
 
-        const productsToUpdate: { [key: number]: Partial<ProductInventoryItem> } = {};
         const productsToAdd: Omit<ProductInventoryItem, 'id'>[] = [];
+        const skippedProducts: string[] = [];
 
         const existingProductsMap = new Map<string, ProductInventoryItem>();
         productInventoryItems.forEach(p => {
@@ -643,36 +643,29 @@ const Inventory: React.FC<InventoryProps> = ({ inventoryItems: propInventoryItem
             const existingProduct = existingProductsMap.get(productKey);
 
             if (existingProduct) {
-                productsToUpdate[existingProduct.id] = {
-                    unit: productData.unit,
-                    quantity: productData.quantity,
-                    price: productData.price,
-                    supplier: productData.supplier || existingProduct.supplier,
-                };
+                // Skip existing products - don't update them
+                skippedProducts.push(name);
             } else {
+                // Only add new products
                 productsToAdd.push(productData);
             }
         });
-        
-        if (Object.keys(productsToUpdate).length > 0 || productsToAdd.length > 0) {
+
+        if (productsToAdd.length > 0) {
             setPropProductInventoryItems?.(prevItems => {
                 let maxId = prevItems.reduce((max, item) => Math.max(item.id, max), 0);
-                
-                const updatedItems = prevItems.map(item => 
-                    productsToUpdate[item.id] ? { ...item, ...productsToUpdate[item.id] } : item
-                );
 
                 const newItems = productsToAdd.map(newItem => ({
                     ...newItem,
                     id: ++maxId,
                 }));
 
-                return [...updatedItems, ...newItems];
+                return [...prevItems, ...newItems];
             });
 
-            alert(`${Object.keys(productsToUpdate).length} products updated and ${productsToAdd.length} new products added successfully.`);
+            alert(`${productsToAdd.length} new products added successfully.${skippedProducts.length > 0 ? `\n${skippedProducts.length} existing products were skipped (not updated).` : ''}`);
         } else {
-            alert('No new products to add or existing products to update from the CSV file.');
+            alert('No new products to add. All products in the CSV already exist.');
         }
     };
 
