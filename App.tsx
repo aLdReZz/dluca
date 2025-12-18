@@ -349,21 +349,21 @@ const App: React.FC = () => {
 
     // Update employees when Firebase data loads
     useEffect(() => {
-        if (!employeesLoading && firebaseEmployees.length > 0) {
+        if (!employeesLoading && firebaseEmployees && firebaseEmployees.length > 0) {
             setEmployees(firebaseEmployees);
         }
     }, [firebaseEmployees, employeesLoading]);
 
     // Update attendance records when Firebase data loads
     useEffect(() => {
-        if (!attendanceLoading && firebaseAttendanceRecords.length > 0) {
+        if (!attendanceLoading && firebaseAttendanceRecords && firebaseAttendanceRecords.length > 0) {
             setAttendanceRecords(firebaseAttendanceRecords);
         }
     }, [firebaseAttendanceRecords, attendanceLoading]);
 
     // Update sales data when Firebase data loads
     useEffect(() => {
-        if (!salesLoading && firebaseSalesData.length > 0) {
+        if (!salesLoading && firebaseSalesData && firebaseSalesData.length > 0) {
             setSalesData(firebaseSalesData);
         }
     }, [firebaseSalesData, salesLoading]);
