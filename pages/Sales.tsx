@@ -425,9 +425,8 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                 // Convert grouped transactions to SalesData format
                 transactionMap.forEach((transaction) => {
                     const grossSales = transaction.total;
-                    const netSales = grossSales - transaction.serviceAmount;
 
-                    // Apply 4% fee for Card, Credit Card, and QR PH transactions
+                    // Apply 4% fee for Card, Credit Card, and QR PH transactions FIRST
                     let adjustedCost = transaction.totalCost;
                     let adjustedTotal = grossSales;
                     let feeAmount = 0;
@@ -438,7 +437,9 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                         adjustedCost = transaction.totalCost + feeAmount; // Add to cost
                     }
 
-                    const profit = (adjustedTotal - transaction.serviceAmount) - adjustedCost;
+                    // Calculate service charge from adjusted total (after 4% fee deduction)
+                    const adjustedServiceAmount = adjustedTotal * 0.10; // 10% of adjusted total
+                    const profit = (adjustedTotal - adjustedServiceAmount) - adjustedCost;
 
                     data.push({
                         Date: transaction.date,
@@ -448,7 +449,7 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                         'Payment Type': transaction.paymentType,
                         Total: adjustedTotal.toFixed(2),
                         'Service Rate': '10',
-                        'Service Amount': transaction.serviceAmount.toFixed(2),
+                        'Service Amount': adjustedServiceAmount.toFixed(2),
                         Cost: adjustedCost.toFixed(2),
                         Profit: profit.toFixed(2),
                         Cashier: transaction.items[0]['Cashier'] || '',
@@ -456,7 +457,7 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                         'Park Tag': transaction.items[0]['Park Tag'] || '',
                         Type: transaction.items[0]['Type'] || '',
                         __column1: transaction.date,
-                        __column10: transaction.serviceAmount.toFixed(2),
+                        __column10: adjustedServiceAmount.toFixed(2),
                     });
                 });
             } else {
@@ -475,14 +476,18 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                     if (requires4PercentFee(paymentType)) {
                         const total = parseFloat(rowData['Total'] || '0') || 0;
                         const cost = parseFloat(rowData['Cost'] || '0') || 0;
-                        const serviceAmount = parseFloat(rowData['Service Amount'] || '0') || 0;
 
+                        // Apply 4% fee first
                         const feeAmount = total * 0.04;
                         const adjustedTotal = total - feeAmount;
                         const adjustedCost = cost + feeAmount;
-                        const profit = (adjustedTotal - serviceAmount) - adjustedCost;
+
+                        // Calculate service charge from adjusted total (after 4% fee deduction)
+                        const adjustedServiceAmount = adjustedTotal * 0.10; // 10% of adjusted total
+                        const profit = (adjustedTotal - adjustedServiceAmount) - adjustedCost;
 
                         rowData['Total'] = adjustedTotal.toFixed(2);
+                        rowData['Service Amount'] = adjustedServiceAmount.toFixed(2);
                         rowData['Cost'] = adjustedCost.toFixed(2);
                         rowData['Profit'] = profit.toFixed(2);
                     }
