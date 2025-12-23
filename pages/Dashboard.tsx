@@ -68,7 +68,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
     // Use Firebase data if available, otherwise use prop data (for backward compatibility)
     const salesData = (Array.isArray(firebaseSalesData) && firebaseSalesData.length > 0) ? firebaseSalesData : (propSalesData || []);
 
-    const [filter, setFilter] = useState<'daily' | 'weekly' | 'monthly' | 'lastMonth' | 'custom'>('monthly');
+    const [filter, setFilter] = useState<'daily' | 'weekly' | 'monthly' | 'lastMonth' | 'yearlyByMonth' | 'custom'>('monthly');
     const [stats, setStats] = useState({
         netSales: 0,
         grossSales: 0,
@@ -260,6 +260,31 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
             }
 
             chartTitle = 'Hourly Sales';
+        } else if (filter === 'yearlyByMonth') {
+            // Group by month for yearly view
+            const monthlyData = data.reduce((acc, row) => {
+                const dateValue = getSalesFieldValue(row, DATE_INCLUDE, [], DATE_HEADERS);
+                const parsedDate = parseSalesDate(dateValue ?? row.Date);
+                if (parsedDate) {
+                    const monthKey = `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, '0')}`;
+                    const totalValue = parseNumericValue(getSalesFieldValue(row, TOTAL_INCLUDE, TOTAL_EXCLUDE, TOTAL_HEADERS));
+                    const serviceChargeValue = parseNumericValue(getSalesFieldValue(row, SERVICE_INCLUDE, [], SERVICE_HEADERS));
+                    const netValue = Math.max(totalValue - serviceChargeValue, 0);
+                    acc[monthKey] = (acc[monthKey] || 0) + netValue;
+                }
+                return acc;
+            }, {} as { [key: string]: number });
+
+            const sortedMonths = Object.entries(monthlyData)
+                .sort((a, b) => a[0].localeCompare(b[0]));
+
+            labels = sortedMonths.map(([monthKey]) => {
+                const [year, month] = monthKey.split('-');
+                const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+                return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+            });
+            chartData = sortedMonths.map(([, value]) => value);
+            chartTitle = 'Monthly Sales';
         } else {
             // Group by date (existing logic)
             const groupedData = data.reduce((acc, row) => {
@@ -401,7 +426,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
         updateChart(filteredData);
     }, [salesData, startDate, endDate, calculateStats, updateChart]);
     
-    const handleFilterChange = (newFilter: 'daily' | 'weekly' | 'monthly' | 'lastMonth') => {
+    const handleFilterChange = (newFilter: 'daily' | 'weekly' | 'monthly' | 'lastMonth' | 'yearlyByMonth') => {
         setFilter(newFilter);
         const now = new Date();
         let start: Date, end: Date;
@@ -417,6 +442,10 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
         } else if (newFilter === 'lastMonth') {
             start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
             end = new Date(now.getFullYear(), now.getMonth(), 0);
+        } else if (newFilter === 'yearlyByMonth') {
+            // Show current year, grouped by month
+            start = new Date(now.getFullYear(), 0, 1); // January 1st
+            end = now; // Today
         } else { // monthly
             start = new Date(now.getFullYear(), now.getMonth(), 1);
             end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -472,6 +501,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
             case 'weekly': return 'This Week';
             case 'monthly': return 'This Month';
             case 'lastMonth': return 'Last Month';
+            case 'yearlyByMonth': return 'Year by Month';
             case 'custom': return 'Custom Range';
             default: return 'Select Period';
         }
@@ -539,6 +569,12 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
                                     className={`w-full text-left px-3 py-2 text-xs sm:text-sm hover:bg-hover-bg transition ${filter === 'lastMonth' ? 'bg-accent-blue/10 text-accent-blue font-medium' : 'text-text-primary'}`}
                                 >
                                     Last Month
+                                </button>
+                                <button
+                                    onClick={() => { handleFilterChange('yearlyByMonth'); setIsFilterDropdownOpen(false); }}
+                                    className={`w-full text-left px-3 py-2 text-xs sm:text-sm hover:bg-hover-bg transition ${filter === 'yearlyByMonth' ? 'bg-accent-blue/10 text-accent-blue font-medium' : 'text-text-primary'}`}
+                                >
+                                    Year by Month
                                 </button>
                             </div>
                         )}
