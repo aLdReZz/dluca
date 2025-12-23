@@ -167,17 +167,20 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
         }, 0);
 
         // Calculate credit card fees (already embedded in the data)
-        // For card payments, the fee is: (adjusted total) / 0.96 * 0.04
-        // Or simpler: (adjusted total) * 0.04 / 0.96
+        // For card payments, 4% is deducted from both Total and Service Amount
         const creditCardFees = filteredData.reduce((sum, row) => {
             const paymentType = (row['Payment Type'] || '').toLowerCase().trim();
             if (paymentType.includes('card') || paymentType.includes('credit') || paymentType.includes('qr ph') || paymentType.includes('qrph')) {
-                // The Total field already has 4% deducted, so to get the original fee:
-                // adjustedTotal = original * 0.96
-                // fee = original * 0.04 = adjustedTotal * 0.04 / 0.96
+                // Total fee = 4% of original total + 4% of original service amount
+                // adjustedTotal = originalTotal * 0.96, so originalTotal = adjustedTotal / 0.96
+                // adjustedService = originalService * 0.96, so originalService = adjustedService / 0.96
                 const adjustedTotal = parseNumericValue(getSalesFieldValue(row, TOTAL_INCLUDE, TOTAL_EXCLUDE, TOTAL_HEADERS));
-                const fee = adjustedTotal * 0.04 / 0.96;
-                return sum + fee;
+                const adjustedService = parseNumericValue(getSalesFieldValue(row, SERVICE_INCLUDE, [], SERVICE_HEADERS));
+
+                const totalFee = adjustedTotal * 0.04 / 0.96;
+                const serviceFee = adjustedService * 0.04 / 0.96;
+
+                return sum + totalFee + serviceFee;
             }
             return sum;
         }, 0);

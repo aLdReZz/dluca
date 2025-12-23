@@ -417,29 +417,44 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                     const transaction = transactionMap.get(txnId)!;
                     transaction.items.push(rowData);
 
-                    // Aggregate service amount from all items
+                    // Sum service amount from all items in the transaction
                     const itemService = parseFloat(rowData['Service Amount'] || '0') || 0;
                     transaction.serviceAmount += itemService;
                 }
 
                 // Convert grouped transactions to SalesData format
+                console.log(`Processing ${transactionMap.size} unique transactions`);
+
                 transactionMap.forEach((transaction) => {
                     const grossSales = transaction.total;
                     const originalServiceAmount = transaction.serviceAmount; // From CSV
 
-                    // Apply 4% fee for Card, Credit Card, and QR PH transactions FIRST
+                    // Debug: Log service amount for verification
+                    if (transaction.date === '2 Dec 25') {
+                        console.log(`Dec 2 transaction: ${transaction.receiptNo}, items: ${transaction.items.length}, service: ${originalServiceAmount}`);
+                    }
+
+                    // Apply 4% fee for Card, Credit Card, and QR PH transactions
                     let adjustedCost = transaction.totalCost;
                     let adjustedTotal = grossSales;
+                    let adjustedServiceAmount = originalServiceAmount;
                     let feeAmount = 0;
 
                     if (requires4PercentFee(transaction.paymentType)) {
+                        // Deduct 4% from sales
                         feeAmount = grossSales * 0.04;
-                        adjustedTotal = grossSales - feeAmount; // Deduct from sales
-                        adjustedCost = transaction.totalCost + feeAmount; // Add to cost
+                        adjustedTotal = grossSales - feeAmount;
+
+                        // Deduct 4% from service amount
+                        const serviceFee = originalServiceAmount * 0.04;
+                        adjustedServiceAmount = originalServiceAmount - serviceFee;
+
+                        // Add both fees to cost
+                        adjustedCost = transaction.totalCost + feeAmount + serviceFee;
                     }
 
-                    // Use original service amount from CSV, no recalculation
-                    const profit = (adjustedTotal - originalServiceAmount) - adjustedCost;
+                    // Calculate profit with adjusted values
+                    const profit = (adjustedTotal - adjustedServiceAmount) - adjustedCost;
 
                     data.push({
                         Date: transaction.date,
@@ -449,7 +464,7 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                         'Payment Type': transaction.paymentType,
                         Total: adjustedTotal.toFixed(2),
                         'Service Rate': '10',
-                        'Service Amount': originalServiceAmount.toFixed(2),
+                        'Service Amount': adjustedServiceAmount.toFixed(2),
                         Cost: adjustedCost.toFixed(2),
                         Profit: profit.toFixed(2),
                         Cashier: transaction.items[0]['Cashier'] || '',
@@ -457,7 +472,7 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                         'Park Tag': transaction.items[0]['Park Tag'] || '',
                         Type: transaction.items[0]['Type'] || '',
                         __column1: transaction.date,
-                        __column10: originalServiceAmount.toFixed(2),
+                        __column10: adjustedServiceAmount.toFixed(2),
                     });
                 });
             } else {
@@ -478,18 +493,24 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                         const cost = parseFloat(rowData['Cost'] || '0') || 0;
                         const serviceAmount = parseFloat(rowData['Service Amount'] || '0') || 0;
 
-                        // Apply 4% fee first
+                        // Apply 4% fee to total
                         const feeAmount = total * 0.04;
                         const adjustedTotal = total - feeAmount;
-                        const adjustedCost = cost + feeAmount;
 
-                        // Keep original service amount from CSV, no recalculation
-                        const profit = (adjustedTotal - serviceAmount) - adjustedCost;
+                        // Apply 4% fee to service amount
+                        const serviceFee = serviceAmount * 0.04;
+                        const adjustedServiceAmount = serviceAmount - serviceFee;
+
+                        // Add both fees to cost
+                        const adjustedCost = cost + feeAmount + serviceFee;
+
+                        // Calculate profit with adjusted values
+                        const profit = (adjustedTotal - adjustedServiceAmount) - adjustedCost;
 
                         rowData['Total'] = adjustedTotal.toFixed(2);
+                        rowData['Service Amount'] = adjustedServiceAmount.toFixed(2);
                         rowData['Cost'] = adjustedCost.toFixed(2);
                         rowData['Profit'] = profit.toFixed(2);
-                        // Service Amount stays as-is from CSV
                     }
 
                     rowData.__column1 = (values[0] ?? '').trim().replace(/^\uFEFF/, '').replace(/"/g, '');
