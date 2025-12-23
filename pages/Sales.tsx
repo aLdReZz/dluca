@@ -314,6 +314,12 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
         }
     };
 
+    // Helper function to check if payment type requires 4% fee
+    const requires4PercentFee = (paymentType: string): boolean => {
+        const type = paymentType.toLowerCase().trim();
+        return type.includes('card') || type.includes('credit') || type.includes('qr ph') || type.includes('qrph');
+    };
+
     const parseSalesCSV = async (text: string) => {
         try {
             const rows: string[][] = [];
@@ -420,7 +426,19 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                 transactionMap.forEach((transaction) => {
                     const grossSales = transaction.total;
                     const netSales = grossSales - transaction.serviceAmount;
-                    const profit = netSales - transaction.totalCost;
+
+                    // Apply 4% fee for Card, Credit Card, and QR PH transactions
+                    let adjustedCost = transaction.totalCost;
+                    let adjustedTotal = grossSales;
+                    let feeAmount = 0;
+
+                    if (requires4PercentFee(transaction.paymentType)) {
+                        feeAmount = grossSales * 0.04;
+                        adjustedTotal = grossSales - feeAmount; // Deduct from sales
+                        adjustedCost = transaction.totalCost + feeAmount; // Add to cost
+                    }
+
+                    const profit = (adjustedTotal - transaction.serviceAmount) - adjustedCost;
 
                     data.push({
                         Date: transaction.date,
@@ -428,10 +446,10 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                         'Transaction ID': transaction.items[0]['Transaction ID'] || '',
                         'Receipt No.': transaction.receiptNo,
                         'Payment Type': transaction.paymentType,
-                        Total: grossSales.toFixed(2),
+                        Total: adjustedTotal.toFixed(2),
                         'Service Rate': '10',
                         'Service Amount': transaction.serviceAmount.toFixed(2),
-                        Cost: transaction.totalCost.toFixed(2),
+                        Cost: adjustedCost.toFixed(2),
                         Profit: profit.toFixed(2),
                         Cashier: transaction.items[0]['Cashier'] || '',
                         Customer: transaction.items[0]['Customer'] || '',
@@ -442,7 +460,7 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                     });
                 });
             } else {
-                // Old format: Direct mapping
+                // Old format: Direct mapping with 4% fee adjustment
                 for (let i = 1; i < rows.length; i++) {
                     const values = rows[i];
                     if (values.every(value => !value || !value.trim())) continue;
@@ -451,6 +469,24 @@ const Sales: React.FC<SalesProps> = ({ salesData: propSalesData, setSalesData: s
                         const raw = values[index] ?? '';
                         rowData[header] = raw.trim().replace(/^\uFEFF/, '').replace(/"/g, '');
                     });
+
+                    // Apply 4% fee for Card, Credit Card, and QR PH transactions
+                    const paymentType = rowData['Payment Type'] || '';
+                    if (requires4PercentFee(paymentType)) {
+                        const total = parseFloat(rowData['Total'] || '0') || 0;
+                        const cost = parseFloat(rowData['Cost'] || '0') || 0;
+                        const serviceAmount = parseFloat(rowData['Service Amount'] || '0') || 0;
+
+                        const feeAmount = total * 0.04;
+                        const adjustedTotal = total - feeAmount;
+                        const adjustedCost = cost + feeAmount;
+                        const profit = (adjustedTotal - serviceAmount) - adjustedCost;
+
+                        rowData['Total'] = adjustedTotal.toFixed(2);
+                        rowData['Cost'] = adjustedCost.toFixed(2);
+                        rowData['Profit'] = profit.toFixed(2);
+                    }
+
                     rowData.__column1 = (values[0] ?? '').trim().replace(/^\uFEFF/, '').replace(/"/g, '');
                     rowData.__column10 = (values[9] ?? '').trim().replace(/^\uFEFF/, '').replace(/"/g, '');
                     data.push(rowData);
