@@ -74,6 +74,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
         grossSales: 0,
         totalProfit: 0,
         totalCOGS: 0,
+        creditCardFees: 0,
         serviceCharge: 0,
         serviceChargeEmployee: 0,
         serviceChargeGhost: 0,
@@ -129,6 +130,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
                 grossSales: 0,
                 totalProfit: 0,
                 totalCOGS: 0,
+                creditCardFees: 0,
                 serviceCharge: 0,
                 serviceChargeEmployee: 0,
                 serviceChargeGhost: 0,
@@ -164,6 +166,16 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
             return sum + parseNumericValue(value);
         }, 0);
 
+        // Calculate credit card fees (4% for Card, Credit Card, QR PH transactions)
+        const creditCardFees = filteredData.reduce((sum, row) => {
+            const paymentType = (row['Payment Type'] || '').toLowerCase().trim();
+            if (paymentType.includes('card') || paymentType.includes('credit') || paymentType.includes('qr ph') || paymentType.includes('qrph')) {
+                const gross = parseNumericValue(getSalesFieldValue(row, TOTAL_INCLUDE, TOTAL_EXCLUDE, TOTAL_HEADERS));
+                return sum + (gross * 0.04);
+            }
+            return sum;
+        }, 0);
+
         const employeeShare = totalServiceCharge * 0.4;
         const ghostShare = totalServiceCharge * 0.6;
         const netSales = Math.max(totalGrossSales - totalServiceCharge, 0);
@@ -173,6 +185,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
             grossSales: totalGrossSales,
             totalProfit,
             totalCOGS,
+            creditCardFees,
             serviceCharge: totalServiceCharge,
             serviceChargeEmployee: employeeShare,
             serviceChargeGhost: ghostShare,
@@ -549,7 +562,22 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
                 <StatCard title="Net Sales" value={formatPeso(stats.netSales)} icon={CurrencyPesoIcon} color="blue" />
                 <StatCard title="Gross Sales" value={formatPeso(stats.grossSales)} icon={CurrencyPesoIcon} color="purple" />
                 <StatCard title="Total Profit" value={formatPeso(stats.totalProfit)} icon={ArrowTrendingUpIcon} color="green" />
-                <StatCard title="Cost of Goods" value={formatPeso(stats.totalCOGS)} icon={BanknotesIcon} color="orange" />
+                <StatCard
+                    title="Cost of Goods"
+                    value={formatPeso(stats.totalCOGS)}
+                    icon={BanknotesIcon}
+                    color="orange"
+                    tooltip={
+                        stats.creditCardFees > 0 ? (
+                            <div className="text-left text-[11px] leading-snug mt-1">
+                                <div>
+                                    <span className="text-text-secondary">Credit Card Fees:</span>{' '}
+                                    <span className="font-semibold text-text-primary">{formatPeso(stats.creditCardFees)}</span>
+                                </div>
+                            </div>
+                        ) : undefined
+                    }
+                />
                 <StatCard
                     title="Service Charge"
                     value={formatPeso(stats.serviceCharge)}
