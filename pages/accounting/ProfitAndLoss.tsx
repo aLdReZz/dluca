@@ -1,25 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useFirebaseData } from '../../hooks/useFirebase';
-import { salesService, chartOfAccountsService } from '../../utils/firebaseService';
-import type { SalesData, Account } from '../../types';
+import { accountingService, chartOfAccountsService } from '../../utils/firebaseService';
+import type { AccountingTransaction, Account } from '../../types';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { CalendarDaysIcon, ChevronDownIcon, DocumentChartBarIcon } from '../../components/Icons';
 import CalendarPopup from '../../components/CalendarPopup';
-import {
-    parseSalesDate,
-    parseNumericValue,
-    getSalesFieldValue,
-    TOTAL_HEADERS,
-    TOTAL_INCLUDE,
-    TOTAL_EXCLUDE,
-    SERVICE_HEADERS,
-    SERVICE_INCLUDE,
-    COGS_HEADERS,
-    COGS_INCLUDE,
-    COGS_EXCLUDE,
-    DATE_HEADERS,
-    DATE_INCLUDE,
-} from '../../utils/salesData';
 
 const formatPeso = (amount: number) => {
     return '₱' + amount.toLocaleString('en-PH', {
@@ -48,8 +33,8 @@ const formatDateForDisplay = (dateString: string) => {
 
 const ProfitAndLoss: React.FC = () => {
     // Fetch data
-    const { data: salesData = [], loading: salesLoading } = useFirebaseData(
-        () => salesService.getAll(),
+    const { data: transactions = [], loading: transactionsLoading } = useFirebaseData(
+        () => accountingService.getAll(),
         []
     );
     const { data: accounts = [], loading: accountsLoading } = useFirebaseData(
@@ -92,72 +77,63 @@ const ProfitAndLoss: React.FC = () => {
 
     // Calculate P&L data
     const profitLossData = useMemo(() => {
-        if (!startDate || !endDate || !Array.isArray(salesData) || !Array.isArray(accounts)) return null;
+        if (!startDate || !endDate || !Array.isArray(transactions) || !Array.isArray(accounts)) return null;
 
         const start = new Date(startDate + 'T00:00:00');
         const end = new Date(endDate + 'T23:59:59');
 
-        // Filter sales data by date range
-        const filteredData = salesData.filter(row => {
-            const dateValue = getSalesFieldValue(row, DATE_INCLUDE, [], DATE_HEADERS);
-            const rowDate = parseSalesDate(dateValue ?? row.Date);
-            return rowDate && rowDate >= start && rowDate <= end;
+        // Filter transactions by date range
+        const filteredTransactions = transactions.filter(txn => {
+            const txnDate = new Date(txn.date);
+            return txnDate >= start && txnDate <= end;
         });
 
-        // Calculate revenue (from sales)
-        const grossSales = filteredData.reduce((sum, row) => {
-            const value = getSalesFieldValue(row, TOTAL_INCLUDE, TOTAL_EXCLUDE, TOTAL_HEADERS);
-            return sum + parseNumericValue(value);
-        }, 0);
+        // Calculate revenue (credit transactions)
+        const totalRevenue = filteredTransactions
+            .filter(txn => txn.type === 'credit')
+            .reduce((sum, txn) => sum + txn.amount, 0);
 
-        const serviceCharge = filteredData.reduce((sum, row) => {
-            const value = getSalesFieldValue(row, SERVICE_INCLUDE, [], SERVICE_HEADERS);
-            return sum + parseNumericValue(value);
-        }, 0);
+        // Calculate expenses (debit transactions)
+        const totalExpenses = filteredTransactions
+            .filter(txn => txn.type === 'debit')
+            .reduce((sum, txn) => sum + txn.amount, 0);
 
-        const netSales = grossSales - serviceCharge;
+        // Group expenses by description/category
+        const expenseBreakdown = filteredTransactions
+            .filter(txn => txn.type === 'debit')
+            .reduce((acc, txn) => {
+                const key = txn.description || 'Uncategorized';
+                if (!acc[key]) {
+                    acc[key] = 0;
+                }
+                acc[key] += txn.amount;
+                return acc;
+            }, {} as { [key: string]: number });
 
-        // Cost of Goods Sold
-        const costOfGoodsSold = filteredData.reduce((sum, row) => {
-            const value = getSalesFieldValue(row, COGS_INCLUDE, COGS_EXCLUDE, COGS_HEADERS);
-            return sum + parseNumericValue(value);
-        }, 0);
-
-        const grossProfit = netSales - costOfGoodsSold;
-
-        // Operating Expenses (from chart of accounts - expense type)
-        const expenseAccounts = accounts.filter((acc: Account) => acc.type === 'expense' && acc.isActive);
-
-        // For now, we'll show the structure. In the future, you can link actual transactions to these accounts
-        const operatingExpenses = expenseAccounts.map((acc: Account) => ({
-            code: acc.code,
-            name: acc.name,
-            amount: 0 // This should be populated from actual transactions
+        const operatingExpenses = Object.entries(expenseBreakdown).map(([name, amount]) => ({
+            code: '',
+            name,
+            amount
         }));
 
-        const totalOperatingExpenses = operatingExpenses.reduce((sum, exp) => sum + exp.amount, 0);
-
-        const operatingIncome = grossProfit - totalOperatingExpenses;
-
-        // Net Income
-        const netIncome = operatingIncome;
+        const netIncome = totalRevenue - totalExpenses;
 
         return {
-            grossSales,
-            serviceCharge,
-            netSales,
-            costOfGoodsSold,
-            grossProfit,
-            grossProfitMargin: netSales > 0 ? (grossProfit / netSales) * 100 : 0,
+            grossSales: totalRevenue,
+            serviceCharge: 0,
+            netSales: totalRevenue,
+            costOfGoodsSold: 0,
+            grossProfit: totalRevenue,
+            grossProfitMargin: totalRevenue > 0 ? (totalRevenue / totalRevenue) * 100 : 0,
             operatingExpenses,
-            totalOperatingExpenses,
-            operatingIncome,
+            totalOperatingExpenses: totalExpenses,
+            operatingIncome: netIncome,
             netIncome,
-            netProfitMargin: netSales > 0 ? (netIncome / netSales) * 100 : 0,
+            netProfitMargin: totalRevenue > 0 ? (netIncome / totalRevenue) * 100 : 0,
         };
-    }, [salesData, accounts, startDate, endDate]);
+    }, [transactions, accounts, startDate, endDate]);
 
-    if (salesLoading || accountsLoading) {
+    if (transactionsLoading || accountsLoading) {
         return (
             <div className="flex justify-center items-center h-full">
                 <LoadingSpinner />
@@ -223,36 +199,9 @@ const ProfitAndLoss: React.FC = () => {
                             <div className="px-6 py-4 border-b border-border-color">
                                 <h4 className="text-sm font-bold text-accent-green mb-3">REVENUE</h4>
                                 <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="text-text-secondary pl-4">Gross Sales</span>
-                                        <span className="text-text-primary font-medium">{formatPeso(profitLossData.grossSales)}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-text-secondary pl-4">Less: Service Charge</span>
-                                        <span className="text-text-primary font-medium">({formatPeso(profitLossData.serviceCharge)})</span>
-                                    </div>
-                                    <div className="flex justify-between pt-2 border-t border-border-color font-semibold">
-                                        <span className="text-text-primary">Net Sales</span>
-                                        <span className="text-text-primary">{formatPeso(profitLossData.netSales)}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Cost of Goods Sold */}
-                            <div className="px-6 py-4 border-b border-border-color">
-                                <h4 className="text-sm font-bold text-accent-orange mb-3">COST OF GOODS SOLD</h4>
-                                <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="text-text-secondary pl-4">Cost of Goods Sold</span>
-                                        <span className="text-text-primary font-medium">{formatPeso(profitLossData.costOfGoodsSold)}</span>
-                                    </div>
-                                    <div className="flex justify-between pt-2 border-t border-border-color font-semibold">
-                                        <span className="text-text-primary">Gross Profit</span>
-                                        <span className="text-accent-green">{formatPeso(profitLossData.grossProfit)}</span>
-                                    </div>
-                                    <div className="flex justify-between text-xs">
-                                        <span className="text-text-secondary pl-4">Gross Profit Margin</span>
-                                        <span className="text-text-secondary">{profitLossData.grossProfitMargin.toFixed(2)}%</span>
+                                    <div className="flex justify-between font-semibold">
+                                        <span className="text-text-primary">Total Revenue</span>
+                                        <span className="text-text-primary">{formatPeso(profitLossData.grossSales)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -263,12 +212,12 @@ const ProfitAndLoss: React.FC = () => {
                                 <div className="space-y-2 text-sm">
                                     {profitLossData.operatingExpenses.length === 0 ? (
                                         <div className="text-text-secondary pl-4 text-xs italic">
-                                            No expense accounts defined. Add expense accounts in Chart of Accounts.
+                                            No expenses recorded for this period.
                                         </div>
                                     ) : (
                                         profitLossData.operatingExpenses.map((exp, index) => (
                                             <div key={index} className="flex justify-between">
-                                                <span className="text-text-secondary pl-4">{exp.code} - {exp.name}</span>
+                                                <span className="text-text-secondary pl-4">{exp.name}</span>
                                                 <span className="text-text-primary font-medium">{formatPeso(exp.amount)}</span>
                                             </div>
                                         ))
@@ -306,7 +255,7 @@ const ProfitAndLoss: React.FC = () => {
                         {/* Print Note */}
                         <div className="mt-4 text-center">
                             <p className="text-xs text-text-secondary">
-                                Note: Operating expenses are currently placeholders. Link actual expense transactions to accounts for accurate reporting.
+                                Note: Expenses are grouped by transaction description. Update the Chart of Accounts to link transactions to specific expense categories.
                             </p>
                         </div>
                     </div>
