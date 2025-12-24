@@ -82,6 +82,9 @@ const ProfitAndLoss: React.FC = () => {
         const start = new Date(startDate + 'T00:00:00');
         const end = new Date(endDate + 'T23:59:59');
 
+        // Create account lookup map
+        const accountMap = new Map(accounts.map(acc => [acc.id, acc]));
+
         // Filter transactions by date range
         const filteredTransactions = transactions.filter(txn => {
             const txnDate = new Date(txn.date);
@@ -98,22 +101,31 @@ const ProfitAndLoss: React.FC = () => {
             .filter(txn => txn.type === 'debit')
             .reduce((sum, txn) => sum + txn.amount, 0);
 
-        // Group expenses by description/category
+        // Group expenses by account
         const expenseBreakdown = filteredTransactions
             .filter(txn => txn.type === 'debit')
             .reduce((acc, txn) => {
-                const key = txn.description || 'Uncategorized';
-                if (!acc[key]) {
-                    acc[key] = 0;
-                }
-                acc[key] += txn.amount;
-                return acc;
-            }, {} as { [key: string]: number });
+                // Get account from Chart of Accounts if accountId is set
+                let accountKey = 'Uncategorized';
+                let accountCode = '';
 
-        const operatingExpenses = Object.entries(expenseBreakdown).map(([name, amount]) => ({
-            code: '',
+                if (txn.accountId && accountMap.has(txn.accountId)) {
+                    const account = accountMap.get(txn.accountId)!;
+                    accountKey = account.name;
+                    accountCode = account.code;
+                }
+
+                if (!acc[accountKey]) {
+                    acc[accountKey] = { amount: 0, code: accountCode };
+                }
+                acc[accountKey].amount += txn.amount;
+                return acc;
+            }, {} as { [key: string]: { amount: number; code: string } });
+
+        const operatingExpenses = Object.entries(expenseBreakdown).map(([name, data]) => ({
+            code: data.code,
             name,
-            amount
+            amount: data.amount
         }));
 
         const netIncome = totalRevenue - totalExpenses;
@@ -217,7 +229,10 @@ const ProfitAndLoss: React.FC = () => {
                                     ) : (
                                         profitLossData.operatingExpenses.map((exp, index) => (
                                             <div key={index} className="flex justify-between">
-                                                <span className="text-text-secondary pl-4">{exp.name}</span>
+                                                <span className="text-text-secondary pl-4">
+                                                    {exp.code && <span className="font-mono">{exp.code} - </span>}
+                                                    {exp.name}
+                                                </span>
                                                 <span className="text-text-primary font-medium">{formatPeso(exp.amount)}</span>
                                             </div>
                                         ))

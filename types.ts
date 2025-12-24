@@ -186,6 +186,7 @@ export interface AccountingTransaction {
     notes?: string;
     transferTo?: string;
     runningBalance: number;
+    accountId?: string; // Link to Chart of Accounts
     createdAt?: string;
     updatedAt?: string;
 }
