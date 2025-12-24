@@ -92,7 +92,7 @@ const ProfitAndLoss: React.FC = () => {
 
     // Calculate P&L data
     const profitLossData = useMemo(() => {
-        if (!startDate || !endDate) return null;
+        if (!startDate || !endDate || !Array.isArray(salesData) || !Array.isArray(accounts)) return null;
 
         const start = new Date(startDate + 'T00:00:00');
         const end = new Date(endDate + 'T23:59:59');
