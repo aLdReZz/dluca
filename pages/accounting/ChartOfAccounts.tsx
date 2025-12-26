@@ -52,6 +52,10 @@ const ChartOfAccounts: React.FC = () => {
         (id: string) => chartOfAccountsService.delete(id)
     );
 
+    const { mutate: seedAccounts, loading: seedingAccounts } = useFirebaseMutation(
+        () => chartOfAccountsService.seedRestaurantAccounts()
+    );
+
     const handleAddAccount = async () => {
         if (!newCode || !newName || !newType) {
             setOperationStatus({ type: 'error', message: 'Please fill in all required fields' });
@@ -141,6 +145,18 @@ const ChartOfAccounts: React.FC = () => {
         }
     };
 
+    const handleSeedAccounts = async () => {
+        if (window.confirm('This will add a complete restaurant Chart of Accounts. Continue?')) {
+            try {
+                await seedAccounts();
+                setOperationStatus({ type: 'success', message: 'Restaurant accounts added successfully!' });
+                await refetch();
+            } catch (error) {
+                setOperationStatus({ type: 'error', message: 'Failed to seed accounts' });
+            }
+        }
+    };
+
     // Clear status messages after 3 seconds
     useEffect(() => {
         if (operationStatus) {
@@ -175,13 +191,27 @@ const ChartOfAccounts: React.FC = () => {
                         <h1 className="text-2xl font-bold text-text-primary">Chart of Accounts</h1>
                         <p className="text-sm text-text-secondary mt-1">Manage your accounting categories and accounts</p>
                     </div>
-                    <button
-                        onClick={() => setIsAddingNew(true)}
-                        className="flex items-center justify-center gap-2 px-4 py-3 bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 transition-colors tap-target"
-                    >
-                        <PlusIcon className="w-5 h-5" />
-                        <span className="font-medium">Add Account</span>
-                    </button>
+                    <div className="flex gap-2">
+                        {accounts.length === 0 && (
+                            <button
+                                onClick={handleSeedAccounts}
+                                disabled={seedingAccounts}
+                                className="flex items-center justify-center gap-2 px-4 py-3 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 transition-colors tap-target disabled:opacity-50"
+                            >
+                                <FolderIcon className="w-5 h-5" />
+                                <span className="font-medium">
+                                    {seedingAccounts ? 'Loading...' : 'Load Restaurant Accounts'}
+                                </span>
+                            </button>
+                        )}
+                        <button
+                            onClick={() => setIsAddingNew(true)}
+                            className="flex items-center justify-center gap-2 px-4 py-3 bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 transition-colors tap-target"
+                        >
+                            <PlusIcon className="w-5 h-5" />
+                            <span className="font-medium">Add Account</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
