@@ -17,6 +17,9 @@ const config: Config = {
       '2xl': '1536px', // Extra large desktop
     },
     extend: {
+      scale: {
+        '102': '1.02',
+      },
       colors: {
         'bg-primary': '#161617',
         'bg-secondary': '#1d1d1f',
