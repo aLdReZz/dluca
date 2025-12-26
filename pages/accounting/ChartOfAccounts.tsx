@@ -100,14 +100,33 @@ const ChartOfAccounts: React.FC = () => {
         }
 
         try {
-            await addAccount({
-                code: '',
+            // Auto-generate code based on account type and count
+            const typePrefix = {
+                'bank': '1',
+                'asset': '1',
+                'liability': '2',
+                'equity': '3',
+                'revenue': '4',
+                'expense': '5'
+            }[newType] || '9';
+
+            const sameTypeCount = accounts.filter(a => a.type === newType).length;
+            const generatedCode = `${typePrefix}${String(sameTypeCount + 1).padStart(3, '0')}`;
+
+            const accountData: Omit<Account, 'id'> = {
+                code: generatedCode,
                 name: newName,
                 type: newType,
                 description: newDescription,
-                parentId: newParentId || undefined,
                 isActive: true,
-            });
+            };
+
+            // Only add parentId if it has a value (Firebase doesn't allow undefined)
+            if (newParentId) {
+                accountData.parentId = newParentId;
+            }
+
+            await addAccount(accountData);
             setOperationStatus({ type: 'success', message: 'Account added successfully' });
             await refetch();
 
@@ -118,7 +137,8 @@ const ChartOfAccounts: React.FC = () => {
             setNewParentId('');
             setIsAddingNew(false);
         } catch (error) {
-            setOperationStatus({ type: 'error', message: 'Failed to add account' });
+            console.error('Error adding account:', error);
+            setOperationStatus({ type: 'error', message: `Failed to add account: ${error instanceof Error ? error.message : 'Unknown error'}` });
         }
     };
 
@@ -145,20 +165,27 @@ const ChartOfAccounts: React.FC = () => {
         }
 
         try {
+            const updates: Partial<Account> = {
+                name: editName,
+                type: editType,
+                description: editDescription,
+            };
+
+            // Only add parentId if it has a value (Firebase doesn't allow undefined)
+            if (editParentId) {
+                updates.parentId = editParentId;
+            }
+
             await updateAccount({
                 id: editingAccountId,
-                updates: {
-                    name: editName,
-                    type: editType,
-                    description: editDescription,
-                    parentId: editParentId || undefined,
-                }
+                updates
             });
             setOperationStatus({ type: 'success', message: 'Account updated successfully' });
             await refetch();
             setEditingAccountId(null);
         } catch (error) {
-            setOperationStatus({ type: 'error', message: 'Failed to update account' });
+            console.error('Error updating account:', error);
+            setOperationStatus({ type: 'error', message: `Failed to update account: ${error instanceof Error ? error.message : 'Unknown error'}` });
         }
     };
 

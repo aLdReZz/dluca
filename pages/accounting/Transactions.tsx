@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { AccountingTransaction, Account } from '../../types';
 import { useFirebaseData, useFirebaseMutation } from '../../hooks/useFirebase';
 import { accountingService, chartOfAccountsService } from '../../utils/firebaseService';
 import DeleteConfirmationModal from '../../components/DeleteConfirmationModal';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import DatePickerInput from '../../components/DatePickerInput';
-import { PlusIcon, PencilIcon, TrashIcon, BanknotesIcon, ArrowTrendingUpIcon, ChartBarIcon, XMarkIcon, CheckIcon } from '../../components/Icons';
+import { PlusIcon, PencilIcon, TrashIcon, BanknotesIcon, ArrowTrendingUpIcon, ChartBarIcon, XMarkIcon, CheckIcon, ChevronUpIcon, ChevronDownIcon, ArrowsUpDownIcon } from '../../components/Icons';
 
 const formatPeso = (amount: number) => {
     return '₱' + amount.toLocaleString('en-PH', {
@@ -21,6 +21,183 @@ const formatDate = (dateString: string) => {
         month: 'short',
         day: 'numeric'
     });
+};
+
+const SortableHeader: React.FC<{
+    label: string;
+    field: SortField;
+    currentSortField: SortField;
+    sortDirection: SortDirection;
+    onSort: (field: SortField) => void;
+    width: number;
+    onResizeStart: (e: React.MouseEvent) => void;
+    align?: 'left' | 'right' | 'center';
+}> = ({ label, field, currentSortField, sortDirection, onSort, width, onResizeStart, align = 'left' }) => {
+    const isActive = currentSortField === field && sortDirection;
+
+    return (
+        <th
+            className="relative px-4 py-3 text-sm font-semibold text-text-primary bg-bg-tertiary select-none group"
+            style={{ width: `${width}px`, minWidth: `${width}px` }}
+        >
+            <div
+                className={`flex items-center gap-2 cursor-pointer hover:text-accent-blue transition-colors ${
+                    align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start'
+                }`}
+                onClick={() => onSort(field)}
+            >
+                <span>{label}</span>
+                <span className="w-4 h-4 flex items-center justify-center">
+                    {isActive ? (
+                        sortDirection === 'asc' ? (
+                            <ChevronUpIcon className="w-4 h-4 text-accent-blue" />
+                        ) : (
+                            <ChevronDownIcon className="w-4 h-4 text-accent-blue" />
+                        )
+                    ) : (
+                        <ArrowsUpDownIcon className="w-3 h-3 text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
+                    )}
+                </span>
+            </div>
+            {/* Resize handle */}
+            <div
+                className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-accent-blue/50 active:bg-accent-blue"
+                onMouseDown={onResizeStart}
+                onClick={(e) => e.stopPropagation()}
+            />
+        </th>
+    );
+};
+
+const CategoryAutocomplete: React.FC<{
+    value: string;
+    onChange: (value: string) => void;
+    options: { id: string; name: string }[];
+    placeholder?: string;
+    className?: string;
+}> = ({ value, onChange, options, placeholder = 'Select or type category', className = '' }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [inputValue, setInputValue] = useState(value);
+    const [selectedIndex, setSelectedIndex] = useState(-1);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+    const optionsRef = useRef<(HTMLDivElement | null)[]>([]);
+
+    useEffect(() => {
+        setInputValue(value);
+    }, [value]);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+                setSelectedIndex(-1);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const filteredOptions = useMemo(() => {
+        if (!inputValue) return options;
+        return options.filter(option =>
+            option.name.toLowerCase().includes(inputValue.toLowerCase())
+        );
+    }, [inputValue, options]);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newValue = e.target.value;
+        setInputValue(newValue);
+        onChange(newValue);
+        setIsOpen(true);
+        setSelectedIndex(-1);
+    };
+
+    const handleSelectOption = (optionName: string) => {
+        setInputValue(optionName);
+        onChange(optionName);
+        setIsOpen(false);
+        setSelectedIndex(-1);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (!isOpen && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+            setIsOpen(true);
+            setSelectedIndex(0);
+            e.preventDefault();
+            return;
+        }
+
+        if (!isOpen) return;
+
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                setSelectedIndex(prev => {
+                    const newIndex = prev < filteredOptions.length - 1 ? prev + 1 : prev;
+                    // Scroll into view
+                    setTimeout(() => {
+                        optionsRef.current[newIndex]?.scrollIntoView({ block: 'nearest' });
+                    }, 0);
+                    return newIndex;
+                });
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                setSelectedIndex(prev => {
+                    const newIndex = prev > 0 ? prev - 1 : 0;
+                    // Scroll into view
+                    setTimeout(() => {
+                        optionsRef.current[newIndex]?.scrollIntoView({ block: 'nearest' });
+                    }, 0);
+                    return newIndex;
+                });
+                break;
+            case 'Enter':
+                e.preventDefault();
+                if (selectedIndex >= 0 && selectedIndex < filteredOptions.length) {
+                    handleSelectOption(filteredOptions[selectedIndex].name);
+                }
+                break;
+            case 'Escape':
+                e.preventDefault();
+                setIsOpen(false);
+                setSelectedIndex(-1);
+                break;
+        }
+    };
+
+    return (
+        <div ref={wrapperRef} className="relative">
+            <input
+                type="text"
+                value={inputValue}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setIsOpen(true)}
+                placeholder={placeholder}
+                className={className}
+                autoComplete="off"
+            />
+            {isOpen && filteredOptions.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-bg-primary border border-border-color rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                    {filteredOptions.map((option, index) => (
+                        <div
+                            key={option.id}
+                            ref={el => optionsRef.current[index] = el}
+                            onClick={() => handleSelectOption(option.name)}
+                            className={`px-3 py-2 cursor-pointer transition-colors text-sm text-text-primary ${
+                                index === selectedIndex
+                                    ? 'bg-accent-blue text-white'
+                                    : 'hover:bg-hover-bg'
+                            }`}
+                        >
+                            {option.name}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
 };
 
 const SummaryCard: React.FC<{
@@ -56,6 +233,9 @@ const SummaryCard: React.FC<{
     </div>
 );
 
+type SortField = 'date' | 'type' | 'category' | 'description' | 'reference' | 'bank' | 'amount';
+type SortDirection = 'asc' | 'desc' | null;
+
 const Transactions: React.FC = () => {
     const [isAddingNew, setIsAddingNew] = useState(false);
     const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
@@ -63,6 +243,25 @@ const Transactions: React.FC = () => {
     const [operationStatus, setOperationStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
     const [openingBalance, setOpeningBalance] = useState<number>(0);
     const [selectedBank, setSelectedBank] = useState<string | null>(null);
+
+    // Sorting state
+    const [sortField, setSortField] = useState<SortField>('date');
+    const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+    // Column resizing state
+    const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
+        date: 120,
+        type: 100,
+        category: 150,
+        description: 250,
+        reference: 150,
+        bank: 120,
+        amount: 130,
+        actions: 100
+    });
+    const [resizingColumn, setResizingColumn] = useState<string | null>(null);
+    const [startX, setStartX] = useState<number>(0);
+    const [startWidth, setStartWidth] = useState<number>(0);
 
     // Edit transaction form state
     const [editDate, setEditDate] = useState('');
@@ -101,6 +300,14 @@ const Transactions: React.FC = () => {
     const bankAccounts = useMemo(() => {
         if (!allAccounts || !Array.isArray(allAccounts)) return [];
         return allAccounts.filter(account => account.type === 'bank' && account.isActive);
+    }, [allAccounts]);
+
+    // Filter to get expense and revenue accounts for category dropdown
+    const categoryAccounts = useMemo(() => {
+        if (!allAccounts || !Array.isArray(allAccounts)) return [];
+        return allAccounts.filter(account =>
+            (account.type === 'expense' || account.type === 'revenue') && account.isActive
+        ).sort((a, b) => a.name.localeCompare(b.name));
     }, [allAccounts]);
 
     // Fetch opening balance
@@ -142,12 +349,58 @@ const Transactions: React.FC = () => {
         return sortedTransactions.filter(t => (t as any).paymentMethod === selectedBank);
     }, [sortedTransactions, selectedBank]);
 
-    // Calculate running balance
+    // Sorting handler
+    const handleSort = (field: SortField) => {
+        if (sortField === field) {
+            // Cycle through: asc -> desc -> no sort -> asc
+            setSortDirection(sortDirection === 'asc' ? 'desc' : sortDirection === 'desc' ? null : 'asc');
+        } else {
+            setSortField(field);
+            setSortDirection('asc');
+        }
+    };
+
+    // Column resize handlers
+    const handleResizeStart = (e: React.MouseEvent, columnKey: string) => {
+        e.preventDefault();
+        setResizingColumn(columnKey);
+        setStartX(e.clientX);
+        setStartWidth(columnWidths[columnKey]);
+    };
+
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (resizingColumn) {
+                const diff = e.clientX - startX;
+                const newWidth = Math.max(80, startWidth + diff);
+                setColumnWidths(prev => ({
+                    ...prev,
+                    [resizingColumn]: newWidth
+                }));
+            }
+        };
+
+        const handleMouseUp = () => {
+            setResizingColumn(null);
+        };
+
+        if (resizingColumn) {
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+        }
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [resizingColumn, startX, startWidth]);
+
+    // Calculate running balance with sorting
     const transactionsWithBalance = useMemo(() => {
         const sorted = [...filteredTransactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         let balance = openingBalance || 0;
 
-        return sorted.map(transaction => {
+        const withBalance = sorted.map(transaction => {
             if (transaction.type === 'credit') {
                 balance += transaction.amount;
             } else {
@@ -155,7 +408,54 @@ const Transactions: React.FC = () => {
             }
             return { ...transaction, runningBalance: balance };
         }).reverse();
-    }, [filteredTransactions, openingBalance]);
+
+        // Apply sorting if active
+        if (sortDirection) {
+            return [...withBalance].sort((a, b) => {
+                let aValue: any;
+                let bValue: any;
+
+                switch (sortField) {
+                    case 'date':
+                        aValue = new Date(a.date).getTime();
+                        bValue = new Date(b.date).getTime();
+                        break;
+                    case 'type':
+                        aValue = a.type;
+                        bValue = b.type;
+                        break;
+                    case 'category':
+                        aValue = (a as any).category || '';
+                        bValue = (b as any).category || '';
+                        break;
+                    case 'description':
+                        aValue = a.description.toLowerCase();
+                        bValue = b.description.toLowerCase();
+                        break;
+                    case 'reference':
+                        aValue = a.reference || '';
+                        bValue = b.reference || '';
+                        break;
+                    case 'bank':
+                        aValue = (a as any).paymentMethod || '';
+                        bValue = (b as any).paymentMethod || '';
+                        break;
+                    case 'amount':
+                        aValue = a.amount;
+                        bValue = b.amount;
+                        break;
+                    default:
+                        return 0;
+                }
+
+                if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+                if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        return withBalance;
+    }, [filteredTransactions, openingBalance, sortField, sortDirection]);
 
     // Calculate bank account balances
     const bankBalances = useMemo(() => {
@@ -402,19 +702,82 @@ const Transactions: React.FC = () => {
                     <>
                         {/* Desktop Table */}
                         <div className="hidden lg:block bg-bg-secondary rounded-xl border border-border-color overflow-hidden">
-                            <table className="w-full">
-                                <thead className="bg-bg-tertiary">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Date</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Type</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Category</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Description</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Reference</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Bank</th>
-                                        <th className="px-4 py-3 text-right text-sm font-semibold text-text-primary">Amount</th>
-                                        <th className="px-4 py-3 text-center text-sm font-semibold text-text-primary">Actions</th>
-                                    </tr>
-                                </thead>
+                            <div className="overflow-x-auto">
+                                <table className="w-full" style={{ tableLayout: 'fixed' }}>
+                                    <thead className="bg-bg-tertiary">
+                                        <tr>
+                                            <SortableHeader
+                                                label="Date"
+                                                field="date"
+                                                currentSortField={sortField}
+                                                sortDirection={sortDirection}
+                                                onSort={handleSort}
+                                                width={columnWidths.date}
+                                                onResizeStart={(e) => handleResizeStart(e, 'date')}
+                                            />
+                                            <SortableHeader
+                                                label="Type"
+                                                field="type"
+                                                currentSortField={sortField}
+                                                sortDirection={sortDirection}
+                                                onSort={handleSort}
+                                                width={columnWidths.type}
+                                                onResizeStart={(e) => handleResizeStart(e, 'type')}
+                                            />
+                                            <SortableHeader
+                                                label="Category"
+                                                field="category"
+                                                currentSortField={sortField}
+                                                sortDirection={sortDirection}
+                                                onSort={handleSort}
+                                                width={columnWidths.category}
+                                                onResizeStart={(e) => handleResizeStart(e, 'category')}
+                                            />
+                                            <SortableHeader
+                                                label="Description"
+                                                field="description"
+                                                currentSortField={sortField}
+                                                sortDirection={sortDirection}
+                                                onSort={handleSort}
+                                                width={columnWidths.description}
+                                                onResizeStart={(e) => handleResizeStart(e, 'description')}
+                                            />
+                                            <SortableHeader
+                                                label="Reference"
+                                                field="reference"
+                                                currentSortField={sortField}
+                                                sortDirection={sortDirection}
+                                                onSort={handleSort}
+                                                width={columnWidths.reference}
+                                                onResizeStart={(e) => handleResizeStart(e, 'reference')}
+                                            />
+                                            <SortableHeader
+                                                label="Bank"
+                                                field="bank"
+                                                currentSortField={sortField}
+                                                sortDirection={sortDirection}
+                                                onSort={handleSort}
+                                                width={columnWidths.bank}
+                                                onResizeStart={(e) => handleResizeStart(e, 'bank')}
+                                            />
+                                            <SortableHeader
+                                                label="Amount"
+                                                field="amount"
+                                                currentSortField={sortField}
+                                                sortDirection={sortDirection}
+                                                onSort={handleSort}
+                                                width={columnWidths.amount}
+                                                onResizeStart={(e) => handleResizeStart(e, 'amount')}
+                                                align="right"
+                                            />
+                                            <th
+                                                className="relative px-4 py-3 text-center text-sm font-semibold text-text-primary bg-bg-tertiary"
+                                                style={{ width: `${columnWidths.actions}px`, minWidth: `${columnWidths.actions}px` }}
+                                            >
+                                                Actions
+                                            </th>
+                                        </tr>
+                                    </thead>
                                 <tbody className="divide-y divide-border-color">
                                     {/* Inline Add New Transaction Row */}
                                     {isAddingNew && (
@@ -436,18 +799,13 @@ const Transactions: React.FC = () => {
                                                 </select>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <select
+                                                <CategoryAutocomplete
                                                     value={newCategory}
-                                                    onChange={(e) => setNewCategory(e.target.value)}
-                                                    className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10"
-                                                >
-                                                    <option value="">Select category</option>
-                                                    <option value="Food">Food</option>
-                                                    <option value="Transportation">Transportation</option>
-                                                    <option value="Utilities">Utilities</option>
-                                                    <option value="Salary">Salary</option>
-                                                    <option value="Other">Other</option>
-                                                </select>
+                                                    onChange={setNewCategory}
+                                                    options={categoryAccounts}
+                                                    placeholder="Type or select category"
+                                                    className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
+                                                />
                                             </td>
                                             <td className="px-4 py-3">
                                                 <input
@@ -523,14 +881,13 @@ const Transactions: React.FC = () => {
                                                         </select>
                                                     </td>
                                                     <td className="px-4 py-3">
-                                                        <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10">
-                                                            <option value="">Select category</option>
-                                                            <option value="Food">Food</option>
-                                                            <option value="Transportation">Transportation</option>
-                                                            <option value="Utilities">Utilities</option>
-                                                            <option value="Salary">Salary</option>
-                                                            <option value="Other">Other</option>
-                                                        </select>
+                                                        <CategoryAutocomplete
+                                                            value={editCategory}
+                                                            onChange={setEditCategory}
+                                                            options={categoryAccounts}
+                                                            placeholder="Type or select category"
+                                                            className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
+                                                        />
                                                     </td>
                                                     <td className="px-4 py-3">
                                                         <input type="text" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} placeholder="Description" className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue" />
@@ -597,6 +954,7 @@ const Transactions: React.FC = () => {
                                     })}
                                 </tbody>
                             </table>
+                            </div>
                         </div>
 
                         {/* Mobile Cards */}
@@ -625,18 +983,13 @@ const Transactions: React.FC = () => {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-medium text-text-secondary mb-1">Category</label>
-                                            <select
+                                            <CategoryAutocomplete
                                                 value={newCategory}
-                                                onChange={(e) => setNewCategory(e.target.value)}
-                                                className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10"
-                                            >
-                                                <option value="">Select category</option>
-                                                <option value="Food">Food</option>
-                                                <option value="Transportation">Transportation</option>
-                                                <option value="Utilities">Utilities</option>
-                                                <option value="Salary">Salary</option>
-                                                <option value="Other">Other</option>
-                                            </select>
+                                                onChange={setNewCategory}
+                                                options={categoryAccounts}
+                                                placeholder="Type or select category"
+                                                className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
+                                            />
                                         </div>
                                         <div>
                                             <label className="block text-xs font-medium text-text-secondary mb-1">Description</label>
