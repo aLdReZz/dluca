@@ -197,7 +197,10 @@ const placeholderSalesData: SalesData[] = [
 const App: React.FC = () => {
     const [role, setRole] = useState<Role | null>('admin');
     const [isPinModalOpen, setPinModalOpen] = useState<boolean>(false);
-    const [page, setPage] = useState<Page>('costing');
+    const [page, setPage] = useState<Page>(() => {
+        const savedPage = localStorage.getItem('currentPage');
+        return (savedPage as Page) || 'dashboard';
+    });
     const [isSidebarOpen, setSidebarOpen] = useState<boolean>(false);
     const [dashboardIntro, setDashboardIntro] = useState(false);
     const dashboardIntroTimeout = useRef<number | null>(null);
@@ -444,6 +447,11 @@ const App: React.FC = () => {
             }
         };
     }, []);
+
+    // Save current page to localStorage whenever it changes
+    useEffect(() => {
+        localStorage.setItem('currentPage', page);
+    }, [page]);
 
     const handleLogout = () => {
         setRole(null);
