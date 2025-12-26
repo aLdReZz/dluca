@@ -201,7 +201,7 @@ export interface Account {
     id: string;
     code: string;
     name: string;
-    type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+    type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense' | 'bank';
     description?: string;
     parentId?: string;
     isActive: boolean;

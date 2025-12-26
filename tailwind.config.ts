@@ -24,6 +24,7 @@ const config: Config = {
         'text-primary': '#f5f5f7',
         'text-secondary': '#a1a1a6',
         'accent-blue': '#007aff',
+        'accent-cyan': '#5ac8fa',
         'accent-green': '#30d158',
         'accent-orange': '#ff9f40',
         'accent-red': '#ff453a',

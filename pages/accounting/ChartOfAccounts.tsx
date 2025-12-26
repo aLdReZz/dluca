@@ -7,6 +7,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import { PlusIcon, PencilIcon, TrashIcon, FolderIcon } from '../../components/Icons';
 
 const accountTypes = [
+    { value: 'bank', label: 'Bank', color: 'text-accent-cyan' },
     { value: 'asset', label: 'Asset', color: 'text-accent-blue' },
     { value: 'liability', label: 'Liability', color: 'text-accent-red' },
     { value: 'equity', label: 'Equity', color: 'text-accent-purple' },
