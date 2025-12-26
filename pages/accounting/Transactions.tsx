@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { AccountingTransaction } from '../../types';
+import type { AccountingTransaction, Account } from '../../types';
 import { useFirebaseData, useFirebaseMutation } from '../../hooks/useFirebase';
-import { accountingService } from '../../utils/firebaseService';
+import { accountingService, chartOfAccountsService } from '../../utils/firebaseService';
 import DeleteConfirmationModal from '../../components/DeleteConfirmationModal';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import DatePickerInput from '../../components/DatePickerInput';
@@ -75,6 +75,17 @@ const Transactions: React.FC = () => {
         () => accountingService.getAll(),
         []
     );
+
+    // Fetch bank accounts from Chart of Accounts
+    const { data: allAccounts = [], loading: accountsLoading } = useFirebaseData(
+        () => chartOfAccountsService.getAll(),
+        []
+    );
+
+    // Filter to get only bank type accounts
+    const bankAccounts = useMemo(() => {
+        return allAccounts.filter(account => account.type === 'bank' && account.isActive);
+    }, [allAccounts]);
 
     // Fetch opening balance
     const { data: balanceData } = useFirebaseData(() => accountingService.getAccountBalance('general'), []);
@@ -344,7 +355,7 @@ const Transactions: React.FC = () => {
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Category</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Description</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Reference</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Payment Method</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Bank</th>
                                         <th className="px-4 py-3 text-right text-sm font-semibold text-text-primary">Amount</th>
                                         <th className="px-4 py-3 text-center text-sm font-semibold text-text-primary">Actions</th>
                                     </tr>
@@ -407,11 +418,10 @@ const Transactions: React.FC = () => {
                                                     onChange={(e) => setNewPaymentMethod(e.target.value)}
                                                     className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10"
                                                 >
-                                                    <option value="">Select method</option>
-                                                    <option value="Cash">Cash</option>
-                                                    <option value="GCash">GCash</option>
-                                                    <option value="Grab">Grab</option>
-                                                    <option value="Card">Card</option>
+                                                    <option value="">Select bank</option>
+                                                    {bankAccounts.map(account => (
+                                                        <option key={account.id} value={account.name}>{account.name}</option>
+                                                    ))}
                                                 </select>
                                             </td>
                                             <td className="px-4 py-3">
@@ -475,11 +485,10 @@ const Transactions: React.FC = () => {
                                                     </td>
                                                     <td className="px-4 py-3">
                                                         <select value={editPaymentMethod} onChange={(e) => setEditPaymentMethod(e.target.value)} className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10">
-                                                            <option value="">Select method</option>
-                                                            <option value="Cash">Cash</option>
-                                                            <option value="GCash">GCash</option>
-                                                            <option value="Grab">Grab</option>
-                                                            <option value="Card">Card</option>
+                                                            <option value="">Select bank</option>
+                                                            {bankAccounts.map(account => (
+                                                                <option key={account.id} value={account.name}>{account.name}</option>
+                                                            ))}
                                                         </select>
                                                     </td>
                                                     <td className="px-4 py-3">
@@ -595,17 +604,16 @@ const Transactions: React.FC = () => {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium text-text-secondary mb-1">Payment Method</label>
+                                            <label className="block text-xs font-medium text-text-secondary mb-1">Bank</label>
                                             <select
                                                 value={newPaymentMethod}
                                                 onChange={(e) => setNewPaymentMethod(e.target.value)}
                                                 className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10"
                                             >
-                                                <option value="">Select method</option>
-                                                <option value="Cash">Cash</option>
-                                                <option value="GCash">GCash</option>
-                                                <option value="Grab">Grab</option>
-                                                <option value="Card">Card</option>
+                                                <option value="">Select bank</option>
+                                                {bankAccounts.map(account => (
+                                                    <option key={account.id} value={account.name}>{account.name}</option>
+                                                ))}
                                             </select>
                                         </div>
                                         <div>
@@ -668,7 +676,7 @@ const Transactions: React.FC = () => {
                                         )}
                                         {(transaction as any).paymentMethod && (
                                             <div className="flex justify-between">
-                                                <span className="text-text-secondary">Payment Method:</span>
+                                                <span className="text-text-secondary">Bank:</span>
                                                 <span className="text-text-primary">{(transaction as any).paymentMethod}</span>
                                             </div>
                                         )}
