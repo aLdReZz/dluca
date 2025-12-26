@@ -22,13 +22,11 @@ const ChartOfAccounts: React.FC = () => {
     const [operationStatus, setOperationStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
     // New account form state
-    const [newCode, setNewCode] = useState('');
     const [newName, setNewName] = useState('');
     const [newType, setNewType] = useState<Account['type']>('expense');
     const [newDescription, setNewDescription] = useState('');
 
     // Edit account form state
-    const [editCode, setEditCode] = useState('');
     const [editName, setEditName] = useState('');
     const [editType, setEditType] = useState<Account['type']>('expense');
     const [editDescription, setEditDescription] = useState('');
@@ -58,14 +56,14 @@ const ChartOfAccounts: React.FC = () => {
     );
 
     const handleAddAccount = async () => {
-        if (!newCode || !newName || !newType) {
+        if (!newName || !newType) {
             setOperationStatus({ type: 'error', message: 'Please fill in all required fields' });
             return;
         }
 
         try {
             await addAccount({
-                code: newCode,
+                code: '',
                 name: newName,
                 type: newType,
                 description: newDescription,
@@ -75,7 +73,6 @@ const ChartOfAccounts: React.FC = () => {
             await refetch();
 
             // Reset form
-            setNewCode('');
             setNewName('');
             setNewType('expense');
             setNewDescription('');
@@ -86,7 +83,6 @@ const ChartOfAccounts: React.FC = () => {
     };
 
     const handleCancelNew = () => {
-        setNewCode('');
         setNewName('');
         setNewType('expense');
         setNewDescription('');
@@ -95,14 +91,13 @@ const ChartOfAccounts: React.FC = () => {
 
     const handleEditAccount = (account: Account) => {
         setEditingAccountId(account.id);
-        setEditCode(account.code);
         setEditName(account.name);
         setEditType(account.type);
         setEditDescription(account.description || '');
     };
 
     const handleSaveEdit = async () => {
-        if (!editingAccountId || !editCode || !editName || !editType) {
+        if (!editingAccountId || !editName || !editType) {
             setOperationStatus({ type: 'error', message: 'Please fill in all required fields' });
             return;
         }
@@ -111,7 +106,6 @@ const ChartOfAccounts: React.FC = () => {
             await updateAccount({
                 id: editingAccountId,
                 updates: {
-                    code: editCode,
                     name: editName,
                     type: editType,
                     description: editDescription,
@@ -127,7 +121,6 @@ const ChartOfAccounts: React.FC = () => {
 
     const handleCancelEdit = () => {
         setEditingAccountId(null);
-        setEditCode('');
         setEditName('');
         setEditType('expense');
         setEditDescription('');
@@ -228,7 +221,6 @@ const ChartOfAccounts: React.FC = () => {
                             <table className="w-full">
                                 <thead className="bg-bg-tertiary">
                                     <tr>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Code</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Account Name</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Type</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Description</th>
@@ -240,15 +232,6 @@ const ChartOfAccounts: React.FC = () => {
                                     {/* Inline Add New Account Row */}
                                     {isAddingNew && (
                                         <tr className="bg-accent-blue/10 border-2 border-accent-blue">
-                                            <td className="px-4 py-3">
-                                                <input
-                                                    type="text"
-                                                    value={newCode}
-                                                    onChange={(e) => setNewCode(e.target.value)}
-                                                    placeholder="e.g., 1000"
-                                                    className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
-                                                />
-                                            </td>
                                             <td className="px-4 py-3">
                                                 <input
                                                     type="text"
@@ -307,9 +290,6 @@ const ChartOfAccounts: React.FC = () => {
                                             return (
                                                 <tr key={account.id} className="bg-accent-purple/10 border-2 border-accent-purple">
                                                     <td className="px-4 py-3">
-                                                        <input type="text" value={editCode} onChange={(e) => setEditCode(e.target.value)} placeholder="Account code" className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue" />
-                                                    </td>
-                                                    <td className="px-4 py-3">
                                                         <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Account name" className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue" />
                                                     </td>
                                                     <td className="px-4 py-3">
@@ -337,7 +317,6 @@ const ChartOfAccounts: React.FC = () => {
 
                                         return (
                                             <tr key={account.id} className="hover:bg-hover-bg/30 transition-colors">
-                                                <td className="px-4 py-3 text-sm font-mono text-text-primary">{account.code}</td>
                                                 <td className="px-4 py-3 text-sm font-medium text-text-primary">{account.name}</td>
                                                 <td className="px-4 py-3 text-sm">
                                                     <span className={`font-medium ${accountType?.color}`}>{accountType?.label}</span>
@@ -372,10 +351,6 @@ const ChartOfAccounts: React.FC = () => {
                                 <div className="bg-accent-blue/10 border-2 border-accent-blue rounded-xl p-4">
                                     <div className="space-y-3">
                                         <div>
-                                            <label className="block text-xs font-medium text-text-secondary mb-1">Account Code</label>
-                                            <input type="text" value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="e.g., 1000" className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue" />
-                                        </div>
-                                        <div>
                                             <label className="block text-xs font-medium text-text-secondary mb-1">Account Name</label>
                                             <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Account name" className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue" />
                                         </div>
@@ -404,8 +379,7 @@ const ChartOfAccounts: React.FC = () => {
                                     <div key={account.id} className="bg-bg-secondary rounded-xl border border-border-color p-4">
                                         <div className="flex justify-between items-start mb-3">
                                             <div>
-                                                <div className="text-sm font-mono text-text-secondary">{account.code}</div>
-                                                <div className="text-lg font-semibold text-text-primary mt-1">{account.name}</div>
+                                                <div className="text-lg font-semibold text-text-primary">{account.name}</div>
                                             </div>
                                             <span className={`px-2 py-1 rounded text-xs font-medium ${account.isActive ? 'bg-accent-green/20 text-accent-green' : 'bg-text-secondary/20 text-text-secondary'}`}>
                                                 {account.isActive ? 'Active' : 'Inactive'}
