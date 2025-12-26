@@ -84,6 +84,7 @@ const Transactions: React.FC = () => {
 
     // Filter to get only bank type accounts
     const bankAccounts = useMemo(() => {
+        if (!allAccounts || !Array.isArray(allAccounts)) return [];
         return allAccounts.filter(account => account.type === 'bank' && account.isActive);
     }, [allAccounts]);
 
