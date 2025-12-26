@@ -46,6 +46,8 @@ const ChartOfAccounts: React.FC = () => {
 
     // Build hierarchical account tree
     const accountsTree = useMemo(() => {
+        if (!accounts || !Array.isArray(accounts)) return [];
+
         const buildTree = (parentId: string | null | undefined = null, level = 0): AccountWithChildren[] => {
             return accounts
                 .filter(account => account.parentId === parentId || (!account.parentId && !parentId))
@@ -62,6 +64,8 @@ const ChartOfAccounts: React.FC = () => {
 
     // Flatten tree for display
     const flattenedAccounts = useMemo(() => {
+        if (!accountsTree || accountsTree.length === 0) return [];
+
         const flatten = (nodes: AccountWithChildren[]): AccountWithChildren[] => {
             return nodes.reduce((acc, node) => {
                 return [...acc, node, ...flatten(node.children)];
@@ -300,7 +304,7 @@ const ChartOfAccounts: React.FC = () => {
                                                     className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10"
                                                 >
                                                     <option value="">None (Top Level)</option>
-                                                    {accounts.filter(a => a.type === newType).map(acc => (
+                                                    {(accounts || []).filter(a => a.type === newType).map(acc => (
                                                         <option key={acc.id} value={acc.id}>{acc.name}</option>
                                                     ))}
                                                 </select>
@@ -359,7 +363,7 @@ const ChartOfAccounts: React.FC = () => {
                                                     <td className="px-4 py-3">
                                                         <select value={editParentId} onChange={(e) => setEditParentId(e.target.value)} className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10">
                                                             <option value="">None (Top Level)</option>
-                                                            {accounts.filter(a => a.type === editType && a.id !== editingAccountId).map(acc => (
+                                                            {(accounts || []).filter(a => a.type === editType && a.id !== editingAccountId).map(acc => (
                                                                 <option key={acc.id} value={acc.id}>{acc.name}</option>
                                                             ))}
                                                         </select>
@@ -397,7 +401,7 @@ const ChartOfAccounts: React.FC = () => {
                                                     <span className={`font-medium ${accountType?.color}`}>{accountType?.label}</span>
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-text-secondary">
-                                                    {account.parentId ? accounts.find(a => a.id === account.parentId)?.name || '-' : '-'}
+                                                    {account.parentId ? (accounts || []).find(a => a.id === account.parentId)?.name || '-' : '-'}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-text-secondary">{account.description || '-'}</td>
                                                 <td className="px-4 py-3 text-center">
@@ -444,7 +448,7 @@ const ChartOfAccounts: React.FC = () => {
                                             <label className="block text-xs font-medium text-text-secondary mb-1">Parent Account (optional)</label>
                                             <select value={newParentId} onChange={(e) => setNewParentId(e.target.value)} className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10">
                                                 <option value="">None (Top Level)</option>
-                                                {accounts.filter(a => a.type === newType).map(acc => (
+                                                {(accounts || []).filter(a => a.type === newType).map(acc => (
                                                     <option key={acc.id} value={acc.id}>{acc.name}</option>
                                                 ))}
                                             </select>
@@ -485,7 +489,7 @@ const ChartOfAccounts: React.FC = () => {
                                             {account.parentId && (
                                                 <div className="flex justify-between">
                                                     <span className="text-text-secondary">Parent:</span>
-                                                    <span className="text-text-primary">{accounts.find(a => a.id === account.parentId)?.name || '-'}</span>
+                                                    <span className="text-text-primary">{(accounts || []).find(a => a.id === account.parentId)?.name || '-'}</span>
                                                 </div>
                                             )}
                                             {account.description && (
