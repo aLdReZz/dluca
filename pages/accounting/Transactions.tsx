@@ -28,8 +28,17 @@ const SummaryCard: React.FC<{
     value: string;
     icon: React.FC<{ className?: string }>;
     color?: string;
-}> = ({ title, value, icon: Icon, color = 'text-accent-blue' }) => (
-    <div className="bg-bg-secondary p-5 rounded-xl border border-border-color">
+    onClick?: () => void;
+    isSelected?: boolean;
+}> = ({ title, value, icon: Icon, color = 'text-accent-blue', onClick, isSelected = false }) => (
+    <div
+        className={`bg-bg-secondary p-5 rounded-xl border transition-all cursor-pointer ${
+            isSelected
+                ? 'border-accent-blue shadow-lg shadow-accent-blue/20'
+                : 'border-border-color hover:border-border-color/80'
+        }`}
+        onClick={onClick}
+    >
         <div className="flex justify-between items-start">
             <div>
                 <div className="text-sm font-medium text-text-secondary">{title}</div>
@@ -48,6 +57,7 @@ const Transactions: React.FC = () => {
     const [deletingTransaction, setDeletingTransaction] = useState<AccountingTransaction | null>(null);
     const [operationStatus, setOperationStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
     const [openingBalance, setOpeningBalance] = useState<number>(0);
+    const [selectedBank, setSelectedBank] = useState<string | null>(null);
 
     // Edit transaction form state
     const [editDate, setEditDate] = useState('');
@@ -121,9 +131,15 @@ const Transactions: React.FC = () => {
         return allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [allTransactions]);
 
+    // Filter transactions by selected bank
+    const filteredTransactions = useMemo(() => {
+        if (!selectedBank) return sortedTransactions;
+        return sortedTransactions.filter(t => (t as any).paymentMethod === selectedBank);
+    }, [sortedTransactions, selectedBank]);
+
     // Calculate running balance
     const transactionsWithBalance = useMemo(() => {
-        const sorted = [...sortedTransactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const sorted = [...filteredTransactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         let balance = openingBalance || 0;
 
         return sorted.map(transaction => {
@@ -134,7 +150,7 @@ const Transactions: React.FC = () => {
             }
             return { ...transaction, runningBalance: balance };
         }).reverse();
-    }, [sortedTransactions, openingBalance]);
+    }, [filteredTransactions, openingBalance]);
 
     // Calculate bank account balances
     const bankBalances = useMemo(() => {
@@ -197,6 +213,11 @@ const Transactions: React.FC = () => {
         } catch (error) {
             setOperationStatus({ type: 'error', message: 'Failed to add transaction' });
         }
+    };
+
+    const handleOpenAddTransaction = () => {
+        setNewPaymentMethod(selectedBank || '');
+        setIsAddingNew(true);
     };
 
     const handleCancelNew = () => {
@@ -315,33 +336,50 @@ const Transactions: React.FC = () => {
             )}
 
             {/* Bank Account Balance Cards */}
-            <div className="p-4 lg:p-6 grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-                {bankBalances.length > 0 ? (
-                    bankBalances.map((bank, index) => (
-                        <SummaryCard
-                            key={bank.name}
-                            title={bank.name}
-                            value={formatPeso(bank.balance)}
-                            icon={BanknotesIcon}
-                            color={
-                                index === 0 ? 'text-accent-blue' :
-                                index === 1 ? 'text-accent-cyan' :
-                                index === 2 ? 'text-accent-green' :
-                                'text-accent-purple'
-                            }
-                        />
-                    ))
-                ) : (
-                    <div className="col-span-2 lg:col-span-4 text-center text-text-secondary py-8">
-                        No bank accounts found. Add bank accounts in Chart of Accounts.
-                    </div>
-                )}
+            <div className="p-4 lg:p-6">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-semibold text-text-primary">
+                        {selectedBank ? `${selectedBank} Transactions` : 'All Bank Accounts'}
+                    </h2>
+                    {selectedBank && (
+                        <button
+                            onClick={() => setSelectedBank(null)}
+                            className="text-sm text-accent-blue hover:text-accent-blue/80 transition-colors"
+                        >
+                            View All Banks
+                        </button>
+                    )}
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+                    {bankBalances.length > 0 ? (
+                        bankBalances.map((bank, index) => (
+                            <SummaryCard
+                                key={bank.name}
+                                title={bank.name}
+                                value={formatPeso(bank.balance)}
+                                icon={BanknotesIcon}
+                                color={
+                                    index === 0 ? 'text-accent-blue' :
+                                    index === 1 ? 'text-accent-cyan' :
+                                    index === 2 ? 'text-accent-green' :
+                                    'text-accent-purple'
+                                }
+                                onClick={() => setSelectedBank(bank.name)}
+                                isSelected={selectedBank === bank.name}
+                            />
+                        ))
+                    ) : (
+                        <div className="col-span-2 lg:col-span-4 text-center text-text-secondary py-8">
+                            No bank accounts found. Add bank accounts in Chart of Accounts.
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Add Transaction Button */}
             <div className="px-6 pb-4 flex justify-end">
                 <button
-                    onClick={() => setIsAddingNew(true)}
+                    onClick={handleOpenAddTransaction}
                     className="flex items-center justify-center gap-2 px-4 py-3 bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 transition-colors tap-target"
                 >
                     <PlusIcon className="w-5 h-5" />
