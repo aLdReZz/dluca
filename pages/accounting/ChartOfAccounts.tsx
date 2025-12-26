@@ -192,18 +192,16 @@ const ChartOfAccounts: React.FC = () => {
                         <p className="text-sm text-text-secondary mt-1">Manage your accounting categories and accounts</p>
                     </div>
                     <div className="flex gap-2">
-                        {accounts.length === 0 && (
-                            <button
-                                onClick={handleSeedAccounts}
-                                disabled={seedingAccounts}
-                                className="flex items-center justify-center gap-2 px-4 py-3 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 transition-colors tap-target disabled:opacity-50"
-                            >
-                                <FolderIcon className="w-5 h-5" />
-                                <span className="font-medium">
-                                    {seedingAccounts ? 'Loading...' : 'Load Restaurant Accounts'}
-                                </span>
-                            </button>
-                        )}
+                        <button
+                            onClick={handleSeedAccounts}
+                            disabled={seedingAccounts}
+                            className="flex items-center justify-center gap-2 px-4 py-3 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 transition-colors tap-target disabled:opacity-50"
+                        >
+                            <FolderIcon className="w-5 h-5" />
+                            <span className="font-medium">
+                                {seedingAccounts ? 'Loading...' : 'Load Restaurant Accounts'}
+                            </span>
+                        </button>
                         <button
                             onClick={() => setIsAddingNew(true)}
                             className="flex items-center justify-center gap-2 px-4 py-3 bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 transition-colors tap-target"
