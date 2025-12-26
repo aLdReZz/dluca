@@ -279,7 +279,7 @@ const Transactions: React.FC = () => {
         console.error('Error loading transactions:', transactionsError);
     }
 
-    if (transactionsLoading && !allTransactions) {
+    if ((transactionsLoading && !allTransactions) || (accountsLoading && !allAccounts)) {
         return (
             <div className="flex justify-center items-center h-full">
                 <LoadingSpinner />
