@@ -30,53 +30,31 @@ const SummaryCard: React.FC<{
     color?: string;
     onClick?: () => void;
     isSelected?: boolean;
-}> = ({ title, value, icon: Icon, color = 'text-accent-blue', onClick, isSelected = false }) => {
-    const bgColor = color.replace('text-', 'bg-').replace('accent-', 'accent-');
-    const shadowColor = color.replace('text-accent-', '');
-
-    return (
-        <div
-            className={`relative p-6 rounded-2xl border-2 transition-all duration-300 cursor-pointer overflow-hidden group ${
-                isSelected
-                    ? `border-accent-${shadowColor} shadow-2xl shadow-accent-${shadowColor}/30 scale-105`
-                    : 'border-border-color hover:border-border-color/60 hover:scale-102'
-            }`}
-            style={{
-                background: isSelected
-                    ? `linear-gradient(135deg, rgba(${shadowColor === 'cyan' ? '90, 200, 250' : shadowColor === 'blue' ? '0, 122, 255' : '48, 209, 88'}, 0.1) 0%, rgba(29, 29, 31, 1) 100%)`
-                    : 'linear-gradient(135deg, rgba(44, 44, 46, 0.8) 0%, rgba(29, 29, 31, 1) 100%)'
-            }}
-            onClick={onClick}
-        >
-            {/* Decorative gradient overlay */}
-            <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl opacity-20 transition-opacity ${
-                isSelected ? 'opacity-40' : 'opacity-0 group-hover:opacity-20'
-            }`} style={{ background: color.replace('text-', '') }} />
-
-            <div className="relative z-10">
-                <div className="flex justify-between items-start mb-4">
-                    <div className={`p-3 rounded-xl ${isSelected ? `${bgColor}/20` : 'bg-bg-tertiary group-hover:bg-bg-tertiary/80'} transition-colors`}>
-                        <Icon className={`w-7 h-7 ${color}`} />
-                    </div>
-                    {isSelected && (
-                        <div className={`px-2 py-1 rounded-lg ${bgColor}/20 border border-accent-${shadowColor}/30`}>
-                            <span className={`text-xs font-semibold ${color}`}>Active</span>
-                        </div>
-                    )}
-                </div>
-                <div>
-                    <div className="text-sm font-semibold text-text-secondary mb-1">{title}</div>
-                    <div className={`text-3xl font-bold ${isSelected ? color : 'text-text-primary'} transition-colors`}>{value}</div>
-                </div>
+}> = ({ title, value, icon: Icon, color = 'text-accent-blue', onClick, isSelected = false }) => (
+    <div
+        className={`bg-bg-secondary p-4 rounded-xl border transition-all duration-200 cursor-pointer ${
+            isSelected
+                ? 'border-accent-blue shadow-lg shadow-accent-blue/20'
+                : 'border-border-color hover:border-border-color/80'
+        }`}
+        onClick={onClick}
+    >
+        <div className="flex items-center justify-between mb-2">
+            <div className="p-2 rounded-lg bg-bg-tertiary">
+                <Icon className="w-5 h-5 text-text-secondary" />
             </div>
-
-            {/* Bottom accent line */}
-            <div className={`absolute bottom-0 left-0 h-1 transition-all duration-300 ${
-                isSelected ? `w-full ${bgColor}` : 'w-0 group-hover:w-1/2 bg-border-color'
-            }`} />
+            {isSelected && (
+                <div className="px-2 py-0.5 rounded bg-accent-blue/20 border border-accent-blue/30">
+                    <span className="text-xs font-medium text-accent-blue">Active</span>
+                </div>
+            )}
         </div>
-    );
-};
+        <div>
+            <div className="text-xs font-medium text-text-secondary mb-1">{title}</div>
+            <div className="text-xl font-bold text-text-primary">{value}</div>
+        </div>
+    </div>
+);
 
 const Transactions: React.FC = () => {
     const [isAddingNew, setIsAddingNew] = useState(false);
