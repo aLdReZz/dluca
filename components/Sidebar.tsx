@@ -116,7 +116,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, currentPage, onNavigate, isOpen
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
+            <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-6 scrollbar-hide">
                 {/* Main Menu */}
                 <div className="space-y-1">
                     <h3 className="px-3 text-[11px] font-semibold uppercase tracking-wider text-text-secondary/60 mb-3">Main Menu</h3>
