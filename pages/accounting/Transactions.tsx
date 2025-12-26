@@ -136,18 +136,33 @@ const Transactions: React.FC = () => {
         }).reverse();
     }, [sortedTransactions, openingBalance]);
 
-    // Calculate statistics
-    const stats = useMemo(() => {
-        const income = sortedTransactions
-            .filter(t => t.type === 'credit')
-            .reduce((sum, t) => sum + t.amount, 0);
-        const expenses = sortedTransactions
-            .filter(t => t.type === 'debit')
-            .reduce((sum, t) => sum + t.amount, 0);
-        const currentBalance = openingBalance + income - expenses;
+    // Calculate bank account balances
+    const bankBalances = useMemo(() => {
+        if (!bankAccounts || bankAccounts.length === 0) return [];
 
-        return { openingBalance, income, expenses, currentBalance };
-    }, [sortedTransactions, openingBalance]);
+        return bankAccounts.map(bank => {
+            const bankTransactions = sortedTransactions.filter(
+                t => (t as any).paymentMethod === bank.name
+            );
+
+            const income = bankTransactions
+                .filter(t => t.type === 'credit')
+                .reduce((sum, t) => sum + t.amount, 0);
+
+            const expenses = bankTransactions
+                .filter(t => t.type === 'debit')
+                .reduce((sum, t) => sum + t.amount, 0);
+
+            const balance = income - expenses;
+
+            return {
+                name: bank.name,
+                balance,
+                income,
+                expenses
+            };
+        });
+    }, [sortedTransactions, bankAccounts]);
 
     const handleAddNewTransaction = async () => {
         if (!newDate || !newDescription || !newAmount) {
@@ -299,32 +314,28 @@ const Transactions: React.FC = () => {
                 </div>
             )}
 
-            {/* Summary Cards */}
+            {/* Bank Account Balance Cards */}
             <div className="p-4 lg:p-6 grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-                <SummaryCard
-                    title="Opening Balance"
-                    value={formatPeso(stats.openingBalance)}
-                    icon={BanknotesIcon}
-                    color="text-accent-purple"
-                />
-                <SummaryCard
-                    title="Total Income"
-                    value={formatPeso(stats.income)}
-                    icon={ArrowTrendingUpIcon}
-                    color="text-accent-green"
-                />
-                <SummaryCard
-                    title="Total Expenses"
-                    value={formatPeso(stats.expenses)}
-                    icon={ChartBarIcon}
-                    color="text-accent-red"
-                />
-                <SummaryCard
-                    title="Current Balance"
-                    value={formatPeso(stats.currentBalance)}
-                    icon={BanknotesIcon}
-                    color="text-accent-blue"
-                />
+                {bankBalances.length > 0 ? (
+                    bankBalances.map((bank, index) => (
+                        <SummaryCard
+                            key={bank.name}
+                            title={bank.name}
+                            value={formatPeso(bank.balance)}
+                            icon={BanknotesIcon}
+                            color={
+                                index === 0 ? 'text-accent-blue' :
+                                index === 1 ? 'text-accent-cyan' :
+                                index === 2 ? 'text-accent-green' :
+                                'text-accent-purple'
+                            }
+                        />
+                    ))
+                ) : (
+                    <div className="col-span-2 lg:col-span-4 text-center text-text-secondary py-8">
+                        No bank accounts found. Add bank accounts in Chart of Accounts.
+                    </div>
+                )}
             </div>
 
             {/* Add Transaction Button */}
