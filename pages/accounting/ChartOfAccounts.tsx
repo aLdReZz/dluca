@@ -1,10 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useFirebaseData, useFirebaseMutation } from '../../hooks/useFirebase';
 import { chartOfAccountsService } from '../../utils/firebaseService';
 import type { Account } from '../../types';
 import DeleteConfirmationModal from '../../components/DeleteConfirmationModal';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { PlusIcon, PencilIcon, TrashIcon, FolderIcon } from '../../components/Icons';
+
+interface AccountWithChildren extends Account {
+    children: AccountWithChildren[];
+    level: number;
+}
 
 const accountTypes = [
     { value: 'bank', label: 'Bank', color: 'text-accent-cyan' },
@@ -25,17 +30,46 @@ const ChartOfAccounts: React.FC = () => {
     const [newName, setNewName] = useState('');
     const [newType, setNewType] = useState<Account['type']>('expense');
     const [newDescription, setNewDescription] = useState('');
+    const [newParentId, setNewParentId] = useState('');
 
     // Edit account form state
     const [editName, setEditName] = useState('');
     const [editType, setEditType] = useState<Account['type']>('expense');
     const [editDescription, setEditDescription] = useState('');
+    const [editParentId, setEditParentId] = useState('');
 
     // Fetch accounts
     const { data: accounts = [], loading, error, refetch } = useFirebaseData(
         () => chartOfAccountsService.getAll(),
         []
     );
+
+    // Build hierarchical account tree
+    const accountsTree = useMemo(() => {
+        const buildTree = (parentId: string | null | undefined = null, level = 0): AccountWithChildren[] => {
+            return accounts
+                .filter(account => account.parentId === parentId || (!account.parentId && !parentId))
+                .map(account => ({
+                    ...account,
+                    level,
+                    children: buildTree(account.id, level + 1)
+                }))
+                .sort((a, b) => a.name.localeCompare(b.name));
+        };
+
+        return buildTree(null);
+    }, [accounts]);
+
+    // Flatten tree for display
+    const flattenedAccounts = useMemo(() => {
+        const flatten = (nodes: AccountWithChildren[]): AccountWithChildren[] => {
+            return nodes.reduce((acc, node) => {
+                return [...acc, node, ...flatten(node.children)];
+            }, [] as AccountWithChildren[]);
+        };
+
+        return flatten(accountsTree);
+    }, [accountsTree]);
 
     // Mutations
     const { mutate: addAccount } = useFirebaseMutation(
@@ -67,6 +101,7 @@ const ChartOfAccounts: React.FC = () => {
                 name: newName,
                 type: newType,
                 description: newDescription,
+                parentId: newParentId || undefined,
                 isActive: true,
             });
             setOperationStatus({ type: 'success', message: 'Account added successfully' });
@@ -76,6 +111,7 @@ const ChartOfAccounts: React.FC = () => {
             setNewName('');
             setNewType('expense');
             setNewDescription('');
+            setNewParentId('');
             setIsAddingNew(false);
         } catch (error) {
             setOperationStatus({ type: 'error', message: 'Failed to add account' });
@@ -86,6 +122,7 @@ const ChartOfAccounts: React.FC = () => {
         setNewName('');
         setNewType('expense');
         setNewDescription('');
+        setNewParentId('');
         setIsAddingNew(false);
     };
 
@@ -94,6 +131,7 @@ const ChartOfAccounts: React.FC = () => {
         setEditName(account.name);
         setEditType(account.type);
         setEditDescription(account.description || '');
+        setEditParentId(account.parentId || '');
     };
 
     const handleSaveEdit = async () => {
@@ -109,6 +147,7 @@ const ChartOfAccounts: React.FC = () => {
                     name: editName,
                     type: editType,
                     description: editDescription,
+                    parentId: editParentId || undefined,
                 }
             });
             setOperationStatus({ type: 'success', message: 'Account updated successfully' });
@@ -124,6 +163,7 @@ const ChartOfAccounts: React.FC = () => {
         setEditName('');
         setEditType('expense');
         setEditDescription('');
+        setEditParentId('');
     };
 
     const handleDeleteAccount = async () => {
@@ -223,6 +263,7 @@ const ChartOfAccounts: React.FC = () => {
                                     <tr>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Account Name</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Type</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Parent Account</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Description</th>
                                         <th className="px-4 py-3 text-center text-sm font-semibold text-text-primary">Status</th>
                                         <th className="px-4 py-3 text-center text-sm font-semibold text-text-primary">Actions</th>
@@ -249,6 +290,18 @@ const ChartOfAccounts: React.FC = () => {
                                                 >
                                                     {accountTypes.map(type => (
                                                         <option key={type.value} value={type.value}>{type.label}</option>
+                                                    ))}
+                                                </select>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <select
+                                                    value={newParentId}
+                                                    onChange={(e) => setNewParentId(e.target.value)}
+                                                    className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10"
+                                                >
+                                                    <option value="">None (Top Level)</option>
+                                                    {accounts.filter(a => a.type === newType).map(acc => (
+                                                        <option key={acc.id} value={acc.id}>{acc.name}</option>
                                                     ))}
                                                 </select>
                                             </td>
@@ -282,20 +335,32 @@ const ChartOfAccounts: React.FC = () => {
                                             </td>
                                         </tr>
                                     )}
-                                    {accounts.map((account: Account) => {
+                                    {flattenedAccounts.map((account: AccountWithChildren) => {
                                         const isEditing = editingAccountId === account.id;
                                         const accountType = accountTypes.find(t => t.value === account.type);
+                                        const indentation = account.level * 24; // 24px per level
 
                                         if (isEditing) {
                                             return (
                                                 <tr key={account.id} className="bg-accent-purple/10 border-2 border-accent-purple">
                                                     <td className="px-4 py-3">
-                                                        <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Account name" className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue" />
+                                                        <div className="flex items-center gap-2">
+                                                            <div style={{ width: `${indentation}px` }} />
+                                                            <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Account name" className="flex-1 bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue" />
+                                                        </div>
                                                     </td>
                                                     <td className="px-4 py-3">
                                                         <select value={editType} onChange={(e) => setEditType(e.target.value as Account['type'])} className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10">
                                                             {accountTypes.map(type => (
                                                                 <option key={type.value} value={type.value}>{type.label}</option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <select value={editParentId} onChange={(e) => setEditParentId(e.target.value)} className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10">
+                                                            <option value="">None (Top Level)</option>
+                                                            {accounts.filter(a => a.type === editType && a.id !== editingAccountId).map(acc => (
+                                                                <option key={acc.id} value={acc.id}>{acc.name}</option>
                                                             ))}
                                                         </select>
                                                     </td>
@@ -317,9 +382,22 @@ const ChartOfAccounts: React.FC = () => {
 
                                         return (
                                             <tr key={account.id} className="hover:bg-hover-bg/30 transition-colors">
-                                                <td className="px-4 py-3 text-sm font-medium text-text-primary">{account.name}</td>
+                                                <td className="px-4 py-3 text-sm">
+                                                    <div className="flex items-center gap-2">
+                                                        <div style={{ width: `${indentation}px` }} />
+                                                        {account.level > 0 && (
+                                                            <span className="text-text-secondary">└─</span>
+                                                        )}
+                                                        <span className={`${account.level === 0 ? 'font-semibold' : 'font-medium'} text-text-primary`}>
+                                                            {account.name}
+                                                        </span>
+                                                    </div>
+                                                </td>
                                                 <td className="px-4 py-3 text-sm">
                                                     <span className={`font-medium ${accountType?.color}`}>{accountType?.label}</span>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-text-secondary">
+                                                    {account.parentId ? accounts.find(a => a.id === account.parentId)?.name || '-' : '-'}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-text-secondary">{account.description || '-'}</td>
                                                 <td className="px-4 py-3 text-center">
@@ -363,6 +441,15 @@ const ChartOfAccounts: React.FC = () => {
                                             </select>
                                         </div>
                                         <div>
+                                            <label className="block text-xs font-medium text-text-secondary mb-1">Parent Account (optional)</label>
+                                            <select value={newParentId} onChange={(e) => setNewParentId(e.target.value)} className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10">
+                                                <option value="">None (Top Level)</option>
+                                                {accounts.filter(a => a.type === newType).map(acc => (
+                                                    <option key={acc.id} value={acc.id}>{acc.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
                                             <label className="block text-xs font-medium text-text-secondary mb-1">Description (optional)</label>
                                             <input type="text" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Description" className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue" />
                                         </div>
@@ -373,13 +460,18 @@ const ChartOfAccounts: React.FC = () => {
                                     </div>
                                 </div>
                             )}
-                            {accounts.map((account: Account) => {
+                            {flattenedAccounts.map((account: AccountWithChildren) => {
                                 const accountType = accountTypes.find(t => t.value === account.type);
+                                const indentation = account.level * 16; // 16px per level for mobile
                                 return (
                                     <div key={account.id} className="bg-bg-secondary rounded-xl border border-border-color p-4">
                                         <div className="flex justify-between items-start mb-3">
-                                            <div>
-                                                <div className="text-lg font-semibold text-text-primary">{account.name}</div>
+                                            <div className="flex items-center gap-2">
+                                                <div style={{ width: `${indentation}px` }} />
+                                                {account.level > 0 && (
+                                                    <span className="text-text-secondary text-sm">└─</span>
+                                                )}
+                                                <div className={`text-lg ${account.level === 0 ? 'font-bold' : 'font-semibold'} text-text-primary`}>{account.name}</div>
                                             </div>
                                             <span className={`px-2 py-1 rounded text-xs font-medium ${account.isActive ? 'bg-accent-green/20 text-accent-green' : 'bg-text-secondary/20 text-text-secondary'}`}>
                                                 {account.isActive ? 'Active' : 'Inactive'}
@@ -390,6 +482,12 @@ const ChartOfAccounts: React.FC = () => {
                                                 <span className="text-text-secondary">Type:</span>
                                                 <span className={`font-medium ${accountType?.color}`}>{accountType?.label}</span>
                                             </div>
+                                            {account.parentId && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-text-secondary">Parent:</span>
+                                                    <span className="text-text-primary">{accounts.find(a => a.id === account.parentId)?.name || '-'}</span>
+                                                </div>
+                                            )}
                                             {account.description && (
                                                 <div className="flex justify-between">
                                                     <span className="text-text-secondary">Description:</span>
