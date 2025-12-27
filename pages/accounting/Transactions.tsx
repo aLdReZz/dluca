@@ -938,11 +938,11 @@ const Transactions: React.FC = () => {
                                                 </select>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <CategoryAutocomplete
+                                                <input
+                                                    type="text"
                                                     value={newCategory}
-                                                    onChange={setNewCategory}
-                                                    options={categoryAccounts}
-                                                    placeholder="Type or select category"
+                                                    onChange={(e) => setNewCategory(e.target.value)}
+                                                    placeholder="Category"
                                                     className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
                                                 />
                                             </td>
@@ -1029,11 +1029,11 @@ const Transactions: React.FC = () => {
                                                         </select>
                                                     </td>
                                                     <td className="px-4 py-3">
-                                                        <CategoryAutocomplete
+                                                        <input
+                                                            type="text"
                                                             value={editCategory}
-                                                            onChange={setEditCategory}
-                                                            options={categoryAccounts}
-                                                            placeholder="Type or select category"
+                                                            onChange={(e) => setEditCategory(e.target.value)}
+                                                            placeholder="Category"
                                                             className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
                                                         />
                                                     </td>
@@ -1157,11 +1157,11 @@ const Transactions: React.FC = () => {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-medium text-text-secondary mb-1">Category</label>
-                                            <CategoryAutocomplete
+                                            <input
+                                                type="text"
                                                 value={newCategory}
-                                                onChange={setNewCategory}
-                                                options={categoryAccounts}
-                                                placeholder="Type or select category"
+                                                onChange={(e) => setNewCategory(e.target.value)}
+                                                placeholder="Category"
                                                 className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
                                             />
                                         </div>
