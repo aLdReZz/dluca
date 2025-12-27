@@ -244,6 +244,16 @@ const Transactions: React.FC = () => {
     const [openingBalance, setOpeningBalance] = useState<number>(0);
     const [selectedBank, setSelectedBank] = useState<string | null>(null);
 
+    // Batch selection state
+    const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set());
+    const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+    const [isBatchEditing, setIsBatchEditing] = useState(false);
+    const [batchEditData, setBatchEditData] = useState({
+        type: '',
+        category: '',
+        bank: ''
+    });
+
     // Sorting state
     const [sortField, setSortField] = useState<SortField>('date');
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -609,6 +619,94 @@ const Transactions: React.FC = () => {
         }
     };
 
+    // Batch selection handlers
+    const handleSelectAll = () => {
+        if (selectedTransactions.size === transactionsWithBalance.length) {
+            setSelectedTransactions(new Set());
+        } else {
+            const allIds = new Set(transactionsWithBalance.map(t => t.id).filter(Boolean) as string[]);
+            setSelectedTransactions(allIds);
+        }
+    };
+
+    const handleSelectTransaction = (id: string) => {
+        const newSelected = new Set(selectedTransactions);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+        } else {
+            newSelected.add(id);
+        }
+        setSelectedTransactions(newSelected);
+    };
+
+    const handleBatchDelete = async () => {
+        if (selectedTransactions.size === 0) return;
+        setIsBatchDeleting(true);
+    };
+
+    const confirmBatchDelete = async () => {
+        try {
+            const deletePromises = Array.from(selectedTransactions).map(id =>
+                deleteTransaction({ id })
+            );
+            await Promise.all(deletePromises);
+            setSelectedTransactions(new Set());
+            setIsBatchDeleting(false);
+            setOperationStatus({
+                type: 'success',
+                message: `Successfully deleted ${deletePromises.length} transaction(s)`
+            });
+            refetch();
+        } catch (error) {
+            setOperationStatus({ type: 'error', message: 'Failed to delete some transactions' });
+            setIsBatchDeleting(false);
+        }
+    };
+
+    const cancelBatchDelete = () => {
+        setIsBatchDeleting(false);
+    };
+
+    const handleBatchEdit = () => {
+        if (selectedTransactions.size === 0) return;
+        setIsBatchEditing(true);
+        setBatchEditData({ type: '', category: '', bank: '' });
+    };
+
+    const confirmBatchEdit = async () => {
+        try {
+            const updatePromises = Array.from(selectedTransactions).map(id => {
+                const transaction = transactionsWithBalance.find(t => t.id === id);
+                if (!transaction) return Promise.resolve();
+
+                const updates: Partial<AccountingTransaction> = {};
+                if (batchEditData.type) updates.type = batchEditData.type as 'credit' | 'debit';
+                if (batchEditData.category) updates.category = batchEditData.category;
+                if (batchEditData.bank) updates.bank = batchEditData.bank;
+
+                return updateTransaction({ id, updates });
+            });
+
+            await Promise.all(updatePromises);
+            setSelectedTransactions(new Set());
+            setIsBatchEditing(false);
+            setBatchEditData({ type: '', category: '', bank: '' });
+            setOperationStatus({
+                type: 'success',
+                message: `Successfully updated ${updatePromises.length} transaction(s)`
+            });
+            refetch();
+        } catch (error) {
+            setOperationStatus({ type: 'error', message: 'Failed to update some transactions' });
+            setIsBatchEditing(false);
+        }
+    };
+
+    const cancelBatchEdit = () => {
+        setIsBatchEditing(false);
+        setBatchEditData({ type: '', category: '', bank: '' });
+    };
+
     // Clear status messages after 3 seconds
     useEffect(() => {
         if (operationStatus) {
@@ -681,8 +779,39 @@ const Transactions: React.FC = () => {
                 </div>
             </div>
 
-            {/* Add Transaction Button */}
-            <div className="px-4 lg:px-6 pb-4 flex justify-end">
+            {/* Add Transaction Button & Batch Actions */}
+            <div className="px-4 lg:px-6 pb-4 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+                {/* Batch Actions */}
+                {selectedTransactions.size > 0 && (
+                    <div className="flex items-center gap-3 p-3 bg-accent-blue/10 border border-accent-blue/30 rounded-lg">
+                        <span className="text-sm font-medium text-accent-blue whitespace-nowrap">
+                            {selectedTransactions.size} selected
+                        </span>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleBatchEdit}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-accent-blue/10 text-accent-blue rounded hover:bg-accent-blue/20 transition-colors text-sm font-medium"
+                            >
+                                <PencilIcon className="w-4 h-4" />
+                                Edit
+                            </button>
+                            <button
+                                onClick={handleBatchDelete}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-accent-red/10 text-accent-red rounded hover:bg-accent-red/20 transition-colors text-sm font-medium"
+                            >
+                                <TrashIcon className="w-4 h-4" />
+                                Delete
+                            </button>
+                            <button
+                                onClick={() => setSelectedTransactions(new Set())}
+                                className="px-3 py-1.5 bg-bg-tertiary text-text-secondary rounded hover:bg-hover-bg transition-colors text-sm font-medium"
+                            >
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 <button
                     onClick={handleOpenAddTransaction}
                     className="flex items-center justify-center gap-2 px-4 py-3 bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 transition-colors tap-target w-full sm:w-auto"
@@ -706,6 +835,14 @@ const Transactions: React.FC = () => {
                                 <table className="w-full" style={{ tableLayout: 'fixed' }}>
                                     <thead className="bg-bg-tertiary">
                                         <tr>
+                                            <th className="w-12 px-4 py-3 text-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedTransactions.size > 0 && selectedTransactions.size === transactionsWithBalance.length}
+                                                    onChange={handleSelectAll}
+                                                    className="w-4 h-4 rounded border-border-color bg-bg-secondary text-accent-blue focus:ring-2 focus:ring-accent-blue/50 cursor-pointer"
+                                                />
+                                            </th>
                                             <SortableHeader
                                                 label="Date"
                                                 field="date"
@@ -782,6 +919,9 @@ const Transactions: React.FC = () => {
                                     {/* Inline Add New Transaction Row */}
                                     {isAddingNew && (
                                         <tr className="bg-accent-blue/10 border-2 border-accent-blue">
+                                            <td className="px-4 py-3 text-center">
+                                                {/* Empty cell for checkbox column */}
+                                            </td>
                                             <td className="px-4 py-3 relative overflow-visible">
                                                 <DatePickerInput
                                                     value={newDate}
@@ -872,6 +1012,14 @@ const Transactions: React.FC = () => {
                                         if (isEditing) {
                                             return (
                                                 <tr key={transaction.id} className="bg-accent-purple/10 border-2 border-accent-purple">
+                                                    <td className="px-4 py-3 text-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedTransactions.has(transaction.id!)}
+                                                            onChange={() => transaction.id && handleSelectTransaction(transaction.id)}
+                                                            className="w-4 h-4 rounded border-border-color bg-bg-secondary text-accent-blue focus:ring-2 focus:ring-accent-blue/50 cursor-pointer"
+                                                        />
+                                                    </td>
                                                     <td className="px-4 py-3 relative overflow-visible">
                                                         <DatePickerInput value={editDate} onChange={setEditDate} />
                                                     </td>
@@ -921,6 +1069,14 @@ const Transactions: React.FC = () => {
 
                                         return (
                                             <tr key={transaction.id} className="hover:bg-hover-bg/30 transition-colors">
+                                                <td className="px-4 py-3 text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedTransactions.has(transaction.id!)}
+                                                        onChange={() => transaction.id && handleSelectTransaction(transaction.id)}
+                                                        className="w-4 h-4 rounded border-border-color bg-bg-secondary text-accent-blue focus:ring-2 focus:ring-accent-blue/50 cursor-pointer"
+                                                    />
+                                                </td>
                                                 <td className="px-4 py-3 text-sm text-text-primary whitespace-nowrap">{formatDate(transaction.date)}</td>
                                                 <td className="px-4 py-3 text-sm">
                                                     <span className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${
@@ -1073,20 +1229,32 @@ const Transactions: React.FC = () => {
                             )}
                             {transactionsWithBalance.map((transaction) => (
                                 <div key={transaction.id} className="bg-bg-secondary rounded-xl border border-border-color p-4">
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div>
-                                            <div className="text-sm text-text-secondary">{formatDate(transaction.date)}</div>
-                                            <div className="text-lg font-semibold text-text-primary mt-1">{transaction.description}</div>
+                                    <div className="flex items-start gap-3 mb-3">
+                                        {/* Checkbox */}
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedTransactions.has(transaction.id!)}
+                                            onChange={() => transaction.id && handleSelectTransaction(transaction.id)}
+                                            className="w-5 h-5 mt-1 rounded border-border-color bg-bg-tertiary text-accent-blue focus:ring-2 focus:ring-accent-blue/50 cursor-pointer flex-shrink-0"
+                                        />
+
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between items-start">
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="text-sm text-text-secondary">{formatDate(transaction.date)}</div>
+                                                    <div className="text-lg font-semibold text-text-primary mt-1 truncate">{transaction.description}</div>
+                                                </div>
+                                                <span className={`px-2 py-1 rounded text-xs font-medium ml-2 flex-shrink-0 ${
+                                                    transaction.type === 'credit'
+                                                        ? 'bg-accent-green/20 text-accent-green'
+                                                        : transaction.type === 'transfer'
+                                                        ? 'bg-accent-blue/20 text-accent-blue'
+                                                        : 'bg-accent-red/20 text-accent-red'
+                                                }`}>
+                                                    {transaction.type === 'credit' ? 'Income' : transaction.type === 'transfer' ? 'Transfer' : 'Expense'}
+                                                </span>
+                                            </div>
                                         </div>
-                                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                            transaction.type === 'credit'
-                                                ? 'bg-accent-green/20 text-accent-green'
-                                                : transaction.type === 'transfer'
-                                                ? 'bg-accent-blue/20 text-accent-blue'
-                                                : 'bg-accent-red/20 text-accent-red'
-                                        }`}>
-                                            {transaction.type === 'credit' ? 'Income' : transaction.type === 'transfer' ? 'Transfer' : 'Expense'}
-                                        </span>
                                     </div>
                                     <div className="space-y-2 text-sm">
                                         {transaction.reference && (
@@ -1137,6 +1305,116 @@ const Transactions: React.FC = () => {
                 onConfirm={handleDeleteTransaction}
                 itemName={deletingTransaction?.description || 'this transaction'}
             />
+
+            {/* Batch Delete Confirmation Modal */}
+            {isBatchDeleting && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-bg-secondary rounded-xl border border-border-color p-6 max-w-md w-full shadow-2xl">
+                        <h3 className="text-lg font-semibold text-text-primary mb-2">
+                            Confirm Batch Delete
+                        </h3>
+                        <p className="text-sm text-text-secondary mb-6">
+                            Are you sure you want to delete {selectedTransactions.size} transaction{selectedTransactions.size !== 1 ? 's' : ''}?
+                            This action cannot be undone.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={cancelBatchDelete}
+                                className="flex-1 px-4 py-2 bg-bg-tertiary text-text-primary rounded-lg hover:bg-hover-bg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmBatchDelete}
+                                className="flex-1 px-4 py-2 bg-accent-red text-white rounded-lg hover:bg-accent-red/90 transition-colors"
+                            >
+                                Delete All
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Batch Edit Modal */}
+            {isBatchEditing && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-bg-secondary rounded-xl border border-border-color p-6 max-w-md w-full shadow-2xl">
+                        <h3 className="text-lg font-semibold text-text-primary mb-2">
+                            Batch Edit Transactions
+                        </h3>
+                        <p className="text-sm text-text-secondary mb-4">
+                            Update {selectedTransactions.size} transaction{selectedTransactions.size !== 1 ? 's' : ''}.
+                            Only filled fields will be updated.
+                        </p>
+
+                        <div className="space-y-4 mb-6">
+                            {/* Type */}
+                            <div>
+                                <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                                    Transaction Type
+                                </label>
+                                <select
+                                    value={batchEditData.type}
+                                    onChange={(e) => setBatchEditData({ ...batchEditData, type: e.target.value })}
+                                    className="w-full px-3 py-2 bg-bg-tertiary border border-border-color rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-blue"
+                                >
+                                    <option value="">-- Keep Original --</option>
+                                    <option value="credit">Credit</option>
+                                    <option value="debit">Debit</option>
+                                </select>
+                            </div>
+
+                            {/* Category */}
+                            <div>
+                                <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                                    Category
+                                </label>
+                                <input
+                                    type="text"
+                                    value={batchEditData.category}
+                                    onChange={(e) => setBatchEditData({ ...batchEditData, category: e.target.value })}
+                                    placeholder="Leave blank to keep original"
+                                    className="w-full px-3 py-2 bg-bg-tertiary border border-border-color rounded-lg text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-blue"
+                                />
+                            </div>
+
+                            {/* Bank Account */}
+                            <div>
+                                <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                                    Bank Account
+                                </label>
+                                <select
+                                    value={batchEditData.bank}
+                                    onChange={(e) => setBatchEditData({ ...batchEditData, bank: e.target.value })}
+                                    className="w-full px-3 py-2 bg-bg-tertiary border border-border-color rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-blue"
+                                >
+                                    <option value="">-- Keep Original --</option>
+                                    {banks.map((bank) => (
+                                        <option key={bank.id} value={bank.name}>
+                                            {bank.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={cancelBatchEdit}
+                                className="flex-1 px-4 py-2 bg-bg-tertiary text-text-primary rounded-lg hover:bg-hover-bg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmBatchEdit}
+                                className="flex-1 px-4 py-2 bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 transition-colors"
+                            >
+                                Update All
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

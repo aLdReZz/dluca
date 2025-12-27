@@ -25,7 +25,8 @@
       "Bash(ls:*)",
       "Bash(netlify --version:*)",
       "Bash(netlify deploy:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(netlify link:*)"
     ],
     "deny": [],
     "ask": []
