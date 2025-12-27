@@ -539,7 +539,9 @@ const Transactions: React.FC = () => {
                 description: newDescription,
                 reference: newReference,
                 amount: parseFloat(newAmount),
-                account: 'general'
+                account: 'general',
+                category: newCategory,
+                bank: newPaymentMethod
             };
 
             await addTransaction(transaction);
