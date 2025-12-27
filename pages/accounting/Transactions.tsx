@@ -274,7 +274,6 @@ const Transactions: React.FC = () => {
     const [operationStatus, setOperationStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
     const [openingBalance, setOpeningBalance] = useState<number>(0);
     const [selectedBank, setSelectedBank] = useState<string | null>(null);
-    const addTransactionRowRef = useRef<HTMLTableRowElement | HTMLDivElement>(null);
 
     // Batch selection state
     const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set());
@@ -758,40 +757,6 @@ const Transactions: React.FC = () => {
         return () => document.removeEventListener('keydown', handleEscKey);
     }, [isAddingNew]);
 
-    // Handle click outside to cancel add transaction
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (isAddingNew && addTransactionRowRef.current) {
-                const target = event.target as HTMLElement;
-
-                // Don't cancel if clicking inside the add transaction row
-                if (addTransactionRowRef.current.contains(target)) {
-                    return;
-                }
-
-                // Don't cancel if clicking on the "Add Transaction" button
-                if (target.closest('button')?.textContent?.includes('Add Transaction')) {
-                    return;
-                }
-
-                // Don't cancel if clicking on a dropdown/autocomplete menu
-                // (these are rendered with fixed positioning outside the row)
-                if (target.closest('[data-autocomplete-dropdown="true"]')) {
-                    return;
-                }
-
-                // Don't cancel if clicking on a date picker
-                if (target.closest('[role="dialog"]') || target.closest('.react-datepicker')) {
-                    return;
-                }
-
-                handleCancelNew();
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [isAddingNew]);
 
     if (transactionsError) {
         console.error('Error loading transactions:', transactionsError);
@@ -996,7 +961,7 @@ const Transactions: React.FC = () => {
                                 <tbody className="divide-y divide-border-color">
                                     {/* Inline Add New Transaction Row */}
                                     {isAddingNew && (
-                                        <tr ref={addTransactionRowRef as React.RefObject<HTMLTableRowElement>} className="bg-accent-blue/10 border-2 border-accent-blue">
+                                        <tr className="bg-accent-blue/10 border-2 border-accent-blue">
                                             <td className="px-4 py-3 text-center">
                                                 {/* Empty cell for checkbox column */}
                                             </td>
@@ -1214,7 +1179,7 @@ const Transactions: React.FC = () => {
                         <div className="lg:hidden space-y-4">
                             {/* Inline Add New Transaction Card for Mobile */}
                             {isAddingNew && (
-                                <div ref={addTransactionRowRef as React.RefObject<HTMLDivElement>} className="bg-accent-blue/10 border-2 border-accent-blue rounded-xl p-4">
+                                <div className="bg-accent-blue/10 border-2 border-accent-blue rounded-xl p-4">
                                     <div className="space-y-3">
                                         <div>
                                             <label className="block text-xs font-medium text-text-secondary mb-1">Date</label>
