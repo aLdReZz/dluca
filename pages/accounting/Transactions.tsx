@@ -646,17 +646,16 @@ const Transactions: React.FC = () => {
 
     const confirmBatchDelete = async () => {
         try {
-            const deletePromises = Array.from(selectedTransactions).map(id =>
-                deleteTransaction({ id })
-            );
+            const idsToDelete = Array.from(selectedTransactions);
+            const deletePromises = idsToDelete.map(id => deleteTransaction(id));
             await Promise.all(deletePromises);
             setSelectedTransactions(new Set());
             setIsBatchDeleting(false);
             setOperationStatus({
                 type: 'success',
-                message: `Successfully deleted ${deletePromises.length} transaction(s)`
+                message: `Successfully deleted ${idsToDelete.length} transaction(s)`
             });
-            refetch();
+            await refetch();
         } catch (error) {
             setOperationStatus({ type: 'error', message: 'Failed to delete some transactions' });
             setIsBatchDeleting(false);
@@ -695,7 +694,7 @@ const Transactions: React.FC = () => {
                 type: 'success',
                 message: `Successfully updated ${updatePromises.length} transaction(s)`
             });
-            refetch();
+            await refetch();
         } catch (error) {
             setOperationStatus({ type: 'error', message: 'Failed to update some transactions' });
             setIsBatchEditing(false);
