@@ -343,11 +343,11 @@ const Transactions: React.FC = () => {
         return allAccounts.filter(account => account.type === 'bank' && account.isActive);
     }, [allAccounts]);
 
-    // Filter to get expense and revenue accounts for category dropdown
+    // Filter to get all non-bank accounts for category dropdown
     const categoryAccounts = useMemo(() => {
         if (!allAccounts || !Array.isArray(allAccounts)) return [];
         return allAccounts.filter(account =>
-            (account.type === 'expense' || account.type === 'revenue') && account.isActive
+            account.type !== 'bank' && account.isActive
         ).sort((a, b) => a.name.localeCompare(b.name));
     }, [allAccounts]);
 
