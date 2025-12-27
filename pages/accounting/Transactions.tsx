@@ -273,6 +273,7 @@ const Transactions: React.FC = () => {
     const [operationStatus, setOperationStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
     const [openingBalance, setOpeningBalance] = useState<number>(0);
     const [selectedBank, setSelectedBank] = useState<string | null>(null);
+    const addTransactionRowRef = useRef<HTMLTableRowElement | HTMLDivElement>(null);
 
     // Batch selection state
     const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set());
@@ -744,6 +745,35 @@ const Transactions: React.FC = () => {
         }
     }, [operationStatus]);
 
+    // Handle ESC key to cancel add transaction
+    useEffect(() => {
+        const handleEscKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && isAddingNew) {
+                handleCancelNew();
+            }
+        };
+
+        document.addEventListener('keydown', handleEscKey);
+        return () => document.removeEventListener('keydown', handleEscKey);
+    }, [isAddingNew]);
+
+    // Handle click outside to cancel add transaction
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (isAddingNew && addTransactionRowRef.current && !addTransactionRowRef.current.contains(event.target as Node)) {
+                // Don't cancel if clicking on the "Add Transaction" button
+                const target = event.target as HTMLElement;
+                if (target.closest('button')?.textContent?.includes('Add Transaction')) {
+                    return;
+                }
+                handleCancelNew();
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isAddingNew]);
+
     if (transactionsError) {
         console.error('Error loading transactions:', transactionsError);
     }
@@ -947,7 +977,7 @@ const Transactions: React.FC = () => {
                                 <tbody className="divide-y divide-border-color">
                                     {/* Inline Add New Transaction Row */}
                                     {isAddingNew && (
-                                        <tr className="bg-accent-blue/10 border-2 border-accent-blue">
+                                        <tr ref={addTransactionRowRef as React.RefObject<HTMLTableRowElement>} className="bg-accent-blue/10 border-2 border-accent-blue">
                                             <td className="px-4 py-3 text-center">
                                                 {/* Empty cell for checkbox column */}
                                             </td>
@@ -1165,7 +1195,7 @@ const Transactions: React.FC = () => {
                         <div className="lg:hidden space-y-4">
                             {/* Inline Add New Transaction Card for Mobile */}
                             {isAddingNew && (
-                                <div className="bg-accent-blue/10 border-2 border-accent-blue rounded-xl p-4">
+                                <div ref={addTransactionRowRef as React.RefObject<HTMLDivElement>} className="bg-accent-blue/10 border-2 border-accent-blue rounded-xl p-4">
                                     <div className="space-y-3">
                                         <div>
                                             <label className="block text-xs font-medium text-text-secondary mb-1">Date</label>
