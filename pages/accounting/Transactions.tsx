@@ -205,6 +205,7 @@ const CategoryAutocomplete: React.FC<{
             />
             {isOpen && filteredOptions.length > 0 && (
                 <div className="fixed z-[9999] bg-bg-primary border border-border-color rounded-xl shadow-lg max-h-60 overflow-y-auto"
+                     data-autocomplete-dropdown="true"
                      style={{
                          top: `${dropdownPosition.top}px`,
                          left: `${dropdownPosition.left}px`,
@@ -760,12 +761,30 @@ const Transactions: React.FC = () => {
     // Handle click outside to cancel add transaction
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (isAddingNew && addTransactionRowRef.current && !addTransactionRowRef.current.contains(event.target as Node)) {
-                // Don't cancel if clicking on the "Add Transaction" button
+            if (isAddingNew && addTransactionRowRef.current) {
                 const target = event.target as HTMLElement;
+
+                // Don't cancel if clicking inside the add transaction row
+                if (addTransactionRowRef.current.contains(target)) {
+                    return;
+                }
+
+                // Don't cancel if clicking on the "Add Transaction" button
                 if (target.closest('button')?.textContent?.includes('Add Transaction')) {
                     return;
                 }
+
+                // Don't cancel if clicking on a dropdown/autocomplete menu
+                // (these are rendered with fixed positioning outside the row)
+                if (target.closest('[data-autocomplete-dropdown="true"]')) {
+                    return;
+                }
+
+                // Don't cancel if clicking on a date picker
+                if (target.closest('[role="dialog"]') || target.closest('.react-datepicker')) {
+                    return;
+                }
+
                 handleCancelNew();
             }
         };
