@@ -79,12 +79,37 @@ const CategoryAutocomplete: React.FC<{
     const [isOpen, setIsOpen] = useState(false);
     const [inputValue, setInputValue] = useState(value);
     const [selectedIndex, setSelectedIndex] = useState(-1);
+    const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
     const wrapperRef = useRef<HTMLDivElement>(null);
     const optionsRef = useRef<(HTMLDivElement | null)[]>([]);
 
     useEffect(() => {
         setInputValue(value);
     }, [value]);
+
+    useEffect(() => {
+        const updatePosition = () => {
+            if (wrapperRef.current && isOpen) {
+                const rect = wrapperRef.current.getBoundingClientRect();
+                setDropdownPosition({
+                    top: rect.bottom + 4,
+                    left: rect.left,
+                    width: rect.width
+                });
+            }
+        };
+
+        if (isOpen) {
+            updatePosition();
+            window.addEventListener('scroll', updatePosition, true);
+            window.addEventListener('resize', updatePosition);
+        }
+
+        return () => {
+            window.removeEventListener('scroll', updatePosition, true);
+            window.removeEventListener('resize', updatePosition);
+        };
+    }, [isOpen]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -179,7 +204,12 @@ const CategoryAutocomplete: React.FC<{
                 autoComplete="off"
             />
             {isOpen && filteredOptions.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-bg-primary border border-border-color rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                <div className="fixed z-[9999] bg-bg-primary border border-border-color rounded-xl shadow-lg max-h-60 overflow-y-auto"
+                     style={{
+                         top: `${dropdownPosition.top}px`,
+                         left: `${dropdownPosition.left}px`,
+                         width: `${dropdownPosition.width}px`
+                     }}>
                     {filteredOptions.map((option, index) => (
                         <div
                             key={option.id}
@@ -938,11 +968,11 @@ const Transactions: React.FC = () => {
                                                 </select>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <input
-                                                    type="text"
+                                                <CategoryAutocomplete
                                                     value={newCategory}
-                                                    onChange={(e) => setNewCategory(e.target.value)}
-                                                    placeholder="Category"
+                                                    onChange={setNewCategory}
+                                                    options={categoryAccounts}
+                                                    placeholder="Type or select category"
                                                     className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
                                                 />
                                             </td>
@@ -1029,11 +1059,11 @@ const Transactions: React.FC = () => {
                                                         </select>
                                                     </td>
                                                     <td className="px-4 py-3">
-                                                        <input
-                                                            type="text"
+                                                        <CategoryAutocomplete
                                                             value={editCategory}
-                                                            onChange={(e) => setEditCategory(e.target.value)}
-                                                            placeholder="Category"
+                                                            onChange={setEditCategory}
+                                                            options={categoryAccounts}
+                                                            placeholder="Type or select category"
                                                             className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
                                                         />
                                                     </td>
@@ -1157,11 +1187,11 @@ const Transactions: React.FC = () => {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-medium text-text-secondary mb-1">Category</label>
-                                            <input
-                                                type="text"
+                                            <CategoryAutocomplete
                                                 value={newCategory}
-                                                onChange={(e) => setNewCategory(e.target.value)}
-                                                placeholder="Category"
+                                                onChange={setNewCategory}
+                                                options={categoryAccounts}
+                                                placeholder="Type or select category"
                                                 className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
                                             />
                                         </div>
