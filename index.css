@@ -10,6 +10,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-size: 0.8125rem; /* 13px base font size */
   @apply bg-bg-primary text-text-primary;
   /* Prevent horizontal scroll on mobile */
   overflow-x: hidden;
@@ -33,9 +34,9 @@ body {
     white-space: nowrap;
   }
 
-  /* Prevent text from being too small on mobile */
+  /* Prevent zoom on input focus on mobile while keeping text readable */
   input, select, textarea, button {
-    font-size: 16px !important;
+    font-size: 13px !important;
   }
 }
 
@@ -874,15 +875,15 @@ input[type="number"] {
     min-height: 44px; /* iOS recommended touch target size */
     min-width: 44px;
   }
-  
+
   /* Larger tap targets for mobile */
   .tap-target {
     padding: 0.75rem;
   }
-  
-  /* Prevent zoom on input focus on iOS */
+
+  /* Prevent zoom on input focus on iOS while keeping text smaller */
   input, select, textarea {
-    font-size: 16px !important;
+    font-size: 13px !important;
   }
 }
 

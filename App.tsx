@@ -3,6 +3,8 @@ import RoleSelection from './components/RoleSelection';
 import PinModal from './components/PinModal';
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
+import FAB from './components/FAB';
+import SpeedDial from './components/SpeedDial';
 import Dashboard from './pages/Dashboard';
 import Sales from './pages/Sales';
 import Inventory from './pages/Inventory';
@@ -13,7 +15,7 @@ import Payroll from './pages/Payroll';
 import Calendar from './pages/Calendar';
 import PurchaseRequest from './pages/PurchaseRequest';
 import type { Role, Page, SalesData, InventoryItem, PurchaseOrder, Employee, CalendarEvent, RecipeCosting, PayrollRecord, AttendanceRecord, ProductInventoryItem } from './types';
-import { MenuIcon, ShieldCheckIcon, UserIcon } from './components/Icons';
+import { MenuIcon, ShieldCheckIcon, UserIcon, PlusIcon, ChartBarIcon, FunnelIcon, DocumentTextIcon, CubeIcon, ReceiptPercentIcon } from './components/Icons';
 import { useFirebaseData } from './hooks/useFirebase';
 import { employeesService, attendanceService, salesService, clearAttendanceData } from './utils/firebaseService';
 import { isFirebaseConfigured } from './utils/firebase';
@@ -203,6 +205,7 @@ const App: React.FC = () => {
     });
     const [isSidebarOpen, setSidebarOpen] = useState<boolean>(false);
     const [dashboardIntro, setDashboardIntro] = useState(false);
+    const [isSpeedDialOpen, setSpeedDialOpen] = useState(false);
     const dashboardIntroTimeout = useRef<number | null>(null);
 
     // Fetch employees from Firebase
@@ -487,6 +490,41 @@ const App: React.FC = () => {
         });
     };
 
+    // Get context-aware FAB actions based on current page
+    const getFABActions = () => {
+        switch (page) {
+            case 'dashboard':
+                return [
+                    { icon: <ChartBarIcon className="w-5 h-5" />, label: 'View Reports', onClick: () => console.log('Reports') },
+                    { icon: <FunnelIcon className="w-5 h-5" />, label: 'Filter Data', onClick: () => console.log('Filter') },
+                ];
+            case 'sales':
+                return [
+                    { icon: <PlusIcon className="w-5 h-5" />, label: 'New Transaction', onClick: () => console.log('New Transaction'), color: 'bg-accent-blue' },
+                    { icon: <FunnelIcon className="w-5 h-5" />, label: 'Filter', onClick: () => console.log('Filter'), color: 'bg-bg-tertiary' },
+                ];
+            case 'inventory-supplies':
+            case 'pricelist':
+                return [
+                    { icon: <PlusIcon className="w-5 h-5" />, label: 'Add Item', onClick: () => console.log('Add Item'), color: 'bg-accent-blue' },
+                    { icon: <DocumentTextIcon className="w-5 h-5" />, label: 'Purchase Order', onClick: () => console.log('PO'), color: 'bg-bg-tertiary' },
+                ];
+            case 'accounting':
+            case 'accounting-transactions':
+                return [
+                    { icon: <PlusIcon className="w-5 h-5" />, label: 'New Transaction', onClick: () => console.log('New Transaction'), color: 'bg-accent-blue' },
+                    { icon: <ChartBarIcon className="w-5 h-5" />, label: 'Reports', onClick: () => console.log('Reports'), color: 'bg-bg-tertiary' },
+                ];
+            case 'costing':
+                return [
+                    { icon: <PlusIcon className="w-5 h-5" />, label: 'New Recipe', onClick: () => console.log('New Recipe'), color: 'bg-accent-blue' },
+                    { icon: <ReceiptPercentIcon className="w-5 h-5" />, label: 'Calculate Costs', onClick: () => console.log('Calculate'), color: 'bg-bg-tertiary' },
+                ];
+            default:
+                return [];
+        }
+    };
+
     const renderPage = () => {
         switch (page) {
             case 'dashboard':
@@ -618,6 +656,20 @@ const App: React.FC = () => {
                     role={role}
                     currentPage={page}
                     onNavigate={handleNavigate}
+                />
+
+                {/* Floating Action Button */}
+                <FAB
+                    onClick={() => setSpeedDialOpen(!isSpeedDialOpen)}
+                    showOnDesktop={false}
+                    aria-label="Quick actions"
+                />
+
+                {/* Speed Dial Menu */}
+                <SpeedDial
+                    actions={getFABActions()}
+                    open={isSpeedDialOpen}
+                    onClose={() => setSpeedDialOpen(false)}
                 />
             </div>
         </div>

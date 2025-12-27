@@ -22,7 +22,10 @@
       "Bash(node:*)",
       "Bash(git grep:*)",
       "Bash(where:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(netlify --version:*)",
+      "Bash(netlify deploy:*)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []

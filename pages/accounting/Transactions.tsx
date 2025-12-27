@@ -217,18 +217,18 @@ const SummaryCard: React.FC<{
         onClick={onClick}
     >
         <div className="flex items-center justify-between mb-2">
-            <div className="p-2 rounded-lg bg-bg-tertiary">
+            <div className="p-2 rounded-lg bg-bg-tertiary flex-shrink-0">
                 <Icon className="w-5 h-5 text-text-secondary" />
             </div>
             {isSelected && (
-                <div className="px-2 py-0.5 rounded bg-accent-blue/20 border border-accent-blue/30">
-                    <span className="text-xs font-medium text-accent-blue">Active</span>
+                <div className="px-2 py-0.5 rounded bg-accent-blue/20 border border-accent-blue/30 flex-shrink-0">
+                    <span className="text-xs font-medium text-accent-blue whitespace-nowrap">Active</span>
                 </div>
             )}
         </div>
-        <div>
-            <div className="text-xs font-medium text-text-secondary mb-1">{title}</div>
-            <div className="text-xl font-bold text-text-primary">{value}</div>
+        <div className="min-w-0">
+            <div className="text-xs font-medium text-text-secondary mb-1 truncate" title={title}>{title}</div>
+            <div className="text-xl font-bold text-text-primary truncate" title={value}>{value}</div>
         </div>
     </div>
 );
@@ -642,20 +642,20 @@ const Transactions: React.FC = () => {
 
             {/* Bank Account Balance Cards */}
             <div className="p-4 lg:p-6">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-lg font-semibold text-text-primary">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4">
+                    <h2 className="text-lg font-semibold text-text-primary truncate">
                         {selectedBank ? `${selectedBank} Transactions` : 'All Bank Accounts'}
                     </h2>
                     {selectedBank && (
                         <button
                             onClick={() => setSelectedBank(null)}
-                            className="text-sm text-accent-blue hover:text-accent-blue/80 transition-colors"
+                            className="text-sm text-accent-blue hover:text-accent-blue/80 transition-colors whitespace-nowrap self-start sm:self-auto"
                         >
                             View All Banks
                         </button>
                     )}
                 </div>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4">
                     {bankBalances.length > 0 ? (
                         bankBalances.map((bank, index) => (
                             <SummaryCard
@@ -682,10 +682,10 @@ const Transactions: React.FC = () => {
             </div>
 
             {/* Add Transaction Button */}
-            <div className="px-6 pb-4 flex justify-end">
+            <div className="px-4 lg:px-6 pb-4 flex justify-end">
                 <button
                     onClick={handleOpenAddTransaction}
-                    className="flex items-center justify-center gap-2 px-4 py-3 bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 transition-colors tap-target"
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 transition-colors tap-target w-full sm:w-auto"
                 >
                     <PlusIcon className="w-5 h-5" />
                     <span className="font-medium">Add Transaction</span>
@@ -693,9 +693,9 @@ const Transactions: React.FC = () => {
             </div>
 
             {/* Transactions List */}
-            <div className="flex-1 overflow-auto px-6 pb-6">
+            <div className="flex-1 overflow-auto px-4 lg:px-6 pb-6">
                 {transactionsWithBalance.length === 0 && !isAddingNew ? (
-                    <div className="bg-bg-secondary rounded-xl border border-border-color p-12 text-center">
+                    <div className="bg-bg-secondary rounded-xl border border-border-color p-8 lg:p-12 text-center">
                         <p className="text-text-secondary">No transactions yet. Click "Add Transaction" to get started.</p>
                     </div>
                 ) : (
@@ -857,9 +857,10 @@ const Transactions: React.FC = () => {
                                                     </button>
                                                     <button
                                                         onClick={handleCancelNew}
-                                                        className="px-3 py-1.5 bg-bg-tertiary text-text-secondary rounded-lg hover:bg-hover-bg transition-colors text-sm font-medium"
+                                                        className="p-2 bg-bg-tertiary text-text-secondary rounded-lg hover:bg-hover-bg transition-colors"
+                                                        title="Cancel"
                                                     >
-                                                        Cancel
+                                                        <XMarkIcon className="w-4 h-4" />
                                                     </button>
                                                 </div>
                                             </td>
@@ -909,7 +910,9 @@ const Transactions: React.FC = () => {
                                                     <td className="px-4 py-3">
                                                         <div className="flex items-center justify-center gap-2">
                                                             <button onClick={handleSaveEdit} className="px-3 py-1.5 bg-accent-green text-white rounded-lg hover:bg-accent-green/80 transition-colors text-sm font-medium">Save</button>
-                                                            <button onClick={handleCancelEdit} className="px-3 py-1.5 bg-bg-tertiary text-text-secondary rounded-lg hover:bg-hover-bg transition-colors text-sm font-medium">Cancel</button>
+                                                            <button onClick={handleCancelEdit} className="p-2 bg-bg-tertiary text-text-secondary rounded-lg hover:bg-hover-bg transition-colors" title="Cancel">
+                                                                <XMarkIcon className="w-4 h-4" />
+                                                            </button>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -918,9 +921,9 @@ const Transactions: React.FC = () => {
 
                                         return (
                                             <tr key={transaction.id} className="hover:bg-hover-bg/30 transition-colors">
-                                                <td className="px-4 py-3 text-sm text-text-primary">{formatDate(transaction.date)}</td>
+                                                <td className="px-4 py-3 text-sm text-text-primary whitespace-nowrap">{formatDate(transaction.date)}</td>
                                                 <td className="px-4 py-3 text-sm">
-                                                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                                    <span className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${
                                                         transaction.type === 'credit'
                                                             ? 'bg-accent-green/20 text-accent-green'
                                                             : transaction.type === 'transfer'
@@ -930,11 +933,27 @@ const Transactions: React.FC = () => {
                                                         {transaction.type === 'credit' ? 'Income' : transaction.type === 'transfer' ? 'Transfer' : 'Expense'}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-3 text-sm text-text-secondary">{(transaction as any).category || '-'}</td>
-                                                <td className="px-4 py-3 text-sm text-text-primary">{transaction.description}</td>
-                                                <td className="px-4 py-3 text-sm text-text-secondary">{transaction.reference || '-'}</td>
-                                                <td className="px-4 py-3 text-sm text-text-secondary">{(transaction as any).paymentMethod || '-'}</td>
-                                                <td className="px-4 py-3 text-sm text-right font-medium">
+                                                <td className="px-4 py-3 text-sm text-text-secondary">
+                                                    <div className="truncate" title={(transaction as any).category || '-'}>
+                                                        {(transaction as any).category || '-'}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-text-primary">
+                                                    <div className="truncate" title={transaction.description}>
+                                                        {transaction.description}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-text-secondary">
+                                                    <div className="truncate" title={transaction.reference || '-'}>
+                                                        {transaction.reference || '-'}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-text-secondary">
+                                                    <div className="truncate" title={(transaction as any).paymentMethod || '-'}>
+                                                        {(transaction as any).paymentMethod || '-'}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-right font-medium whitespace-nowrap">
                                                     <span className={transaction.type === 'credit' ? 'text-accent-green' : 'text-accent-red'}>
                                                         {transaction.type === 'credit' ? '+' : '-'}{formatPeso(transaction.amount)}
                                                     </span>
