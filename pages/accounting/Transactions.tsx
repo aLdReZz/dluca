@@ -183,6 +183,12 @@ const CategoryAutocomplete: React.FC<{
                     handleSelectOption(filteredOptions[selectedIndex].name);
                 }
                 break;
+            case 'Tab':
+                if (selectedIndex >= 0 && selectedIndex < filteredOptions.length) {
+                    handleSelectOption(filteredOptions[selectedIndex].name);
+                }
+                // Don't preventDefault - allow Tab to move to next field
+                break;
             case 'Escape':
                 e.preventDefault();
                 setIsOpen(false);
@@ -387,7 +393,7 @@ const Transactions: React.FC = () => {
     // Filter transactions by selected bank
     const filteredTransactions = useMemo(() => {
         if (!selectedBank) return sortedTransactions;
-        return sortedTransactions.filter(t => (t as any).paymentMethod === selectedBank);
+        return sortedTransactions.filter(t => (t as any).bank === selectedBank);
     }, [sortedTransactions, selectedBank]);
 
     // Sorting handler
@@ -478,8 +484,8 @@ const Transactions: React.FC = () => {
                         bValue = b.reference || '';
                         break;
                     case 'bank':
-                        aValue = (a as any).paymentMethod || '';
-                        bValue = (b as any).paymentMethod || '';
+                        aValue = (a as any).bank || '';
+                        bValue = (b as any).bank || '';
                         break;
                     case 'amount':
                         aValue = a.amount;
@@ -504,7 +510,7 @@ const Transactions: React.FC = () => {
 
         return bankAccounts.map(bank => {
             const bankTransactions = sortedTransactions.filter(
-                t => (t as any).paymentMethod === bank.name
+                t => (t as any).bank === bank.name
             );
 
             const income = bankTransactions
@@ -587,7 +593,7 @@ const Transactions: React.FC = () => {
         setEditDescription(transaction.description);
         setEditReference(transaction.reference || '');
         setEditCategory((transaction as any).category || '');
-        setEditPaymentMethod((transaction as any).paymentMethod || '');
+        setEditPaymentMethod((transaction as any).bank || '');
         setEditAmount(transaction.amount.toString());
     };
 
@@ -606,7 +612,7 @@ const Transactions: React.FC = () => {
                     description: editDescription,
                     reference: editReference,
                     category: editCategory,
-                    paymentMethod: editPaymentMethod,
+                    bank: editPaymentMethod,
                     amount: parseFloat(editAmount),
                 }
             });
@@ -1150,8 +1156,8 @@ const Transactions: React.FC = () => {
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-text-secondary">
-                                                    <div className="truncate" title={(transaction as any).paymentMethod || '-'}>
-                                                        {(transaction as any).paymentMethod || '-'}
+                                                    <div className="truncate" title={(transaction as any).bank || '-'}>
+                                                        {(transaction as any).bank || '-'}
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-right font-medium whitespace-nowrap">
@@ -1314,10 +1320,10 @@ const Transactions: React.FC = () => {
                                                 <span className="text-text-primary">{(transaction as any).category}</span>
                                             </div>
                                         )}
-                                        {(transaction as any).paymentMethod && (
+                                        {(transaction as any).bank && (
                                             <div className="flex justify-between">
                                                 <span className="text-text-secondary">Bank:</span>
-                                                <span className="text-text-primary">{(transaction as any).paymentMethod}</span>
+                                                <span className="text-text-primary">{(transaction as any).bank}</span>
                                             </div>
                                         )}
                                         <div className="flex justify-between">
