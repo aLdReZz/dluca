@@ -204,6 +204,10 @@ const App: React.FC = () => {
         return (savedPage as Page) || 'dashboard';
     });
     const [isSidebarOpen, setSidebarOpen] = useState<boolean>(false);
+    const [isSidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+        const saved = localStorage.getItem('sidebarCollapsed');
+        return saved === 'true';
+    });
     const [dashboardIntro, setDashboardIntro] = useState(false);
     const [isSpeedDialOpen, setSpeedDialOpen] = useState(false);
     const dashboardIntroTimeout = useRef<number | null>(null);
@@ -456,6 +460,11 @@ const App: React.FC = () => {
         localStorage.setItem('currentPage', page);
     }, [page]);
 
+    // Save sidebar collapsed state to localStorage whenever it changes
+    useEffect(() => {
+        localStorage.setItem('sidebarCollapsed', isSidebarCollapsed.toString());
+    }, [isSidebarCollapsed]);
+
     const handleLogout = () => {
         setRole(null);
         setPage('dashboard');
@@ -623,6 +632,8 @@ const App: React.FC = () => {
                 onNavigate={handleNavigate}
                 isOpen={isSidebarOpen}
                 setIsOpen={setSidebarOpen}
+                isCollapsed={isSidebarCollapsed}
+                setIsCollapsed={setSidebarCollapsed}
                 onLogout={handleLogout}
             />
             {/* Mobile Overlay */}

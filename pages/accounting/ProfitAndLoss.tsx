@@ -113,6 +113,16 @@ const ProfitAndLoss: React.FC = () => {
                     const account = accountMap.get(txn.accountId)!;
                     accountKey = account.name;
                     accountCode = account.code;
+                } else if ((txn as any).category) {
+                    // Try to find account by category name
+                    const categoryName = (txn as any).category;
+                    const matchingAccount = accounts.find(acc => acc.name === categoryName && acc.type === 'expense');
+                    if (matchingAccount) {
+                        accountKey = matchingAccount.name;
+                        accountCode = matchingAccount.code;
+                    } else {
+                        accountKey = categoryName;
+                    }
                 }
 
                 if (!acc[accountKey]) {
