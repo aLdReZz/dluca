@@ -384,10 +384,21 @@ const Transactions: React.FC = () => {
             accountingService.setAccountBalance(data.account, data.openingBalance)
     );
 
-    // Sort all transactions
+    // Sort all transactions by date, then by time (createdAt)
     const sortedTransactions = useMemo(() => {
         if (!allTransactions || !Array.isArray(allTransactions)) return [];
-        return allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return allTransactions.sort((a, b) => {
+            // First sort by date (newest first)
+            const dateA = new Date(a.date).getTime();
+            const dateB = new Date(b.date).getTime();
+            if (dateB !== dateA) {
+                return dateB - dateA;
+            }
+            // If dates are equal, sort by createdAt time (newest first)
+            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return timeB - timeA;
+        });
     }, [allTransactions]);
 
     // Filter transactions by selected bank
@@ -533,21 +544,37 @@ const Transactions: React.FC = () => {
     }, [sortedTransactions, bankAccounts]);
 
     const handleAddNewTransaction = async () => {
-        if (!newDate || !newDescription || !newAmount) {
+        if (!newDate || !newDescription || !newAmount || !newCategory) {
             setOperationStatus({ type: 'error', message: 'Please fill in all required fields' });
             return;
         }
 
         try {
+            // Find the account from Chart of Accounts to determine transaction type
+            const selectedAccount = categoryAccounts.find(acc => acc.name === newCategory);
+            let transactionType: 'credit' | 'debit' = 'debit';
+
+            if (selectedAccount) {
+                // Revenue increases with credits, expenses/assets decrease with debits
+                if (selectedAccount.type === 'revenue') {
+                    transactionType = 'credit';
+                } else if (selectedAccount.type === 'expense' || selectedAccount.type === 'asset') {
+                    transactionType = 'debit';
+                } else if (selectedAccount.type === 'liability' || selectedAccount.type === 'equity') {
+                    transactionType = 'credit';
+                }
+            }
+
             const transaction: Omit<AccountingTransaction, 'id' | 'runningBalance'> = {
                 date: newDate,
-                type: newType,
+                type: transactionType,
                 description: newDescription,
                 reference: newReference,
                 amount: parseFloat(newAmount),
                 account: 'general',
                 category: newCategory,
-                bank: newPaymentMethod
+                bank: newPaymentMethod,
+                accountId: selectedAccount?.id
             };
 
             await addTransaction(transaction);
@@ -598,22 +625,38 @@ const Transactions: React.FC = () => {
     };
 
     const handleSaveEdit = async () => {
-        if (!editingTransactionId || !editDate || !editDescription || !editAmount) {
+        if (!editingTransactionId || !editDate || !editDescription || !editAmount || !editCategory) {
             setOperationStatus({ type: 'error', message: 'Please fill in all required fields' });
             return;
         }
 
         try {
+            // Find the account from Chart of Accounts to determine transaction type
+            const selectedAccount = categoryAccounts.find(acc => acc.name === editCategory);
+            let transactionType: 'credit' | 'debit' = 'debit';
+
+            if (selectedAccount) {
+                // Revenue increases with credits, expenses/assets decrease with debits
+                if (selectedAccount.type === 'revenue') {
+                    transactionType = 'credit';
+                } else if (selectedAccount.type === 'expense' || selectedAccount.type === 'asset') {
+                    transactionType = 'debit';
+                } else if (selectedAccount.type === 'liability' || selectedAccount.type === 'equity') {
+                    transactionType = 'credit';
+                }
+            }
+
             await updateTransaction({
                 id: editingTransactionId,
                 updates: {
                     date: editDate,
-                    type: editType,
+                    type: transactionType,
                     description: editDescription,
                     reference: editReference,
                     category: editCategory,
                     bank: editPaymentMethod,
                     amount: parseFloat(editAmount),
+                    accountId: selectedAccount?.id
                 }
             });
             setOperationStatus({ type: 'success', message: 'Transaction updated successfully' });
@@ -904,15 +947,6 @@ const Transactions: React.FC = () => {
                                                 onResizeStart={(e) => handleResizeStart(e, 'date')}
                                             />
                                             <SortableHeader
-                                                label="Type"
-                                                field="type"
-                                                currentSortField={sortField}
-                                                sortDirection={sortDirection}
-                                                onSort={handleSort}
-                                                width={columnWidths.type}
-                                                onResizeStart={(e) => handleResizeStart(e, 'type')}
-                                            />
-                                            <SortableHeader
                                                 label="Category"
                                                 field="category"
                                                 currentSortField={sortField}
@@ -978,16 +1012,6 @@ const Transactions: React.FC = () => {
                                                     value={newDate}
                                                     onChange={setNewDate}
                                                 />
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <select
-                                                    value={newType}
-                                                    onChange={(e) => setNewType(e.target.value as 'credit' | 'debit')}
-                                                    className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10"
-                                                >
-                                                    <option value="credit">Income</option>
-                                                    <option value="debit">Expense</option>
-                                                </select>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <CategoryAutocomplete
@@ -1075,12 +1099,6 @@ const Transactions: React.FC = () => {
                                                         <DatePickerInput value={editDate} onChange={setEditDate} />
                                                     </td>
                                                     <td className="px-4 py-3">
-                                                        <select value={editType} onChange={(e) => setEditType(e.target.value as 'credit' | 'debit')} className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10">
-                                                            <option value="credit">Income</option>
-                                                            <option value="debit">Expense</option>
-                                                        </select>
-                                                    </td>
-                                                    <td className="px-4 py-3">
                                                         <CategoryAutocomplete
                                                             value={editCategory}
                                                             onChange={setEditCategory}
@@ -1129,17 +1147,6 @@ const Transactions: React.FC = () => {
                                                     />
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-text-primary whitespace-nowrap">{formatDate(transaction.date)}</td>
-                                                <td className="px-4 py-3 text-sm">
-                                                    <span className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${
-                                                        transaction.type === 'credit'
-                                                            ? 'bg-accent-green/20 text-accent-green'
-                                                            : transaction.type === 'transfer'
-                                                            ? 'bg-accent-blue/20 text-accent-blue'
-                                                            : 'bg-accent-red/20 text-accent-red'
-                                                    }`}>
-                                                        {transaction.type === 'credit' ? 'Income' : transaction.type === 'transfer' ? 'Transfer' : 'Expense'}
-                                                    </span>
-                                                </td>
                                                 <td className="px-4 py-3 text-sm text-text-secondary">
                                                     <div className="truncate" title={(transaction as any).category || '-'}>
                                                         {(transaction as any).category || '-'}
@@ -1197,18 +1204,7 @@ const Transactions: React.FC = () => {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium text-text-secondary mb-1">Type</label>
-                                            <select
-                                                value={newType}
-                                                onChange={(e) => setNewType(e.target.value as 'credit' | 'debit')}
-                                                className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23888888%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.25rem] pr-10"
-                                            >
-                                                <option value="credit">Income</option>
-                                                <option value="debit">Expense</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-text-secondary mb-1">Category</label>
+                                            <label className="block text-xs font-medium text-text-secondary mb-1">Category *</label>
                                             <CategoryAutocomplete
                                                 value={newCategory}
                                                 onChange={setNewCategory}
@@ -1290,20 +1286,9 @@ const Transactions: React.FC = () => {
                                         />
 
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex justify-between items-start">
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="text-sm text-text-secondary">{formatDate(transaction.date)}</div>
-                                                    <div className="text-lg font-semibold text-text-primary mt-1 truncate">{transaction.description}</div>
-                                                </div>
-                                                <span className={`px-2 py-1 rounded text-xs font-medium ml-2 flex-shrink-0 ${
-                                                    transaction.type === 'credit'
-                                                        ? 'bg-accent-green/20 text-accent-green'
-                                                        : transaction.type === 'transfer'
-                                                        ? 'bg-accent-blue/20 text-accent-blue'
-                                                        : 'bg-accent-red/20 text-accent-red'
-                                                }`}>
-                                                    {transaction.type === 'credit' ? 'Income' : transaction.type === 'transfer' ? 'Transfer' : 'Expense'}
-                                                </span>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="text-sm text-text-secondary">{formatDate(transaction.date)}</div>
+                                                <div className="text-lg font-semibold text-text-primary mt-1 truncate">{transaction.description}</div>
                                             </div>
                                         </div>
                                     </div>

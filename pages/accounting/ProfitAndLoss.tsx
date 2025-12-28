@@ -48,6 +48,30 @@ const ProfitAndLoss: React.FC = () => {
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     const calendarRef = React.useRef<HTMLDivElement>(null);
 
+    // Expanded categories state
+    const [expandedRevenue, setExpandedRevenue] = useState<Set<number>>(new Set());
+    const [expandedExpenses, setExpandedExpenses] = useState<Set<number>>(new Set());
+
+    const toggleRevenueCategory = (index: number) => {
+        const newExpanded = new Set(expandedRevenue);
+        if (newExpanded.has(index)) {
+            newExpanded.delete(index);
+        } else {
+            newExpanded.add(index);
+        }
+        setExpandedRevenue(newExpanded);
+    };
+
+    const toggleExpenseCategory = (index: number) => {
+        const newExpanded = new Set(expandedExpenses);
+        if (newExpanded.has(index)) {
+            newExpanded.delete(index);
+        } else {
+            newExpanded.add(index);
+        }
+        setExpandedExpenses(newExpanded);
+    };
+
     // Initialize date range to current month
     useEffect(() => {
         const now = new Date();
@@ -91,65 +115,123 @@ const ProfitAndLoss: React.FC = () => {
             return txnDate >= start && txnDate <= end;
         });
 
-        // Calculate revenue (credit transactions)
-        const totalRevenue = filteredTransactions
-            .filter(txn => txn.type === 'credit')
-            .reduce((sum, txn) => sum + txn.amount, 0);
+        // Helper function to get parent account or self
+        const getParentOrSelf = (account: Account): Account => {
+            if (account.parentId && accountMap.has(account.parentId)) {
+                return accountMap.get(account.parentId)!;
+            }
+            return account;
+        };
 
-        // Calculate expenses (debit transactions)
-        const totalExpenses = filteredTransactions
-            .filter(txn => txn.type === 'debit')
-            .reduce((sum, txn) => sum + txn.amount, 0);
+        // Group transactions by parent category
+        interface CategoryGroup {
+            code: string;
+            name: string;
+            amount: number;
+            children: { code: string; name: string; amount: number }[];
+        }
 
-        // Group expenses by account
-        const expenseBreakdown = filteredTransactions
-            .filter(txn => txn.type === 'debit')
-            .reduce((acc, txn) => {
-                // Get account from Chart of Accounts if accountId is set
-                let accountKey = 'Uncategorized';
-                let accountCode = '';
+        const revenueCategories = new Map<string, CategoryGroup>();
+        const expenseCategories = new Map<string, CategoryGroup>();
+        const uncategorizedItems: { name: string; amount: number }[] = [];
 
-                if (txn.accountId && accountMap.has(txn.accountId)) {
-                    const account = accountMap.get(txn.accountId)!;
-                    accountKey = account.name;
-                    accountCode = account.code;
-                } else if ((txn as any).category) {
-                    // Try to find account by category name
-                    const categoryName = (txn as any).category;
-                    const matchingAccount = accounts.find(acc => acc.name === categoryName && acc.type === 'expense');
-                    if (matchingAccount) {
-                        accountKey = matchingAccount.name;
-                        accountCode = matchingAccount.code;
+        filteredTransactions.forEach(txn => {
+            let account: Account | undefined;
+            let accountType = 'uncategorized';
+
+            // Get account from Chart of Accounts
+            if (txn.accountId && accountMap.has(txn.accountId)) {
+                account = accountMap.get(txn.accountId)!;
+                accountType = account.type;
+            } else if ((txn as any).category) {
+                // Try to find account by category name
+                const categoryName = (txn as any).category;
+                const matchingAccount = accounts.find(acc => acc.name === categoryName);
+                if (matchingAccount) {
+                    account = matchingAccount;
+                    accountType = matchingAccount.type;
+                }
+            }
+
+            // Group by parent category
+            if (txn.type === 'credit' && accountType === 'revenue' && account) {
+                const parent = getParentOrSelf(account);
+                if (!revenueCategories.has(parent.id)) {
+                    revenueCategories.set(parent.id, {
+                        code: parent.code,
+                        name: parent.name,
+                        amount: 0,
+                        children: []
+                    });
+                }
+                const category = revenueCategories.get(parent.id)!;
+                category.amount += txn.amount;
+
+                // If this is a child account, add to children
+                if (account.parentId) {
+                    const existingChild = category.children.find(c => c.name === account.name);
+                    if (existingChild) {
+                        existingChild.amount += txn.amount;
                     } else {
-                        accountKey = categoryName;
+                        category.children.push({
+                            code: account.code,
+                            name: account.name,
+                            amount: txn.amount
+                        });
                     }
                 }
-
-                if (!acc[accountKey]) {
-                    acc[accountKey] = { amount: 0, code: accountCode };
+            } else if (txn.type === 'debit' && accountType === 'expense' && account) {
+                const parent = getParentOrSelf(account);
+                if (!expenseCategories.has(parent.id)) {
+                    expenseCategories.set(parent.id, {
+                        code: parent.code,
+                        name: parent.name,
+                        amount: 0,
+                        children: []
+                    });
                 }
-                acc[accountKey].amount += txn.amount;
-                return acc;
-            }, {} as { [key: string]: { amount: number; code: string } });
+                const category = expenseCategories.get(parent.id)!;
+                category.amount += txn.amount;
 
-        const operatingExpenses = Object.entries(expenseBreakdown).map(([name, data]) => ({
-            code: data.code,
-            name,
-            amount: data.amount
-        }));
+                // If this is a child account, add to children
+                if (account.parentId) {
+                    const existingChild = category.children.find(c => c.name === account.name);
+                    if (existingChild) {
+                        existingChild.amount += txn.amount;
+                    } else {
+                        category.children.push({
+                            code: account.code,
+                            name: account.name,
+                            amount: txn.amount
+                        });
+                    }
+                }
+            } else {
+                // Uncategorized transactions
+                const category = txn.type === 'credit' ? 'Uncategorized Income' : 'Uncategorized Expense';
+                const existing = uncategorizedItems.find(item => item.name === category);
+                if (existing) {
+                    existing.amount += txn.amount;
+                } else {
+                    uncategorizedItems.push({ name: category, amount: txn.amount });
+                }
+            }
+        });
+
+        const totalRevenue = Array.from(revenueCategories.values()).reduce((sum, cat) => sum + cat.amount, 0) +
+            uncategorizedItems.filter(item => item.name === 'Uncategorized Income').reduce((sum, item) => sum + item.amount, 0);
+
+        const totalExpenses = Array.from(expenseCategories.values()).reduce((sum, cat) => sum + cat.amount, 0) +
+            uncategorizedItems.filter(item => item.name === 'Uncategorized Expense').reduce((sum, item) => sum + item.amount, 0);
 
         const netIncome = totalRevenue - totalExpenses;
 
         return {
-            grossSales: totalRevenue,
-            serviceCharge: 0,
-            netSales: totalRevenue,
-            costOfGoodsSold: 0,
-            grossProfit: totalRevenue,
-            grossProfitMargin: totalRevenue > 0 ? (totalRevenue / totalRevenue) * 100 : 0,
-            operatingExpenses,
-            totalOperatingExpenses: totalExpenses,
-            operatingIncome: netIncome,
+            revenueCategories: Array.from(revenueCategories.values()),
+            expenseCategories: Array.from(expenseCategories.values()),
+            uncategorized: uncategorizedItems,
+            totalRevenue,
+            totalExpenses,
             netIncome,
             netProfitMargin: totalRevenue > 0 ? (netIncome / totalRevenue) * 100 : 0,
         };
@@ -221,35 +303,96 @@ const ProfitAndLoss: React.FC = () => {
                             <div className="px-6 py-4 border-b border-border-color">
                                 <h4 className="text-sm font-bold text-accent-green mb-3">REVENUE</h4>
                                 <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between font-semibold">
+                                    {profitLossData.revenueCategories.length === 0 ? (
+                                        <div className="text-text-secondary pl-4 text-xs italic">
+                                            No revenue recorded for this period.
+                                        </div>
+                                    ) : (
+                                        profitLossData.revenueCategories.map((category, index) => (
+                                            <div key={index} className="space-y-1">
+                                                <div
+                                                    className={`flex justify-between font-medium ${category.children.length > 0 ? 'cursor-pointer hover:bg-hover-bg rounded px-2 py-1 -mx-2' : ''}`}
+                                                    onClick={() => category.children.length > 0 && toggleRevenueCategory(index)}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        {category.children.length > 0 && (
+                                                            <ChevronDownIcon className={`w-4 h-4 text-text-secondary transition-transform ${expandedRevenue.has(index) ? '' : '-rotate-90'}`} />
+                                                        )}
+                                                        <span className="text-text-primary">{category.name}</span>
+                                                    </div>
+                                                    <span className="text-text-primary">{formatPeso(category.amount)}</span>
+                                                </div>
+                                                {category.children.length > 0 && expandedRevenue.has(index) && (
+                                                    <div className="pl-6 space-y-1">
+                                                        {category.children.map((child, childIndex) => (
+                                                            <div key={childIndex} className="flex justify-between text-xs">
+                                                                <span className="text-text-secondary">{child.name}</span>
+                                                                <span className="text-text-secondary">{formatPeso(child.amount)}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                    {profitLossData.uncategorized.filter(item => item.name === 'Uncategorized Income').map((item, index) => (
+                                        <div key={`unc-${index}`} className="flex justify-between">
+                                            <span className="text-text-secondary pl-4 italic">{item.name}</span>
+                                            <span className="text-text-primary font-medium">{formatPeso(item.amount)}</span>
+                                        </div>
+                                    ))}
+                                    <div className="flex justify-between pt-2 border-t border-border-color font-semibold">
                                         <span className="text-text-primary">Total Revenue</span>
-                                        <span className="text-text-primary">{formatPeso(profitLossData.grossSales)}</span>
+                                        <span className="text-text-primary">{formatPeso(profitLossData.totalRevenue)}</span>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Operating Expenses */}
+                            {/* Expenses */}
                             <div className="px-6 py-4 border-b border-border-color">
-                                <h4 className="text-sm font-bold text-accent-red mb-3">OPERATING EXPENSES</h4>
+                                <h4 className="text-sm font-bold text-accent-red mb-3">EXPENSES</h4>
                                 <div className="space-y-2 text-sm">
-                                    {profitLossData.operatingExpenses.length === 0 ? (
+                                    {profitLossData.expenseCategories.length === 0 ? (
                                         <div className="text-text-secondary pl-4 text-xs italic">
                                             No expenses recorded for this period.
                                         </div>
                                     ) : (
-                                        profitLossData.operatingExpenses.map((exp, index) => (
-                                            <div key={index} className="flex justify-between">
-                                                <span className="text-text-secondary pl-4">
-                                                    {exp.code && <span className="font-mono">{exp.code} - </span>}
-                                                    {exp.name}
-                                                </span>
-                                                <span className="text-text-primary font-medium">{formatPeso(exp.amount)}</span>
+                                        profitLossData.expenseCategories.map((category, index) => (
+                                            <div key={index} className="space-y-1">
+                                                <div
+                                                    className={`flex justify-between font-medium ${category.children.length > 0 ? 'cursor-pointer hover:bg-hover-bg rounded px-2 py-1 -mx-2' : ''}`}
+                                                    onClick={() => category.children.length > 0 && toggleExpenseCategory(index)}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        {category.children.length > 0 && (
+                                                            <ChevronDownIcon className={`w-4 h-4 text-text-secondary transition-transform ${expandedExpenses.has(index) ? '' : '-rotate-90'}`} />
+                                                        )}
+                                                        <span className="text-text-primary">{category.name}</span>
+                                                    </div>
+                                                    <span className="text-text-primary">{formatPeso(category.amount)}</span>
+                                                </div>
+                                                {category.children.length > 0 && expandedExpenses.has(index) && (
+                                                    <div className="pl-6 space-y-1">
+                                                        {category.children.map((child, childIndex) => (
+                                                            <div key={childIndex} className="flex justify-between text-xs">
+                                                                <span className="text-text-secondary">{child.name}</span>
+                                                                <span className="text-text-secondary">{formatPeso(child.amount)}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                         ))
                                     )}
+                                    {profitLossData.uncategorized.filter(item => item.name === 'Uncategorized Expense').map((item, index) => (
+                                        <div key={`unc-${index}`} className="flex justify-between">
+                                            <span className="text-text-secondary pl-4 italic">{item.name}</span>
+                                            <span className="text-text-primary font-medium">{formatPeso(item.amount)}</span>
+                                        </div>
+                                    ))}
                                     <div className="flex justify-between pt-2 border-t border-border-color font-semibold">
-                                        <span className="text-text-primary">Total Operating Expenses</span>
-                                        <span className="text-text-primary">{formatPeso(profitLossData.totalOperatingExpenses)}</span>
+                                        <span className="text-text-primary">Total Expenses</span>
+                                        <span className="text-text-primary">{formatPeso(profitLossData.totalExpenses)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -257,13 +400,7 @@ const ProfitAndLoss: React.FC = () => {
                             {/* Net Income */}
                             <div className="px-6 py-4 bg-bg-tertiary">
                                 <div className="space-y-2">
-                                    <div className="flex justify-between text-base font-bold">
-                                        <span className="text-text-primary">Operating Income</span>
-                                        <span className={profitLossData.operatingIncome >= 0 ? 'text-accent-green' : 'text-accent-red'}>
-                                            {formatPeso(profitLossData.operatingIncome)}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between text-lg font-bold pt-2 border-t-2 border-border-color">
+                                    <div className="flex justify-between text-lg font-bold pt-2">
                                         <span className="text-text-primary">NET INCOME</span>
                                         <span className={profitLossData.netIncome >= 0 ? 'text-accent-green' : 'text-accent-red'}>
                                             {formatPeso(profitLossData.netIncome)}
