@@ -167,12 +167,23 @@ const formatDateKey = (date: Date): string => {
 
 const parseTimeString = (timeStr: string): number | null => {
     if (!timeStr) return null;
-    const trimmed = timeStr.trim();
+    const trimmed = timeStr.trim().toLowerCase();
 
-    // Try to match HH:MM or HH:MM:SS format
-    const timeMatch = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    // Try to match HH:MM or HH:MM:SS format with optional AM/PM
+    const timeMatch = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?/);
     if (timeMatch) {
-        const hour = parseInt(timeMatch[1], 10);
+        let hour = parseInt(timeMatch[1], 10);
+        const period = timeMatch[4]; // 'am' or 'pm' or undefined
+
+        // Convert 12-hour to 24-hour format if AM/PM is present
+        if (period) {
+            if (period === 'pm' && hour !== 12) {
+                hour += 12;
+            } else if (period === 'am' && hour === 12) {
+                hour = 0;
+            }
+        }
+
         if (hour >= 0 && hour < 24) {
             return hour;
         }

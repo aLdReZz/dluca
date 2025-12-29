@@ -68,7 +68,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
     // Use Firebase data if available, otherwise use prop data (for backward compatibility)
     const salesData = (Array.isArray(firebaseSalesData) && firebaseSalesData.length > 0) ? firebaseSalesData : (propSalesData || []);
 
-    const [filter, setFilter] = useState<'daily' | 'weekly' | 'monthly' | 'lastMonth' | 'yearlyByMonth' | 'custom'>('monthly');
+    const [filter, setFilter] = useState<'daily' | 'weekly' | 'monthly' | 'lastMonth' | 'yearlyByMonth' | 'yearlyByWeek' | 'custom'>('monthly');
     const [stats, setStats] = useState({
         netSales: 0,
         grossSales: 0,
@@ -83,12 +83,15 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
     const [endDate, setEndDate] = useState('');
     const chartRef = useRef<HTMLCanvasElement>(null);
     const chartInstanceRef = useRef<Chart | null>(null);
+    const hourlyChartRef = useRef<HTMLCanvasElement>(null);
+    const hourlyChartInstanceRef = useRef<Chart | null>(null);
     const calendarRef = useRef<HTMLDivElement>(null);
     const filterDropdownRef = useRef<HTMLDivElement>(null);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
     const [isSalesContainerVisible, setIsSalesContainerVisible] = useState(false);
     const [isSalesChartVisible, setIsSalesChartVisible] = useState(false);
+    const [isHourlyChartVisible, setIsHourlyChartVisible] = useState(false);
     
     useEffect(() => {
         // Load filter state from Firebase or default to monthly
@@ -116,10 +119,12 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
     useEffect(() => {
         const containerTimer = window.setTimeout(() => setIsSalesContainerVisible(true), 80);
         const chartTimer = window.setTimeout(() => setIsSalesChartVisible(true), 260);
+        const hourlyChartTimer = window.setTimeout(() => setIsHourlyChartVisible(true), 420);
 
         return () => {
             window.clearTimeout(containerTimer);
             window.clearTimeout(chartTimer);
+            window.clearTimeout(hourlyChartTimer);
         };
     }, []);
 
@@ -225,6 +230,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
         let labels: string[] = [];
         let chartData: number[] = [];
         let chartTitle = 'Sales';
+        let dateMapping: string[] = []; // Store actual dates for tooltip
 
         // Check if this is a single-day range (for any filter, including custom date ranges)
         const isSingleDay = isSingleDayRange(startDate, endDate);
@@ -285,6 +291,42 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
             });
             chartData = sortedMonths.map(([, value]) => value);
             chartTitle = 'Monthly Sales';
+        } else if (filter === 'yearlyByWeek') {
+            // Group by week for yearly view
+            const getWeekStartDate = (date: Date): Date => {
+                const dayOfWeek = date.getDay();
+                const diff = date.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Adjust for Sunday
+                return new Date(date.getFullYear(), date.getMonth(), diff);
+            };
+
+            const weeklyData = data.reduce((acc, row) => {
+                const dateValue = getSalesFieldValue(row, DATE_INCLUDE, [], DATE_HEADERS);
+                const parsedDate = parseSalesDate(dateValue ?? row.Date);
+                if (parsedDate) {
+                    const weekStart = getWeekStartDate(parsedDate);
+                    const weekKey = weekStart.toISOString().split('T')[0]; // YYYY-MM-DD format
+                    const totalValue = parseNumericValue(getSalesFieldValue(row, TOTAL_INCLUDE, TOTAL_EXCLUDE, TOTAL_HEADERS));
+                    const serviceChargeValue = parseNumericValue(getSalesFieldValue(row, SERVICE_INCLUDE, [], SERVICE_HEADERS));
+                    const netValue = Math.max(totalValue - serviceChargeValue, 0);
+                    acc[weekKey] = (acc[weekKey] || 0) + netValue;
+                }
+                return acc;
+            }, {} as { [key: string]: number });
+
+            const sortedWeeks = Object.entries(weeklyData)
+                .sort((a, b) => a[0].localeCompare(b[0]));
+
+            // Calculate week numbers for labels and store dates
+            labels = sortedWeeks.map(([weekKey]) => {
+                const weekStart = new Date(weekKey + 'T00:00:00');
+                const firstDayOfYear = new Date(weekStart.getFullYear(), 0, 1);
+                const pastDaysOfYear = (weekStart.getTime() - firstDayOfYear.getTime()) / 86400000;
+                const weekNumber = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+                return `Week ${weekNumber}`;
+            });
+            dateMapping = sortedWeeks.map(([weekKey]) => weekKey); // Store actual dates
+            chartData = sortedWeeks.map(([, value]) => value);
+            chartTitle = 'Weekly Sales';
         } else {
             // Group by date (existing logic)
             const groupedData = data.reduce((acc, row) => {
@@ -379,7 +421,14 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
                             footer: (items) => {
                                 const first = items[0];
                                 if (!first?.label) return [];
-                                const date = new Date(first.label);
+
+                                // For weekly view, use dateMapping to get the actual date
+                                let dateStr = first.label;
+                                if (dateMapping.length > 0 && first.dataIndex !== undefined) {
+                                    dateStr = dateMapping[first.dataIndex];
+                                }
+
+                                const date = new Date(dateStr);
                                 if (Number.isNaN(date.getTime())) return [first.label];
                                 const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
                                 const formattedDate = date.toLocaleDateString('en-PH', {
@@ -421,12 +470,127 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
         }
     }, [filter, startDate, endDate]);
 
+    const updateHourlyChart = useCallback((data: SalesData[]) => {
+        if (!hourlyChartRef.current) return;
+
+        const chartCtx = hourlyChartRef.current.getContext('2d');
+        if (!chartCtx) return;
+
+        if (hourlyChartInstanceRef.current) {
+            hourlyChartInstanceRef.current.destroy();
+        }
+
+        // Group data by hour
+        const hourlyMap = new Map<number, { count: number; sales: number }>();
+        const START_HOUR = 9;
+        const END_HOUR = 23;
+
+        // Initialize all hours with 0
+        for (let hour = START_HOUR; hour <= END_HOUR; hour++) {
+            hourlyMap.set(hour, { count: 0, sales: 0 });
+        }
+
+        data.forEach((row) => {
+            const hourKey = extractHourKey(row);
+            if (hourKey !== null && hourKey >= START_HOUR && hourKey <= END_HOUR) {
+                const current = hourlyMap.get(hourKey) || { count: 0, sales: 0 };
+                const totalValue = parseNumericValue(getSalesFieldValue(row, TOTAL_INCLUDE, TOTAL_EXCLUDE, TOTAL_HEADERS));
+                const serviceChargeValue = parseNumericValue(getSalesFieldValue(row, SERVICE_INCLUDE, [], SERVICE_HEADERS));
+                const netValue = Math.max(totalValue - serviceChargeValue, 0);
+                hourlyMap.set(hourKey, {
+                    count: current.count + 1,
+                    sales: current.sales + netValue
+                });
+            }
+        });
+
+        const sortedHours = Array.from(hourlyMap.entries()).sort((a, b) => a[0] - b[0]);
+        const labels = sortedHours.map(([hour]) => {
+            const period = hour >= 12 ? 'PM' : 'AM';
+            const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+            return `${displayHour.toString().padStart(2, '0')}:00 ${period}`;
+        });
+        const transactionCounts = sortedHours.map(([, data]) => data.count);
+
+        hourlyChartInstanceRef.current = new Chart(chartCtx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Number of Transactions',
+                    data: transactionCounts,
+                    backgroundColor: 'rgba(34, 197, 94, 0.6)',
+                    borderColor: 'rgba(34, 197, 94, 1)',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(12, 15, 22, 0.94)',
+                        borderColor: 'rgba(96, 165, 250, 0.35)',
+                        borderWidth: 1.2,
+                        padding: 12,
+                        titleColor: '#f4f4f5',
+                        titleFont: { weight: 600, size: 12, family: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+                        bodyColor: '#e2e8f0',
+                        bodyFont: { weight: 500, size: 12, family: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+                        displayColors: false,
+                        cornerRadius: 10,
+                        callbacks: {
+                            title: (items) => {
+                                const hour = items[0].label;
+                                return [`${hour}`];
+                            },
+                            label: (context) => {
+                                const count = context.raw as number;
+                                return `${count} transaction${count !== 1 ? 's' : ''}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: '#a1a1a6',
+                            stepSize: 1,
+                            precision: 0
+                        },
+                        grid: { color: '#424245' },
+                        title: {
+                            display: true,
+                            text: 'Number of Transactions',
+                            color: '#a1a1a6',
+                            font: { size: 11, weight: 500 }
+                        }
+                    },
+                    x: {
+                        ticks: { color: '#a1a1a6' },
+                        grid: { color: 'transparent' },
+                        title: {
+                            display: true,
+                            text: 'Hour of Day',
+                            color: '#a1a1a6',
+                            font: { size: 11, weight: 500 }
+                        }
+                    }
+                }
+            }
+        });
+    }, []);
+
     useEffect(() => {
         const filteredData = calculateStats();
         updateChart(filteredData);
-    }, [salesData, startDate, endDate, calculateStats, updateChart]);
+        updateHourlyChart(filteredData);
+    }, [salesData, startDate, endDate, calculateStats, updateChart, updateHourlyChart]);
     
-    const handleFilterChange = (newFilter: 'daily' | 'weekly' | 'monthly' | 'lastMonth' | 'yearlyByMonth') => {
+    const handleFilterChange = (newFilter: 'daily' | 'weekly' | 'monthly' | 'lastMonth' | 'yearlyByMonth' | 'yearlyByWeek') => {
         setFilter(newFilter);
         const now = new Date();
         let start: Date, end: Date;
@@ -444,6 +608,10 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
             end = new Date(now.getFullYear(), now.getMonth(), 0);
         } else if (newFilter === 'yearlyByMonth') {
             // Show current year, grouped by month
+            start = new Date(now.getFullYear(), 0, 1); // January 1st
+            end = now; // Today
+        } else if (newFilter === 'yearlyByWeek') {
+            // Show current year, grouped by week
             start = new Date(now.getFullYear(), 0, 1); // January 1st
             end = now; // Today
         } else { // monthly
@@ -502,6 +670,7 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
             case 'monthly': return 'This Month';
             case 'lastMonth': return 'Last Month';
             case 'yearlyByMonth': return 'Year by Month';
+            case 'yearlyByWeek': return 'Year by Week';
             case 'custom': return 'Custom Range';
             default: return 'Select Period';
         }
@@ -575,6 +744,12 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
                                     className={`w-full text-left px-3 py-2 text-xs sm:text-sm hover:bg-hover-bg transition ${filter === 'yearlyByMonth' ? 'bg-accent-blue/10 text-accent-blue font-medium' : 'text-text-primary'}`}
                                 >
                                     Year by Month
+                                </button>
+                                <button
+                                    onClick={() => { handleFilterChange('yearlyByWeek'); setIsFilterDropdownOpen(false); }}
+                                    className={`w-full text-left px-3 py-2 text-xs sm:text-sm hover:bg-hover-bg transition ${filter === 'yearlyByWeek' ? 'bg-accent-blue/10 text-accent-blue font-medium' : 'text-text-primary'}`}
+                                >
+                                    Year by Week
                                 </button>
                             </div>
                         )}
@@ -657,6 +832,20 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
                     }`}
                 >
                     <canvas ref={chartRef}></canvas>
+                </div>
+            </div>
+
+            <div
+                className={`bg-bg-secondary p-3 sm:p-4 lg:p-6 rounded-lg sm:rounded-xl border border-border-color transition-all duration-500 ease-out transform mt-4 sm:mt-6 lg:mt-8 ${
+                    isHourlyChartVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+                }`}
+            >
+                <div className="flex justify-between items-center mb-3 sm:mb-4">
+                    <h3 className="text-base sm:text-lg font-semibold">Customer Activity by Hour</h3>
+                    <p className="text-xs sm:text-sm text-text-secondary">Transaction volume during operating hours</p>
+                </div>
+                <div className="h-64 sm:h-72 lg:h-80">
+                    <canvas ref={hourlyChartRef}></canvas>
                 </div>
             </div>
         </div>
