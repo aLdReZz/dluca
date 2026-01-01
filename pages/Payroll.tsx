@@ -6,7 +6,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { CalendarDaysIcon, CurrencyPesoIcon, ClockIcon, BanknotesIcon } from '../components/Icons';
 import PayslipModal from '../components/PayslipModal';
 import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
-import { payrollService } from '../utils/firebaseService';
+import { payrollService, employeesService, attendanceService } from '../utils/firebaseService';
 import {
     extractDateKey,
     extractServiceCharge,
@@ -112,7 +112,19 @@ const SummaryCard: React.FC<{title: string, value: string, icon: React.FC<{class
 
 const OVERTIME_RATE_MULTIPLIER = 1.5;
 
-const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payrollRecords: propPayrollRecords, setPayrollRecords: setPropPayrollRecords, salesData, manualPaidMinutes, manualGhostMinutes }) => {
+const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceRecords: propAttendanceRecords, payrollRecords: propPayrollRecords, setPayrollRecords: setPropPayrollRecords, salesData, manualPaidMinutes, manualGhostMinutes }) => {
+    // Fetch employees from Firebase
+    const { data: firebaseEmployees = [], loading: employeesLoading, error: employeesError } = useFirebaseData(
+        () => employeesService.getAll(),
+        []
+    );
+
+    // Fetch attendance records from Firebase
+    const { data: firebaseAttendanceRecords = [], loading: attendanceLoading, error: attendanceError } = useFirebaseData(
+        () => attendanceService.getAll(),
+        []
+    );
+
     // Fetch payroll records from Firebase
     const { data: firebasePayrollRecords = [], loading: payrollLoading, error: payrollError } = useFirebaseData(
         () => payrollService.getAll(),
@@ -124,7 +136,9 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
         (data: { id: string; updates: any }) => payrollService.update(data.id, data.updates)
     );
 
-    // Use Firebase payroll records if available, otherwise use prop records (for backward compatibility)
+    // Use Firebase data if available, otherwise use prop data (for backward compatibility)
+    const employees = (Array.isArray(firebaseEmployees) && firebaseEmployees.length > 0) ? firebaseEmployees : (propEmployees || []);
+    const attendanceRecords = (Array.isArray(firebaseAttendanceRecords) && firebaseAttendanceRecords.length > 0) ? firebaseAttendanceRecords : (propAttendanceRecords || []);
     const payrollRecords = (Array.isArray(firebasePayrollRecords) && firebasePayrollRecords.length > 0) ? firebasePayrollRecords : (propPayrollRecords || []);
 
     const [payPeriod, setPayPeriod] = useState(() => {
@@ -450,21 +464,23 @@ const Payroll: React.FC<PayrollProps> = ({ employees, attendanceRecords, payroll
     const tableHeaders = ['Staff', 'Rate', 'Regular Hrs', 'OT Hrs', 'Period Earning', 'Service Charge', 'Net Pay', 'Present', 'Absent', 'Late', 'Actions'];
 
     // Show loading state
-    if (payrollLoading) {
+    if (employeesLoading || attendanceLoading || payrollLoading) {
         return (
             <div className="fixed inset-0 flex items-center justify-center">
-                <LoadingSpinner message="Loading payroll records..." />
+                <LoadingSpinner message="Loading payroll data..." />
             </div>
         );
     }
 
     // Show error state
-    if (payrollError) {
+    if (employeesError || attendanceError || payrollError) {
         return (
             <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
                 <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
-                    <p className="text-red-500 font-medium">Error loading payroll records</p>
-                    <p className="text-text-secondary text-sm mt-1">{payrollError}</p>
+                    <p className="text-red-500 font-medium">Error loading payroll data</p>
+                    <p className="text-text-secondary text-sm mt-1">
+                        {employeesError || attendanceError || payrollError}
+                    </p>
                 </div>
             </div>
         );
