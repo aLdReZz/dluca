@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { Employee, AttendanceRecord, PayrollRecord, SalesData, SalaryDeduction } from '../types';
+import type { Employee, AttendanceRecord, PayrollRecord, SalesData, SalaryDeduction, AdditionalIncome } from '../types';
 import {
     XMarkIcon, CreditCardIcon, PencilIcon, TrashIcon,
     CalendarDaysIcon, CheckIcon, PlusIcon, ChevronDownIcon
@@ -128,6 +128,9 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
     const [isAddingDeduction, setIsAddingDeduction] = useState(false);
     const [newDeductionReason, setNewDeductionReason] = useState('');
     const [newDeductionAmount, setNewDeductionAmount] = useState('');
+    const [isAddingIncome, setIsAddingIncome] = useState(false);
+    const [newIncomeReason, setNewIncomeReason] = useState('');
+    const [newIncomeAmount, setNewIncomeAmount] = useState('');
     const [isServiceChargeExpanded, setIsServiceChargeExpanded] = useState(true);
 
     const [committedRange, setCommittedRange] = useState(() => {
@@ -189,6 +192,38 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         onUpdateEmployee({
             ...employee,
             salaryDeductions: currentDeductions.filter(d => d.id !== deductionId),
+        });
+    };
+
+    const handleAddIncome = () => {
+        if (!newIncomeReason.trim() || !newIncomeAmount.trim()) return;
+
+        const amount = parseFloat(newIncomeAmount);
+        if (isNaN(amount) || amount <= 0) return;
+
+        const currentIncome = employee.additionalIncome || [];
+        const newIncome: AdditionalIncome = {
+            id: Date.now().toString(),
+            description: newIncomeReason.trim(),
+            amount: amount,
+            date: new Date().toISOString().split('T')[0],
+        };
+
+        onUpdateEmployee({
+            ...employee,
+            additionalIncome: [...currentIncome, newIncome],
+        });
+
+        setNewIncomeReason('');
+        setNewIncomeAmount('');
+        setIsAddingIncome(false);
+    };
+
+    const handleRemoveIncome = (incomeId: string) => {
+        const currentIncome = employee.additionalIncome || [];
+        onUpdateEmployee({
+            ...employee,
+            additionalIncome: currentIncome.filter(i => i.id !== incomeId),
         });
     };
 
@@ -688,6 +723,123 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                             <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wide">Total</span>
                                             <span className="text-base font-bold text-accent-red">
                                                 {formatPeso(employee.salaryDeductions.reduce((sum, d) => sum + d.amount, 0))}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="mt-6 pt-6 border-t border-border-color">
+                                <div className="flex items-center justify-between mb-3 px-1">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-6 h-6 rounded-md bg-accent-green/10 flex items-center justify-center">
+                                            <PlusIcon className="w-3.5 h-3.5 text-accent-green" />
+                                        </div>
+                                        <h4 className="text-xs font-bold text-text-primary uppercase tracking-wide">Additional Income</h4>
+                                    </div>
+                                    {!isAddingIncome && (
+                                        <button
+                                            onClick={() => setIsAddingIncome(true)}
+                                            className="flex items-center gap-1 px-2 py-1 rounded-md bg-accent-blue/10 hover:bg-accent-blue/20 text-accent-blue transition-all hover:scale-105"
+                                            title="Add Income"
+                                        >
+                                            <PlusIcon className="w-3 h-3" />
+                                            <span className="text-xs font-semibold">Add</span>
+                                        </button>
+                                    )}
+                                </div>
+
+                                {isAddingIncome && (
+                                    <div className="mb-3 p-3 bg-gradient-to-br from-bg-primary/50 to-bg-primary/30 rounded-lg border border-accent-blue/30 shadow-lg space-y-2 animate-fade-in">
+                                        <input
+                                            type="text"
+                                            placeholder="Reason (e.g., Bonus, Allowance)"
+                                            value={newIncomeReason}
+                                            onChange={(e) => setNewIncomeReason(e.target.value)}
+                                            className="w-full px-2.5 py-1.5 bg-bg-secondary border border-border-color rounded-md text-xs text-text-primary placeholder-text-secondary/40 focus:outline-none focus:ring-1 focus:ring-accent-blue/50 focus:border-accent-blue transition-all"
+                                            autoFocus
+                                        />
+                                        <div className="relative">
+                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-secondary text-xs">₱</span>
+                                            <input
+                                                type="number"
+                                                placeholder="0.00"
+                                                value={newIncomeAmount}
+                                                onChange={(e) => setNewIncomeAmount(e.target.value)}
+                                                className="w-full pl-6 pr-2.5 py-1.5 bg-bg-secondary border border-border-color rounded-md text-xs text-text-primary placeholder-text-secondary/40 focus:outline-none focus:ring-1 focus:ring-accent-blue/50 focus:border-accent-blue transition-all"
+                                                step="0.01"
+                                                min="0"
+                                            />
+                                        </div>
+                                        <div className="flex gap-1.5">
+                                            <button
+                                                onClick={handleAddIncome}
+                                                className="flex-1 px-3 py-1.5 bg-accent-blue text-white rounded-md text-xs font-bold hover:bg-accent-blue/90 transition-all"
+                                            >
+                                                Add
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setIsAddingIncome(false);
+                                                    setNewIncomeReason('');
+                                                    setNewIncomeAmount('');
+                                                }}
+                                                className="px-3 py-1.5 bg-bg-secondary/50 text-text-secondary rounded-md text-xs font-semibold hover:bg-hover-bg transition-all border border-border-color"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1 custom-scrollbar">
+                                    {employee.additionalIncome && employee.additionalIncome.length > 0 ? (
+                                        employee.additionalIncome.map((income, index) => (
+                                            <div
+                                                key={income.id}
+                                                className="group flex items-center gap-2 p-2 bg-gradient-to-r from-bg-secondary to-bg-secondary/50 rounded-lg border border-border-color hover:border-accent-green/40 transition-all"
+                                            >
+                                                <div className="flex-shrink-0 w-5 h-5 rounded bg-accent-green/10 flex items-center justify-center text-accent-green font-bold text-[10px]">
+                                                    {index + 1}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-bold text-text-primary truncate leading-tight">{income.description}</p>
+                                                    <p className="text-[10px] text-text-secondary/60 flex items-center gap-0.5 mt-0.5">
+                                                        <CalendarDaysIcon className="w-2.5 h-2.5" />
+                                                        {new Date(income.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-xs font-bold text-accent-green whitespace-nowrap">
+                                                        {formatPeso(income.amount)}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => handleRemoveIncome(income.id)}
+                                                        className="p-1 rounded text-text-secondary/40 hover:text-white hover:bg-accent-red transition-all opacity-0 group-hover:opacity-100"
+                                                        title="Remove"
+                                                    >
+                                                        <TrashIcon className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="text-center py-6 px-4">
+                                            <div className="w-12 h-12 rounded-full bg-bg-primary/50 flex items-center justify-center mx-auto mb-2">
+                                                <PlusIcon className="w-6 h-6 text-text-secondary/30" />
+                                            </div>
+                                            <p className="text-xs font-medium text-text-secondary/70">No additional income added</p>
+                                            <p className="text-[10px] text-text-secondary/50 mt-0.5">Click "Add" to create</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {employee.additionalIncome && employee.additionalIncome.length > 0 && (
+                                    <div className="mt-3 p-2.5 bg-gradient-to-r from-accent-green/10 to-accent-green/5 rounded-lg border border-accent-green/20">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wide">Total</span>
+                                            <span className="text-base font-bold text-accent-green">
+                                                {formatPeso(employee.additionalIncome.reduce((sum, i) => sum + i.amount, 0))}
                                             </span>
                                         </div>
                                     </div>

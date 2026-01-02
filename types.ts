@@ -62,6 +62,13 @@ export interface SalaryDeduction {
     date: string;
 }
 
+export interface AdditionalIncome {
+    id: string;
+    description: string;
+    amount: number;
+    date: string;
+}
+
 export interface Employee {
     id: number;
     name: string;
@@ -77,6 +84,7 @@ export interface Employee {
     paidHoursOverride?: { [dateKey: string]: number };
     order?: number; // Position in the employee list
     salaryDeductions?: SalaryDeduction[];
+    additionalIncome?: AdditionalIncome[];
 }
 
 export interface AttendanceRecord {
