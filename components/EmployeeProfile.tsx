@@ -24,6 +24,7 @@ interface EmployeeProfileProps {
     onEdit: () => void;
     onDelete: () => void;
     onUpdateEmployee: (employee: Employee) => void;
+    onUpdateAttendance?: (records: AttendanceRecord[]) => void;
 }
 
 const timeStringToMinutes = (timeStr: string): number | null => {
@@ -120,7 +121,7 @@ const Tag: React.FC<{text: string, type: 'present' | 'off' | 'absent' | 'late'}>
     return <span className={`inline-block text-center px-2 py-1 text-xs font-medium rounded-md uppercase ${classes[type]}`}>{text}</span>
 };
 
-const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, attendanceRecords, salesData, payrollRecords, setPayrollRecords, onClose, onEdit, onDelete, onUpdateEmployee }) => {
+const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, attendanceRecords, salesData, payrollRecords, setPayrollRecords, onClose, onEdit, onDelete, onUpdateEmployee, onUpdateAttendance }) => {
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     const calendarRef = useRef<HTMLDivElement>(null);
     const [editingOtDateKey, setEditingOtDateKey] = useState<string | null>(null);
@@ -132,6 +133,13 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
     const [newIncomeReason, setNewIncomeReason] = useState('');
     const [newIncomeAmount, setNewIncomeAmount] = useState('');
     const [isServiceChargeExpanded, setIsServiceChargeExpanded] = useState(true);
+    const [editingSchedule, setEditingSchedule] = useState<string | null>(null);
+    const [editingTimeIn, setEditingTimeIn] = useState<string | null>(null);
+    const [editingTimeOut, setEditingTimeOut] = useState<string | null>(null);
+    const [tempScheduleIn, setTempScheduleIn] = useState('');
+    const [tempScheduleOut, setTempScheduleOut] = useState('');
+    const [tempTimeIn, setTempTimeIn] = useState('');
+    const [tempTimeOut, setTempTimeOut] = useState('');
 
     const [committedRange, setCommittedRange] = useState(() => {
         const date = new Date();
@@ -225,6 +233,89 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             ...employee,
             additionalIncome: currentIncome.filter(i => i.id !== incomeId),
         });
+    };
+
+    const handleScheduleEdit = (dateKey: string) => {
+        const schedule = employee.schedule[dateKey];
+        if (schedule && !schedule.off) {
+            setTempScheduleIn(schedule.timeIn || '');
+            setTempScheduleOut(schedule.timeOut || '');
+            setEditingSchedule(dateKey);
+        }
+    };
+
+    const handleScheduleSave = (dateKey: string) => {
+        if (!tempScheduleIn || !tempScheduleOut) return;
+
+        const updatedSchedule = {
+            ...employee.schedule,
+            [dateKey]: {
+                timeIn: tempScheduleIn,
+                timeOut: tempScheduleOut,
+                off: false
+            }
+        };
+
+        onUpdateEmployee({
+            ...employee,
+            schedule: updatedSchedule
+        });
+
+        setEditingSchedule(null);
+        setTempScheduleIn('');
+        setTempScheduleOut('');
+    };
+
+    const handleAttendanceEdit = (dateKey: string, type: 'in' | 'out') => {
+        const record = attendanceRecords.find(r => r.employee.toLowerCase() === employee.name.toLowerCase() && r.date === dateKey);
+
+        if (type === 'in') {
+            setTempTimeIn(record?.timeIn || '');
+            setEditingTimeIn(dateKey);
+        } else {
+            setTempTimeOut(record?.timeOut || '');
+            setEditingTimeOut(dateKey);
+        }
+    };
+
+    const handleAttendanceSave = (dateKey: string, type: 'in' | 'out') => {
+        if (!onUpdateAttendance) return;
+
+        const value = type === 'in' ? tempTimeIn : tempTimeOut;
+        if (!value) return;
+
+        const existingRecord = attendanceRecords.find(r => r.employee.toLowerCase() === employee.name.toLowerCase() && r.date === dateKey);
+
+        let updatedRecords = [...attendanceRecords];
+
+        if (existingRecord) {
+            updatedRecords = updatedRecords.map(r => {
+                if (r.employee.toLowerCase() === employee.name.toLowerCase() && r.date === dateKey) {
+                    return {
+                        ...r,
+                        [type === 'in' ? 'timeIn' : 'timeOut']: value
+                    };
+                }
+                return r;
+            });
+        } else {
+            updatedRecords.push({
+                employee: employee.name,
+                date: dateKey,
+                timeIn: type === 'in' ? value : '',
+                timeOut: type === 'out' ? value : ''
+            });
+        }
+
+        onUpdateAttendance(updatedRecords);
+
+        if (type === 'in') {
+            setEditingTimeIn(null);
+            setTempTimeIn('');
+        } else {
+            setEditingTimeOut(null);
+            setTempTimeOut('');
+        }
     };
 
     useEffect(() => {
@@ -928,9 +1019,97 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                                             {log.status === 'Absent' && <Tag text="Absent" type="absent"/>}
                                                             {(log.status === 'Future' || log.status === 'Not Scheduled') && <span className="text-text-secondary/70">--</span>}
                                                         </td>
-                                                        <td className="px-2 py-1.5 text-text-secondary text-xs whitespace-nowrap text-center">{log.scheduled}</td>
+                                                        <td className="px-2 py-1.5 text-text-secondary text-xs whitespace-nowrap text-center">
+                                                            {editingSchedule === dateKey ? (
+                                                                <div className="flex items-center gap-1 justify-center">
+                                                                    <input
+                                                                        type="time"
+                                                                        value={tempScheduleIn}
+                                                                        onChange={(e) => setTempScheduleIn(e.target.value)}
+                                                                        className="w-20 px-1 py-0.5 bg-bg-primary border border-border-color rounded text-[10px]"
+                                                                    />
+                                                                    <span>-</span>
+                                                                    <input
+                                                                        type="time"
+                                                                        value={tempScheduleOut}
+                                                                        onChange={(e) => setTempScheduleOut(e.target.value)}
+                                                                        className="w-20 px-1 py-0.5 bg-bg-primary border border-border-color rounded text-[10px]"
+                                                                    />
+                                                                    <button onClick={() => handleScheduleSave(dateKey)} className="text-accent-green hover:text-accent-green/80" title="Save">
+                                                                        <CheckIcon className="w-3 h-3" />
+                                                                    </button>
+                                                                    <button onClick={() => setEditingSchedule(null)} className="text-accent-red hover:text-accent-red/80" title="Cancel">
+                                                                        <XMarkIcon className="w-3 h-3" />
+                                                                    </button>
+                                                                </div>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => handleScheduleEdit(dateKey)}
+                                                                    className="hover:text-accent-blue transition-colors"
+                                                                    disabled={log.status === 'OFF' || log.status === 'Future'}
+                                                                >
+                                                                    {log.scheduled}
+                                                                </button>
+                                                            )}
+                                                        </td>
                                                         <td className="px-2 py-1.5 font-semibold whitespace-nowrap text-center">{log.scheduleDuration > 0 ? formatDuration(log.scheduleDuration) : '--'}</td>
-                                                        <td className="px-2 py-1.5 text-text-secondary text-xs whitespace-nowrap text-center">{log.timeIn === '--:--' ? '--:--' : `${log.timeIn} - ${log.timeOut}`}</td>
+                                                        <td className="px-2 py-1.5 text-text-secondary text-xs whitespace-nowrap text-center">
+                                                            {editingTimeIn === dateKey || editingTimeOut === dateKey ? (
+                                                                <div className="flex items-center gap-1 justify-center">
+                                                                    {editingTimeIn === dateKey ? (
+                                                                        <>
+                                                                            <input
+                                                                                type="time"
+                                                                                value={tempTimeIn}
+                                                                                onChange={(e) => setTempTimeIn(e.target.value)}
+                                                                                className="w-20 px-1 py-0.5 bg-bg-primary border border-border-color rounded text-[10px]"
+                                                                                autoFocus
+                                                                            />
+                                                                            <button onClick={() => handleAttendanceSave(dateKey, 'in')} className="text-accent-green hover:text-accent-green/80" title="Save">
+                                                                                <CheckIcon className="w-3 h-3" />
+                                                                            </button>
+                                                                            <button onClick={() => setEditingTimeIn(null)} className="text-accent-red hover:text-accent-red/80" title="Cancel">
+                                                                                <XMarkIcon className="w-3 h-3" />
+                                                                            </button>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <input
+                                                                                type="time"
+                                                                                value={tempTimeOut}
+                                                                                onChange={(e) => setTempTimeOut(e.target.value)}
+                                                                                className="w-20 px-1 py-0.5 bg-bg-primary border border-border-color rounded text-[10px]"
+                                                                                autoFocus
+                                                                            />
+                                                                            <button onClick={() => handleAttendanceSave(dateKey, 'out')} className="text-accent-green hover:text-accent-green/80" title="Save">
+                                                                                <CheckIcon className="w-3 h-3" />
+                                                                            </button>
+                                                                            <button onClick={() => setEditingTimeOut(null)} className="text-accent-red hover:text-accent-red/80" title="Cancel">
+                                                                                <XMarkIcon className="w-3 h-3" />
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center gap-1 justify-center">
+                                                                    <button
+                                                                        onClick={() => handleAttendanceEdit(dateKey, 'in')}
+                                                                        className="hover:text-accent-blue transition-colors"
+                                                                        disabled={log.status === 'OFF' || log.status === 'Future'}
+                                                                    >
+                                                                        {log.timeIn}
+                                                                    </button>
+                                                                    <span>-</span>
+                                                                    <button
+                                                                        onClick={() => handleAttendanceEdit(dateKey, 'out')}
+                                                                        className="hover:text-accent-blue transition-colors"
+                                                                        disabled={log.status === 'OFF' || log.status === 'Future'}
+                                                                    >
+                                                                        {log.timeOut}
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </td>
                                                         <td className="px-2 py-1.5 font-semibold whitespace-nowrap text-center">{log.worked > 0 ? formatDuration(log.worked) : '--'}</td>
                                                         <td className="px-2 py-1.5 font-semibold whitespace-nowrap text-center">
                                                             {log.overtime > 0 ? (

@@ -1042,6 +1042,10 @@ const Attendance: React.FC<AttendanceProps> = ({
         }
     };
 
+    const handleUpdateAttendance = (updatedRecords: AttendanceRecord[]) => {
+        setAttendanceRecords(updatedRecords);
+    };
+
     const today = new Date();
     const todayUTC = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
 
@@ -1603,6 +1607,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                         }
                     }}
                     onUpdateEmployee={handleUpdateEmployee}
+                    onUpdateAttendance={handleUpdateAttendance}
                 />
             )}
 
