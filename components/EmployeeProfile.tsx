@@ -237,11 +237,10 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
 
     const handleScheduleEdit = (dateKey: string) => {
         const schedule = employee.schedule[dateKey];
-        if (schedule && !schedule.off) {
-            setTempScheduleIn(schedule.timeIn || '');
-            setTempScheduleOut(schedule.timeOut || '');
-            setEditingSchedule(dateKey);
-        }
+        // Allow editing even if day is OFF - initialize with empty values for OFF days
+        setTempScheduleIn(schedule?.timeIn || '');
+        setTempScheduleOut(schedule?.timeOut || '');
+        setEditingSchedule(dateKey);
     };
 
     const handleScheduleSave = (dateKey: string) => {
