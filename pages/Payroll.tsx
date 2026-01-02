@@ -262,7 +262,11 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
 
             const regularPay = totalRegularHours * employee.rate;
             const overtimePay = totalOvertimeHours * employee.rate * OVERTIME_RATE_MULTIPLIER;
-            const grossPay = regularPay + overtimePay;
+
+            // Calculate total additional income
+            const totalAdditionalIncome = (employee.additionalIncome || []).reduce((sum, i) => sum + i.amount, 0);
+
+            const grossPay = regularPay + overtimePay + totalAdditionalIncome;
 
             // Calculate total salary deductions
             const totalSalaryDeductions = (employee.salaryDeductions || []).reduce((sum, d) => sum + d.amount, 0);
@@ -296,6 +300,7 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
                 daysPresent,
                 daysAbsent,
                 daysLate,
+                additionalIncome: totalAdditionalIncome,
                 deductionNotes: '',
                 customDeduction: totalSalaryDeductions
             };
@@ -317,7 +322,7 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
         const finalRecords = baseRecords.map(record => {
             const allocation = allocations[record.id];
             const serviceChargeShare = allocation ? roundCurrency(allocation.totalShare) : 0;
-            const grossPayWithService = record.regularPay + record.overtimePay + serviceChargeShare;
+            const grossPayWithService = record.regularPay + record.overtimePay + serviceChargeShare + (record.additionalIncome || 0);
             const appliedCustomDeduction = Math.max(0, record.customDeduction ?? 0);
             const netPayWithService = grossPayWithService - record.deductions.total - appliedCustomDeduction;
             const normalizedBreakdown = allocation

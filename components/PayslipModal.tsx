@@ -264,8 +264,9 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                 { label: 'Basic Salary', amount: record.regularPay },
                 { label: 'Overtime Pay', amount: record.overtimePay },
                 { label: 'Service Charge', amount: record.serviceCharge || 0 },
+                { label: 'Additional Income', amount: record.additionalIncome || 0 },
             ].filter(row => Math.abs(row.amount) > 0.009),
-        [record.regularPay, record.overtimePay, record.serviceCharge],
+        [record.regularPay, record.overtimePay, record.serviceCharge, record.additionalIncome],
     );
 
     const deductionRows = useMemo(

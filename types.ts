@@ -148,6 +148,7 @@ export interface PayrollRecord {
     deductionNotes?: string;
     customDeduction?: number;
     serviceChargeBreakdown?: ServiceChargeBreakdown;
+    additionalIncome?: number;
 }
 
 export interface RecipeIngredient {
