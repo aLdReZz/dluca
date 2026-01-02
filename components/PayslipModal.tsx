@@ -343,6 +343,16 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
 
         totalHours: record.totalHours,
 
+        additionalIncomeItems: employee?.additionalIncome?.map(income => ({
+            description: income.description,
+            amount: income.amount,
+        })),
+
+        salaryDeductionItems: employee?.salaryDeductions?.map(deduction => ({
+            description: deduction.description,
+            amount: deduction.amount,
+        })),
+
     });
 
 

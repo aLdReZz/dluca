@@ -24,6 +24,8 @@ export interface PayslipPdfData {
     daysAbsent: number;
     daysLate: number;
     totalHours: number;
+    additionalIncomeItems?: PayslipPdfTableRow[];
+    salaryDeductionItems?: PayslipPdfTableRow[];
 }
 
 const MARGIN = 72; // 1 inch margin on A4 (72pt = 1in)
@@ -270,6 +272,20 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
         pageWidth,
     });
 
+    // Additional Income Items (if any)
+    if (data.additionalIncomeItems && data.additionalIncomeItems.length > 0) {
+        const totalAdditionalIncome = data.additionalIncomeItems.reduce((sum, item) => sum + item.amount, 0);
+        cursorY = drawTable({
+            doc,
+            title: 'Additional Income',
+            rows: data.additionalIncomeItems,
+            totalLabel: 'Total Additional Income',
+            totalValue: totalAdditionalIncome,
+            startY: cursorY + 10,
+            pageWidth,
+        });
+    }
+
     cursorY = drawTable({
         doc,
         title: 'Deductions',
@@ -279,6 +295,20 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
         startY: cursorY + 10,
         pageWidth,
     });
+
+    // Salary Deduction Items (if any)
+    if (data.salaryDeductionItems && data.salaryDeductionItems.length > 0) {
+        const totalSalaryDeductions = data.salaryDeductionItems.reduce((sum, item) => sum + item.amount, 0);
+        cursorY = drawTable({
+            doc,
+            title: 'Salary Deductions',
+            rows: data.salaryDeductionItems,
+            totalLabel: 'Total Salary Deductions',
+            totalValue: totalSalaryDeductions,
+            startY: cursorY + 10,
+            pageWidth,
+        });
+    }
 
     cursorY += 20;
 
