@@ -1056,14 +1056,13 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                                                             className="pl-2 pr-5 py-0.5 bg-bg-primary border border-border-color rounded text-[10px] appearance-none cursor-pointer"
                                                                         >
                                                                             <option value="">--</option>
-                                                                            <option value="OFF">Day OFF</option>
+                                                                            <option value="OFF">OFF</option>
                                                                             {Array.from({ length: 24 }, (_, i) => {
                                                                                 const hour = i.toString().padStart(2, '0');
                                                                                 const display = i === 0 ? '12:00 AM' : i < 12 ? `${i}:00 AM` : i === 12 ? '12:00 PM' : `${i - 12}:00 PM`;
                                                                                 return <option key={hour} value={`${hour}:00`}>{display}</option>;
                                                                             })}
                                                                         </select>
-                                                                        <ChevronDownIcon className="w-3 h-3 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-text-secondary" />
                                                                     </div>
                                                                     <span>-</span>
                                                                     <div className="relative">
@@ -1080,14 +1079,13 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                                                             disabled={tempScheduleIn === 'OFF'}
                                                                         >
                                                                             <option value="">--</option>
-                                                                            <option value="OFF">Day OFF</option>
+                                                                            <option value="OFF">OFF</option>
                                                                             {Array.from({ length: 24 }, (_, i) => {
                                                                                 const hour = i.toString().padStart(2, '0');
                                                                                 const display = i === 0 ? '12:00 AM' : i < 12 ? `${i}:00 AM` : i === 12 ? '12:00 PM' : `${i - 12}:00 PM`;
                                                                                 return <option key={hour} value={`${hour}:00`}>{display}</option>;
                                                                             })}
                                                                         </select>
-                                                                        <ChevronDownIcon className="w-3 h-3 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-text-secondary" />
                                                                     </div>
                                                                     <button onClick={() => handleScheduleSave(dateKey)} className="text-accent-green hover:text-accent-green/80" title="Save">
                                                                         <CheckIcon className="w-3 h-3" />
