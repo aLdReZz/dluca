@@ -263,64 +263,42 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
     cursorY += 90;
 
     // Combine earnings with individual additional income items
-    const allEarnings = [...data.earnings];
+    let finalEarnings = [...data.earnings];
     if (data.additionalIncomeItems && data.additionalIncomeItems.length > 0) {
         // Remove the aggregated "Additional Income" row if it exists
-        const earningsWithoutAggregated = allEarnings.filter(row => row.description !== 'Additional Income');
+        finalEarnings = finalEarnings.filter(row => row.description !== 'Additional Income');
         // Add individual additional income items
-        data.additionalIncomeItems.forEach(item => {
-            earningsWithoutAggregated.push(item);
-        });
-        cursorY = drawTable({
-            doc,
-            title: 'EARNINGS',
-            rows: earningsWithoutAggregated,
-            totalLabel: 'Total Earnings',
-            totalValue: data.totalEarnings,
-            startY: cursorY,
-            pageWidth,
-        });
-    } else {
-        cursorY = drawTable({
-            doc,
-            title: 'EARNINGS',
-            rows: data.earnings,
-            totalLabel: 'Total Earnings',
-            totalValue: data.totalEarnings,
-            startY: cursorY,
-            pageWidth,
-        });
+        finalEarnings.push(...data.additionalIncomeItems);
     }
 
+    cursorY = drawTable({
+        doc,
+        title: 'EARNINGS',
+        rows: finalEarnings,
+        totalLabel: 'Total Earnings',
+        totalValue: data.totalEarnings,
+        startY: cursorY,
+        pageWidth,
+    });
+
     // Combine deductions with individual salary deduction items
-    const allDeductions = [...data.deductions];
+    let finalDeductions = [...data.deductions];
     if (data.salaryDeductionItems && data.salaryDeductionItems.length > 0) {
         // Remove the aggregated "Custom Deduction" row if it exists
-        const deductionsWithoutAggregated = allDeductions.filter(row => row.description !== 'Custom Deduction');
+        finalDeductions = finalDeductions.filter(row => row.description !== 'Custom Deduction');
         // Add individual salary deduction items
-        data.salaryDeductionItems.forEach(item => {
-            deductionsWithoutAggregated.push(item);
-        });
-        cursorY = drawTable({
-            doc,
-            title: 'Deductions',
-            rows: deductionsWithoutAggregated,
-            totalLabel: 'Total Deductions',
-            totalValue: data.totalDeductions,
-            startY: cursorY + 10,
-            pageWidth,
-        });
-    } else {
-        cursorY = drawTable({
-            doc,
-            title: 'Deductions',
-            rows: data.deductions,
-            totalLabel: 'Total Deductions',
-            totalValue: data.totalDeductions,
-            startY: cursorY + 10,
-            pageWidth,
-        });
+        finalDeductions.push(...data.salaryDeductionItems);
     }
+
+    cursorY = drawTable({
+        doc,
+        title: 'Deductions',
+        rows: finalDeductions,
+        totalLabel: 'Total Deductions',
+        totalValue: data.totalDeductions,
+        startY: cursorY + 10,
+        pageWidth,
+    });
 
     cursorY += 20;
 

@@ -305,55 +305,48 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
     const departmentLabel = getInfoValue(record.department);
     const designationLabel = record.position || 'N/A';
 
-    const buildPayslipPdfData = (): PayslipPdfData => ({
+    const buildPayslipPdfData = (): PayslipPdfData => {
+        const pdfData = {
+            companyName: "D'Luca Bistro X Cafe",
+            companyAddress: "2nd flr. Soho Bldg. Governors's Drive, Brgy. Cabuco, Trece Martires Cavite",
+            employeeName: record.employee,
+            department: departmentLabel,
+            designation: designationLabel,
+            payCoverage: payPeriodRangeShortLabel,
+            payDate: payDateExportLabel,
+            bankAccount: bankAccountLabel,
+            paymentMode: paymentModeLabel,
+            earnings: earningsRows.map(row => ({ description: row.label, amount: row.amount })),
+            deductions: deductionRows.map(row => ({ description: row.label, amount: row.amount })),
+            totalEarnings: grossPay,
+            totalDeductions: combinedDeductions,
+            netSalary: netPay,
+            daysPresent: record.daysPresent,
+            daysAbsent: record.daysAbsent,
+            daysLate: record.daysLate,
+            totalHours: record.totalHours,
+            additionalIncomeItems: employee?.additionalIncome?.map(income => ({
+                description: income.description,
+                amount: income.amount,
+            })),
+            salaryDeductionItems: employee?.salaryDeductions?.map(deduction => ({
+                description: deduction.description,
+                amount: deduction.amount,
+            })),
+        };
 
-        companyName: "D'Luca Bistro X Cafe",
+        console.log('PDF Data:', {
+            employee: employee?.name,
+            hasAdditionalIncome: !!employee?.additionalIncome,
+            additionalIncomeCount: employee?.additionalIncome?.length || 0,
+            additionalIncomeItems: pdfData.additionalIncomeItems,
+            hasSalaryDeductions: !!employee?.salaryDeductions,
+            salaryDeductionsCount: employee?.salaryDeductions?.length || 0,
+            salaryDeductionItems: pdfData.salaryDeductionItems,
+        });
 
-        companyAddress: "2nd flr. Soho Bldg. Governors's Drive, Brgy. Cabuco, Trece Martires Cavite",
-
-        employeeName: record.employee,
-
-        department: departmentLabel,
-
-        designation: designationLabel,
-
-        payCoverage: payPeriodRangeShortLabel,
-
-        payDate: payDateExportLabel,
-
-        bankAccount: bankAccountLabel,
-
-        paymentMode: paymentModeLabel,
-
-        earnings: earningsRows.map(row => ({ description: row.label, amount: row.amount })),
-
-        deductions: deductionRows.map(row => ({ description: row.label, amount: row.amount })),
-
-        totalEarnings: grossPay,
-
-        totalDeductions: combinedDeductions,
-
-        netSalary: netPay,
-
-        daysPresent: record.daysPresent,
-
-        daysAbsent: record.daysAbsent,
-
-        daysLate: record.daysLate,
-
-        totalHours: record.totalHours,
-
-        additionalIncomeItems: employee?.additionalIncome?.map(income => ({
-            description: income.description,
-            amount: income.amount,
-        })),
-
-        salaryDeductionItems: employee?.salaryDeductions?.map(deduction => ({
-            description: deduction.description,
-            amount: deduction.amount,
-        })),
-
-    });
+        return pdfData;
+    };
 
 
 
