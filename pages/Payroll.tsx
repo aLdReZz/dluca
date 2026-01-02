@@ -674,11 +674,12 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
             </div>
 
             {selectedRecord && (
-                <PayslipModal 
+                <PayslipModal
                     record={selectedRecord}
                     payPeriod={payPeriod}
                     onClose={() => setSelectedRecord(null)}
                     onSave={handleSavePayslip}
+                    employee={employees.find(e => e.id === selectedRecord.id)}
                 />
             )}
         </div>

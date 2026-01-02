@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { PayrollRecord } from '../types';
+import type { PayrollRecord, Employee } from '../types';
 import { XMarkIcon, PrinterIcon, InformationCircleIcon } from './Icons';
 import { generatePayslipPdf, type PayslipPdfData } from '../utils/payslipPdf';
 
@@ -8,6 +8,7 @@ interface PayslipModalProps {
     payPeriod: { start: string; end: string };
     onClose: () => void;
     onSave: (updatedRecord: PayrollRecord) => void;
+    employee?: Employee;
 }
 
 const formatPeso = (amount: number) => {
@@ -101,6 +102,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
     payPeriod,
     onClose,
     onSave,
+    employee,
 }) => {
     const [deductionNotes, setDeductionNotes] = useState(record.deductionNotes || '');
     const [isDeductionEditorOpen, setIsDeductionEditorOpen] = useState(Boolean(record.deductionNotes));
@@ -551,6 +553,66 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                     Two ghost employees (12h each) are included each day to smooth allocations. Staff split 40% of the pool based on adjusted paid hours, and the remaining 60% is divided equally between the two ghost employees (shown in the Ghost Share column).
                                 </p>
                             </div>
+
+                            {employee?.additionalIncome && employee.additionalIncome.length > 0 && (
+                                <div className="payslip-export-section">
+                                    <h3>Additional Income</h3>
+                                    <table className="payslip-export-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Description</th>
+                                                <th>Amount</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {employee.additionalIncome.map(income => (
+                                                <tr key={income.id}>
+                                                    <td>{income.description}</td>
+                                                    <td className="text-right">{formatPeso(income.amount)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr>
+                                                <th>Total</th>
+                                                <th className="text-right">
+                                                    {formatPeso(employee.additionalIncome.reduce((sum, i) => sum + i.amount, 0))}
+                                                </th>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            )}
+
+                            {employee?.salaryDeductions && employee.salaryDeductions.length > 0 && (
+                                <div className="payslip-export-section">
+                                    <h3>Deductions</h3>
+                                    <table className="payslip-export-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Description</th>
+                                                <th>Amount</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {employee.salaryDeductions.map(deduction => (
+                                                <tr key={deduction.id}>
+                                                    <td>{deduction.description}</td>
+                                                    <td className="text-right">{formatPeso(deduction.amount)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr>
+                                                <th>Total</th>
+                                                <th className="text-right">
+                                                    {formatPeso(employee.salaryDeductions.reduce((sum, d) => sum + d.amount, 0))}
+                                                </th>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            )}
 
                             <div className="payslip-export-section">
                                 <h3>Deductions</h3>
