@@ -245,6 +245,28 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
     };
 
     const handleScheduleSave = (dateKey: string) => {
+        // Check if either time is set to "OFF"
+        if (tempScheduleIn === 'OFF' || tempScheduleOut === 'OFF') {
+            const updatedSchedule = {
+                ...employee.schedule,
+                [dateKey]: {
+                    timeIn: '',
+                    timeOut: '',
+                    off: true
+                }
+            };
+
+            onUpdateEmployee({
+                ...employee,
+                schedule: updatedSchedule
+            });
+
+            setEditingSchedule(null);
+            setTempScheduleIn('');
+            setTempScheduleOut('');
+            return;
+        }
+
         if (!tempScheduleIn || !tempScheduleOut) return;
 
         const updatedSchedule = {
@@ -1022,45 +1044,52 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                                         <td className="px-2 py-1.5 text-text-secondary text-xs whitespace-nowrap text-center">
                                                             {editingSchedule === dateKey ? (
                                                                 <div className="flex items-center gap-1 justify-center">
-                                                                    <select
-                                                                        value={tempScheduleIn}
-                                                                        onChange={(e) => setTempScheduleIn(e.target.value)}
-                                                                        className="px-1 py-0.5 bg-bg-primary border border-border-color rounded text-[10px]"
-                                                                    >
-                                                                        <option value="">--</option>
-                                                                        {Array.from({ length: 24 }, (_, i) => {
-                                                                            const hour = i.toString().padStart(2, '0');
-                                                                            const display = i === 0 ? '12:00 AM' : i < 12 ? `${i}:00 AM` : i === 12 ? '12:00 PM' : `${i - 12}:00 PM`;
-                                                                            return <option key={hour} value={`${hour}:00`}>{display}</option>;
-                                                                        })}
-                                                                    </select>
+                                                                    <div className="relative">
+                                                                        <select
+                                                                            value={tempScheduleIn}
+                                                                            onChange={(e) => {
+                                                                                const value = e.target.value;
+                                                                                setTempScheduleIn(value);
+                                                                                if (value === 'OFF') {
+                                                                                    setTempScheduleOut('OFF');
+                                                                                }
+                                                                            }}
+                                                                            className="pl-2 pr-5 py-0.5 bg-bg-primary border border-border-color rounded text-[10px] appearance-none cursor-pointer"
+                                                                        >
+                                                                            <option value="">--</option>
+                                                                            <option value="OFF">Day OFF</option>
+                                                                            {Array.from({ length: 24 }, (_, i) => {
+                                                                                const hour = i.toString().padStart(2, '0');
+                                                                                const display = i === 0 ? '12:00 AM' : i < 12 ? `${i}:00 AM` : i === 12 ? '12:00 PM' : `${i - 12}:00 PM`;
+                                                                                return <option key={hour} value={`${hour}:00`}>{display}</option>;
+                                                                            })}
+                                                                        </select>
+                                                                        <ChevronDownIcon className="w-3 h-3 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-text-secondary" />
+                                                                    </div>
                                                                     <span>-</span>
-                                                                    <select
-                                                                        value={tempScheduleOut}
-                                                                        onChange={(e) => setTempScheduleOut(e.target.value)}
-                                                                        className="px-1 py-0.5 bg-bg-primary border border-border-color rounded text-[10px]"
-                                                                    >
-                                                                        <option value="">--</option>
-                                                                        {Array.from({ length: 24 }, (_, i) => {
-                                                                            const hour = i.toString().padStart(2, '0');
-                                                                            const display = i === 0 ? '12:00 AM' : i < 12 ? `${i}:00 AM` : i === 12 ? '12:00 PM' : `${i - 12}:00 PM`;
-                                                                            return <option key={hour} value={`${hour}:00`}>{display}</option>;
-                                                                        })}
-                                                                    </select>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            const updatedSchedule = {
-                                                                                ...employee.schedule,
-                                                                                [dateKey]: { timeIn: '', timeOut: '', off: true }
-                                                                            };
-                                                                            onUpdateEmployee({ ...employee, schedule: updatedSchedule });
-                                                                            setEditingSchedule(null);
-                                                                        }}
-                                                                        className="text-text-secondary hover:text-text-primary text-[10px] px-1"
-                                                                        title="Mark as Day Off"
-                                                                    >
-                                                                        OFF
-                                                                    </button>
+                                                                    <div className="relative">
+                                                                        <select
+                                                                            value={tempScheduleOut}
+                                                                            onChange={(e) => {
+                                                                                const value = e.target.value;
+                                                                                setTempScheduleOut(value);
+                                                                                if (value === 'OFF') {
+                                                                                    setTempScheduleIn('OFF');
+                                                                                }
+                                                                            }}
+                                                                            className="pl-2 pr-5 py-0.5 bg-bg-primary border border-border-color rounded text-[10px] appearance-none cursor-pointer"
+                                                                            disabled={tempScheduleIn === 'OFF'}
+                                                                        >
+                                                                            <option value="">--</option>
+                                                                            <option value="OFF">Day OFF</option>
+                                                                            {Array.from({ length: 24 }, (_, i) => {
+                                                                                const hour = i.toString().padStart(2, '0');
+                                                                                const display = i === 0 ? '12:00 AM' : i < 12 ? `${i}:00 AM` : i === 12 ? '12:00 PM' : `${i - 12}:00 PM`;
+                                                                                return <option key={hour} value={`${hour}:00`}>{display}</option>;
+                                                                            })}
+                                                                        </select>
+                                                                        <ChevronDownIcon className="w-3 h-3 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-text-secondary" />
+                                                                    </div>
                                                                     <button onClick={() => handleScheduleSave(dateKey)} className="text-accent-green hover:text-accent-green/80" title="Save">
                                                                         <CheckIcon className="w-3 h-3" />
                                                                     </button>
