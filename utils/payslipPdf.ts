@@ -262,49 +262,61 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
     drawInfoColumn(doc, rightRows, MARGIN + columnWidth + columnGap, cursorY, columnWidth);
     cursorY += 90;
 
-    cursorY = drawTable({
-        doc,
-        title: 'EARNINGS',
-        rows: data.earnings,
-        totalLabel: 'Total Earnings',
-        totalValue: data.totalEarnings,
-        startY: cursorY,
-        pageWidth,
-    });
-
-    // Additional Income Items (if any)
+    // Combine earnings with individual additional income items
+    const allEarnings = [...data.earnings];
     if (data.additionalIncomeItems && data.additionalIncomeItems.length > 0) {
-        const totalAdditionalIncome = data.additionalIncomeItems.reduce((sum, item) => sum + item.amount, 0);
+        // Remove the aggregated "Additional Income" row if it exists
+        const earningsWithoutAggregated = allEarnings.filter(row => row.description !== 'Additional Income');
+        // Add individual additional income items
+        data.additionalIncomeItems.forEach(item => {
+            earningsWithoutAggregated.push(item);
+        });
         cursorY = drawTable({
             doc,
-            title: 'Additional Income',
-            rows: data.additionalIncomeItems,
-            totalLabel: 'Total Additional Income',
-            totalValue: totalAdditionalIncome,
-            startY: cursorY + 10,
+            title: 'EARNINGS',
+            rows: earningsWithoutAggregated,
+            totalLabel: 'Total Earnings',
+            totalValue: data.totalEarnings,
+            startY: cursorY,
+            pageWidth,
+        });
+    } else {
+        cursorY = drawTable({
+            doc,
+            title: 'EARNINGS',
+            rows: data.earnings,
+            totalLabel: 'Total Earnings',
+            totalValue: data.totalEarnings,
+            startY: cursorY,
             pageWidth,
         });
     }
 
-    cursorY = drawTable({
-        doc,
-        title: 'Deductions',
-        rows: data.deductions,
-        totalLabel: 'Total Deductions',
-        totalValue: data.totalDeductions,
-        startY: cursorY + 10,
-        pageWidth,
-    });
-
-    // Salary Deduction Items (if any)
+    // Combine deductions with individual salary deduction items
+    const allDeductions = [...data.deductions];
     if (data.salaryDeductionItems && data.salaryDeductionItems.length > 0) {
-        const totalSalaryDeductions = data.salaryDeductionItems.reduce((sum, item) => sum + item.amount, 0);
+        // Remove the aggregated "Custom Deduction" row if it exists
+        const deductionsWithoutAggregated = allDeductions.filter(row => row.description !== 'Custom Deduction');
+        // Add individual salary deduction items
+        data.salaryDeductionItems.forEach(item => {
+            deductionsWithoutAggregated.push(item);
+        });
         cursorY = drawTable({
             doc,
-            title: 'Salary Deductions',
-            rows: data.salaryDeductionItems,
-            totalLabel: 'Total Salary Deductions',
-            totalValue: totalSalaryDeductions,
+            title: 'Deductions',
+            rows: deductionsWithoutAggregated,
+            totalLabel: 'Total Deductions',
+            totalValue: data.totalDeductions,
+            startY: cursorY + 10,
+            pageWidth,
+        });
+    } else {
+        cursorY = drawTable({
+            doc,
+            title: 'Deductions',
+            rows: data.deductions,
+            totalLabel: 'Total Deductions',
+            totalValue: data.totalDeductions,
             startY: cursorY + 10,
             pageWidth,
         });
