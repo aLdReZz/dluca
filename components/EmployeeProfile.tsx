@@ -613,51 +613,45 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                             </div>
 
                             <div className="mt-6 pt-6 border-t border-border-color">
-                                <div className="flex items-center justify-between mb-3 px-1">
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-6 h-6 rounded-md bg-accent-red/10 flex items-center justify-center">
-                                            <CreditCardIcon className="w-3.5 h-3.5 text-accent-red" />
-                                        </div>
-                                        <h4 className="text-xs font-bold text-text-primary uppercase tracking-wide">Deductions</h4>
-                                    </div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wide">Deductions</h4>
                                     {!isAddingDeduction && (
                                         <button
                                             onClick={() => setIsAddingDeduction(true)}
-                                            className="flex items-center gap-1 px-2 py-1 rounded-md bg-accent-blue/10 hover:bg-accent-blue/20 text-accent-blue transition-all hover:scale-105"
+                                            className="text-accent-blue hover:text-accent-blue/80 transition-colors"
                                             title="Add Deduction"
                                         >
-                                            <PlusIcon className="w-3 h-3" />
-                                            <span className="text-xs font-semibold">Add</span>
+                                            <PlusIcon className="w-4 h-4" />
                                         </button>
                                     )}
                                 </div>
 
                                 {isAddingDeduction && (
-                                    <div className="mb-3 p-3 bg-gradient-to-br from-bg-primary/50 to-bg-primary/30 rounded-lg border border-accent-blue/30 shadow-lg space-y-2 animate-fade-in">
+                                    <div className="mb-2 p-2 bg-bg-primary/30 rounded-lg border border-border-color space-y-1.5">
                                         <input
                                             type="text"
-                                            placeholder="Reason (e.g., Short, Cash Advance)"
+                                            placeholder="Reason"
                                             value={newDeductionReason}
                                             onChange={(e) => setNewDeductionReason(e.target.value)}
-                                            className="w-full px-2.5 py-1.5 bg-bg-secondary border border-border-color rounded-md text-xs text-text-primary placeholder-text-secondary/40 focus:outline-none focus:ring-1 focus:ring-accent-blue/50 focus:border-accent-blue transition-all"
+                                            className="w-full px-2 py-1 bg-bg-secondary border border-border-color rounded text-xs text-text-primary placeholder-text-secondary/50 focus:outline-none focus:border-accent-blue"
                                             autoFocus
                                         />
                                         <div className="relative">
-                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-secondary text-xs">₱</span>
+                                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-text-secondary text-xs">₱</span>
                                             <input
                                                 type="number"
-                                                placeholder="0.00"
+                                                placeholder="Amount"
                                                 value={newDeductionAmount}
                                                 onChange={(e) => setNewDeductionAmount(e.target.value)}
-                                                className="w-full pl-6 pr-2.5 py-1.5 bg-bg-secondary border border-border-color rounded-md text-xs text-text-primary placeholder-text-secondary/40 focus:outline-none focus:ring-1 focus:ring-accent-blue/50 focus:border-accent-blue transition-all"
+                                                className="w-full pl-5 pr-2 py-1 bg-bg-secondary border border-border-color rounded text-xs text-text-primary placeholder-text-secondary/50 focus:outline-none focus:border-accent-blue"
                                                 step="0.01"
                                                 min="0"
                                             />
                                         </div>
-                                        <div className="flex gap-1.5">
+                                        <div className="flex gap-1">
                                             <button
                                                 onClick={handleAddDeduction}
-                                                className="flex-1 px-3 py-1.5 bg-accent-blue text-white rounded-md text-xs font-bold hover:bg-accent-blue/90 transition-all"
+                                                className="flex-1 px-2 py-1 bg-accent-blue text-white rounded text-xs font-medium hover:bg-accent-blue/90"
                                             >
                                                 Add
                                             </button>
@@ -667,7 +661,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                                     setNewDeductionReason('');
                                                     setNewDeductionAmount('');
                                                 }}
-                                                className="px-3 py-1.5 bg-bg-secondary/50 text-text-secondary rounded-md text-xs font-semibold hover:bg-hover-bg transition-all border border-border-color"
+                                                className="px-2 py-1 bg-bg-secondary text-text-secondary rounded text-xs hover:bg-hover-bg border border-border-color"
                                             >
                                                 Cancel
                                             </button>
@@ -675,106 +669,85 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                     </div>
                                 )}
 
-                                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1 custom-scrollbar">
+                                <div className="space-y-1 max-h-40 overflow-y-auto">
                                     {employee.salaryDeductions && employee.salaryDeductions.length > 0 ? (
                                         employee.salaryDeductions.map((deduction, index) => (
                                             <div
                                                 key={deduction.id}
-                                                className="group flex items-center gap-2 p-2 bg-gradient-to-r from-bg-secondary to-bg-secondary/50 rounded-lg border border-border-color hover:border-accent-red/40 transition-all"
+                                                className="group flex items-center justify-between p-1.5 bg-bg-secondary rounded border border-border-color hover:border-accent-red/30"
                                             >
-                                                <div className="flex-shrink-0 w-5 h-5 rounded bg-accent-red/10 flex items-center justify-center text-accent-red font-bold text-[10px]">
-                                                    {index + 1}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-xs font-bold text-text-primary truncate leading-tight">{deduction.reason}</p>
-                                                    <p className="text-[10px] text-text-secondary/60 flex items-center gap-0.5 mt-0.5">
-                                                        <CalendarDaysIcon className="w-2.5 h-2.5" />
-                                                        {new Date(deduction.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                                    </p>
+                                                <div className="flex-1 min-w-0 mr-2">
+                                                    <p className="text-xs text-text-primary truncate">{deduction.description}</p>
                                                 </div>
                                                 <div className="flex items-center gap-1">
-                                                    <span className="text-xs font-bold text-accent-red whitespace-nowrap">
+                                                    <span className="text-xs font-semibold text-accent-red whitespace-nowrap">
                                                         {formatPeso(deduction.amount)}
                                                     </span>
                                                     <button
                                                         onClick={() => handleRemoveDeduction(deduction.id)}
-                                                        className="p-1 rounded text-text-secondary/40 hover:text-white hover:bg-accent-red transition-all opacity-0 group-hover:opacity-100"
+                                                        className="p-0.5 rounded text-text-secondary/40 hover:text-accent-red opacity-0 group-hover:opacity-100"
                                                         title="Remove"
                                                     >
-                                                        <TrashIcon className="w-3 h-3" />
+                                                        <XMarkIcon className="w-3 h-3" />
                                                     </button>
                                                 </div>
                                             </div>
                                         ))
                                     ) : (
-                                        <div className="text-center py-6 px-4">
-                                            <div className="w-12 h-12 rounded-full bg-bg-primary/50 flex items-center justify-center mx-auto mb-2">
-                                                <CreditCardIcon className="w-6 h-6 text-text-secondary/30" />
-                                            </div>
-                                            <p className="text-xs font-medium text-text-secondary/70">No deductions added</p>
-                                            <p className="text-[10px] text-text-secondary/50 mt-0.5">Click "Add" to create</p>
-                                        </div>
+                                        <p className="text-xs text-text-secondary/60 text-center py-2">No deductions</p>
                                     )}
                                 </div>
 
                                 {employee.salaryDeductions && employee.salaryDeductions.length > 0 && (
-                                    <div className="mt-3 p-2.5 bg-gradient-to-r from-accent-red/10 to-accent-red/5 rounded-lg border border-accent-red/20">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wide">Total</span>
-                                            <span className="text-base font-bold text-accent-red">
-                                                {formatPeso(employee.salaryDeductions.reduce((sum, d) => sum + d.amount, 0))}
-                                            </span>
-                                        </div>
+                                    <div className="mt-2 pt-2 border-t border-border-color flex items-center justify-between">
+                                        <span className="text-[10px] font-medium text-text-secondary uppercase">Total</span>
+                                        <span className="text-sm font-bold text-accent-red">
+                                            {formatPeso(employee.salaryDeductions.reduce((sum, d) => sum + d.amount, 0))}
+                                        </span>
                                     </div>
                                 )}
                             </div>
 
-                            <div className="mt-6 pt-6 border-t border-border-color">
-                                <div className="flex items-center justify-between mb-3 px-1">
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-6 h-6 rounded-md bg-accent-green/10 flex items-center justify-center">
-                                            <PlusIcon className="w-3.5 h-3.5 text-accent-green" />
-                                        </div>
-                                        <h4 className="text-xs font-bold text-text-primary uppercase tracking-wide">Additional Income</h4>
-                                    </div>
+                            <div className="mt-4 pt-4 border-t border-border-color">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wide">Additional Income</h4>
                                     {!isAddingIncome && (
                                         <button
                                             onClick={() => setIsAddingIncome(true)}
-                                            className="flex items-center gap-1 px-2 py-1 rounded-md bg-accent-blue/10 hover:bg-accent-blue/20 text-accent-blue transition-all hover:scale-105"
+                                            className="text-accent-blue hover:text-accent-blue/80 transition-colors"
                                             title="Add Income"
                                         >
-                                            <PlusIcon className="w-3 h-3" />
-                                            <span className="text-xs font-semibold">Add</span>
+                                            <PlusIcon className="w-4 h-4" />
                                         </button>
                                     )}
                                 </div>
 
                                 {isAddingIncome && (
-                                    <div className="mb-3 p-3 bg-gradient-to-br from-bg-primary/50 to-bg-primary/30 rounded-lg border border-accent-blue/30 shadow-lg space-y-2 animate-fade-in">
+                                    <div className="mb-2 p-2 bg-bg-primary/30 rounded-lg border border-border-color space-y-1.5">
                                         <input
                                             type="text"
-                                            placeholder="Reason (e.g., Bonus, Allowance)"
+                                            placeholder="Reason"
                                             value={newIncomeReason}
                                             onChange={(e) => setNewIncomeReason(e.target.value)}
-                                            className="w-full px-2.5 py-1.5 bg-bg-secondary border border-border-color rounded-md text-xs text-text-primary placeholder-text-secondary/40 focus:outline-none focus:ring-1 focus:ring-accent-blue/50 focus:border-accent-blue transition-all"
+                                            className="w-full px-2 py-1 bg-bg-secondary border border-border-color rounded text-xs text-text-primary placeholder-text-secondary/50 focus:outline-none focus:border-accent-blue"
                                             autoFocus
                                         />
                                         <div className="relative">
-                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-secondary text-xs">₱</span>
+                                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-text-secondary text-xs">₱</span>
                                             <input
                                                 type="number"
-                                                placeholder="0.00"
+                                                placeholder="Amount"
                                                 value={newIncomeAmount}
                                                 onChange={(e) => setNewIncomeAmount(e.target.value)}
-                                                className="w-full pl-6 pr-2.5 py-1.5 bg-bg-secondary border border-border-color rounded-md text-xs text-text-primary placeholder-text-secondary/40 focus:outline-none focus:ring-1 focus:ring-accent-blue/50 focus:border-accent-blue transition-all"
+                                                className="w-full pl-5 pr-2 py-1 bg-bg-secondary border border-border-color rounded text-xs text-text-primary placeholder-text-secondary/50 focus:outline-none focus:border-accent-blue"
                                                 step="0.01"
                                                 min="0"
                                             />
                                         </div>
-                                        <div className="flex gap-1.5">
+                                        <div className="flex gap-1">
                                             <button
                                                 onClick={handleAddIncome}
-                                                className="flex-1 px-3 py-1.5 bg-accent-blue text-white rounded-md text-xs font-bold hover:bg-accent-blue/90 transition-all"
+                                                className="flex-1 px-2 py-1 bg-accent-blue text-white rounded text-xs font-medium hover:bg-accent-blue/90"
                                             >
                                                 Add
                                             </button>
@@ -784,7 +757,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                                     setNewIncomeReason('');
                                                     setNewIncomeAmount('');
                                                 }}
-                                                className="px-3 py-1.5 bg-bg-secondary/50 text-text-secondary rounded-md text-xs font-semibold hover:bg-hover-bg transition-all border border-border-color"
+                                                className="px-2 py-1 bg-bg-secondary text-text-secondary rounded text-xs hover:bg-hover-bg border border-border-color"
                                             >
                                                 Cancel
                                             </button>
@@ -792,56 +765,41 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                     </div>
                                 )}
 
-                                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1 custom-scrollbar">
+                                <div className="space-y-1 max-h-40 overflow-y-auto">
                                     {employee.additionalIncome && employee.additionalIncome.length > 0 ? (
                                         employee.additionalIncome.map((income, index) => (
                                             <div
                                                 key={income.id}
-                                                className="group flex items-center gap-2 p-2 bg-gradient-to-r from-bg-secondary to-bg-secondary/50 rounded-lg border border-border-color hover:border-accent-green/40 transition-all"
+                                                className="group flex items-center justify-between p-1.5 bg-bg-secondary rounded border border-border-color hover:border-accent-green/30"
                                             >
-                                                <div className="flex-shrink-0 w-5 h-5 rounded bg-accent-green/10 flex items-center justify-center text-accent-green font-bold text-[10px]">
-                                                    {index + 1}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-xs font-bold text-text-primary truncate leading-tight">{income.description}</p>
-                                                    <p className="text-[10px] text-text-secondary/60 flex items-center gap-0.5 mt-0.5">
-                                                        <CalendarDaysIcon className="w-2.5 h-2.5" />
-                                                        {new Date(income.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                                    </p>
+                                                <div className="flex-1 min-w-0 mr-2">
+                                                    <p className="text-xs text-text-primary truncate">{income.description}</p>
                                                 </div>
                                                 <div className="flex items-center gap-1">
-                                                    <span className="text-xs font-bold text-accent-green whitespace-nowrap">
+                                                    <span className="text-xs font-semibold text-accent-green whitespace-nowrap">
                                                         {formatPeso(income.amount)}
                                                     </span>
                                                     <button
                                                         onClick={() => handleRemoveIncome(income.id)}
-                                                        className="p-1 rounded text-text-secondary/40 hover:text-white hover:bg-accent-red transition-all opacity-0 group-hover:opacity-100"
+                                                        className="p-0.5 rounded text-text-secondary/40 hover:text-accent-red opacity-0 group-hover:opacity-100"
                                                         title="Remove"
                                                     >
-                                                        <TrashIcon className="w-3 h-3" />
+                                                        <XMarkIcon className="w-3 h-3" />
                                                     </button>
                                                 </div>
                                             </div>
                                         ))
                                     ) : (
-                                        <div className="text-center py-6 px-4">
-                                            <div className="w-12 h-12 rounded-full bg-bg-primary/50 flex items-center justify-center mx-auto mb-2">
-                                                <PlusIcon className="w-6 h-6 text-text-secondary/30" />
-                                            </div>
-                                            <p className="text-xs font-medium text-text-secondary/70">No additional income added</p>
-                                            <p className="text-[10px] text-text-secondary/50 mt-0.5">Click "Add" to create</p>
-                                        </div>
+                                        <p className="text-xs text-text-secondary/60 text-center py-2">No additional income</p>
                                     )}
                                 </div>
 
                                 {employee.additionalIncome && employee.additionalIncome.length > 0 && (
-                                    <div className="mt-3 p-2.5 bg-gradient-to-r from-accent-green/10 to-accent-green/5 rounded-lg border border-accent-green/20">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wide">Total</span>
-                                            <span className="text-base font-bold text-accent-green">
-                                                {formatPeso(employee.additionalIncome.reduce((sum, i) => sum + i.amount, 0))}
-                                            </span>
-                                        </div>
+                                    <div className="mt-2 pt-2 border-t border-border-color flex items-center justify-between">
+                                        <span className="text-[10px] font-medium text-text-secondary uppercase">Total</span>
+                                        <span className="text-sm font-bold text-accent-green">
+                                            {formatPeso(employee.additionalIncome.reduce((sum, i) => sum + i.amount, 0))}
+                                        </span>
                                     </div>
                                 )}
                             </div>
