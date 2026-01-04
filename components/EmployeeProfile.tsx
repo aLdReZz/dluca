@@ -129,13 +129,18 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
     const [isAddingDeduction, setIsAddingDeduction] = useState(false);
     const [newDeductionReason, setNewDeductionReason] = useState('');
     const [newDeductionAmount, setNewDeductionAmount] = useState('');
+    const [newDeductionDate, setNewDeductionDate] = useState('');
+    const [editingDeductionId, setEditingDeductionId] = useState<string | null>(null);
     const [isAddingIncome, setIsAddingIncome] = useState(false);
     const [newIncomeReason, setNewIncomeReason] = useState('');
     const [newIncomeAmount, setNewIncomeAmount] = useState('');
+    const [newIncomeDate, setNewIncomeDate] = useState('');
+    const [editingIncomeId, setEditingIncomeId] = useState<string | null>(null);
     const [isServiceChargeExpanded, setIsServiceChargeExpanded] = useState(false);
     const [editingSchedule, setEditingSchedule] = useState<string | null>(null);
     const [editingTimeIn, setEditingTimeIn] = useState<string | null>(null);
     const [editingTimeOut, setEditingTimeOut] = useState<string | null>(null);
+    const [editingTimeBoth, setEditingTimeBoth] = useState<string | null>(null);
     const [tempScheduleIn, setTempScheduleIn] = useState('');
     const [tempScheduleOut, setTempScheduleOut] = useState('');
     const [tempTimeIn, setTempTimeIn] = useState('');
@@ -182,7 +187,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             id: Date.now().toString(),
             description: newDeductionReason.trim(),
             amount: amount,
-            date: new Date().toISOString().split('T')[0],
+            date: newDeductionDate || new Date().toISOString().split('T')[0],
         };
 
         onUpdateEmployee({
@@ -192,7 +197,52 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
 
         setNewDeductionReason('');
         setNewDeductionAmount('');
+        setNewDeductionDate('');
         setIsAddingDeduction(false);
+    };
+
+    const handleEditDeduction = (deduction: SalaryDeduction) => {
+        setEditingDeductionId(deduction.id);
+        setNewDeductionReason(deduction.description);
+        setNewDeductionAmount(deduction.amount.toString());
+        setNewDeductionDate(deduction.date);
+        setIsAddingDeduction(false);
+    };
+
+    const handleSaveDeduction = () => {
+        if (!editingDeductionId || !newDeductionReason.trim() || !newDeductionAmount.trim()) return;
+
+        const amount = parseFloat(newDeductionAmount);
+        if (isNaN(amount) || amount <= 0) return;
+
+        const currentDeductions = employee.salaryDeductions || [];
+        const updatedDeductions = currentDeductions.map(d =>
+            d.id === editingDeductionId
+                ? {
+                      ...d,
+                      description: newDeductionReason.trim(),
+                      amount: amount,
+                      date: newDeductionDate || d.date,
+                  }
+                : d
+        );
+
+        onUpdateEmployee({
+            ...employee,
+            salaryDeductions: updatedDeductions,
+        });
+
+        setEditingDeductionId(null);
+        setNewDeductionReason('');
+        setNewDeductionAmount('');
+        setNewDeductionDate('');
+    };
+
+    const handleCancelEditDeduction = () => {
+        setEditingDeductionId(null);
+        setNewDeductionReason('');
+        setNewDeductionAmount('');
+        setNewDeductionDate('');
     };
 
     const handleRemoveDeduction = (deductionId: number) => {
@@ -214,7 +264,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             id: Date.now().toString(),
             description: newIncomeReason.trim(),
             amount: amount,
-            date: new Date().toISOString().split('T')[0],
+            date: newIncomeDate || new Date().toISOString().split('T')[0],
         };
 
         onUpdateEmployee({
@@ -224,7 +274,52 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
 
         setNewIncomeReason('');
         setNewIncomeAmount('');
+        setNewIncomeDate('');
         setIsAddingIncome(false);
+    };
+
+    const handleEditIncome = (income: AdditionalIncome) => {
+        setEditingIncomeId(income.id);
+        setNewIncomeReason(income.description);
+        setNewIncomeAmount(income.amount.toString());
+        setNewIncomeDate(income.date);
+        setIsAddingIncome(false);
+    };
+
+    const handleSaveIncome = () => {
+        if (!editingIncomeId || !newIncomeReason.trim() || !newIncomeAmount.trim()) return;
+
+        const amount = parseFloat(newIncomeAmount);
+        if (isNaN(amount) || amount <= 0) return;
+
+        const currentIncome = employee.additionalIncome || [];
+        const updatedIncome = currentIncome.map(i =>
+            i.id === editingIncomeId
+                ? {
+                      ...i,
+                      description: newIncomeReason.trim(),
+                      amount: amount,
+                      date: newIncomeDate || i.date,
+                  }
+                : i
+        );
+
+        onUpdateEmployee({
+            ...employee,
+            additionalIncome: updatedIncome,
+        });
+
+        setEditingIncomeId(null);
+        setNewIncomeReason('');
+        setNewIncomeAmount('');
+        setNewIncomeDate('');
+    };
+
+    const handleCancelEditIncome = () => {
+        setEditingIncomeId(null);
+        setNewIncomeReason('');
+        setNewIncomeAmount('');
+        setNewIncomeDate('');
     };
 
     const handleRemoveIncome = (incomeId: string) => {
@@ -237,9 +332,15 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
 
     const handleScheduleEdit = (dateKey: string) => {
         const schedule = employee.schedule[dateKey];
-        // Allow editing even if day is OFF - initialize with empty values for OFF days
-        setTempScheduleIn(schedule?.timeIn || '');
-        setTempScheduleOut(schedule?.timeOut || '');
+        // If schedule exists and is marked as OFF, set to 'OFF' to show in dropdown
+        if (schedule?.off) {
+            setTempScheduleIn('OFF');
+            setTempScheduleOut('OFF');
+        } else {
+            // Otherwise, use the actual schedule times
+            setTempScheduleIn(schedule?.timeIn || '');
+            setTempScheduleOut(schedule?.timeOut || '');
+        }
         setEditingSchedule(dateKey);
     };
 
@@ -287,10 +388,14 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         setTempScheduleOut('');
     };
 
-    const handleAttendanceEdit = (dateKey: string, type: 'in' | 'out') => {
+    const handleAttendanceEdit = (dateKey: string, type: 'in' | 'out' | 'both') => {
         const record = attendanceRecords.find(r => r.employee.toLowerCase() === employee.name.toLowerCase() && r.date === dateKey);
 
-        if (type === 'in') {
+        if (type === 'both') {
+            setTempTimeIn(record?.timeIn || '');
+            setTempTimeOut(record?.timeOut || '');
+            setEditingTimeBoth(dateKey);
+        } else if (type === 'in') {
             setTempTimeIn(record?.timeIn || '');
             setEditingTimeIn(dateKey);
         } else {
@@ -299,43 +404,75 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         }
     };
 
-    const handleAttendanceSave = (dateKey: string, type: 'in' | 'out') => {
+    const handleAttendanceSave = (dateKey: string, type: 'in' | 'out' | 'both') => {
         if (!onUpdateAttendance) return;
 
-        const value = type === 'in' ? tempTimeIn : tempTimeOut;
-        if (!value) return;
+        if (type === 'both') {
+            if (!tempTimeIn && !tempTimeOut) return;
 
-        const existingRecord = attendanceRecords.find(r => r.employee.toLowerCase() === employee.name.toLowerCase() && r.date === dateKey);
+            const existingRecord = attendanceRecords.find(r => r.employee.toLowerCase() === employee.name.toLowerCase() && r.date === dateKey);
+            let updatedRecords = [...attendanceRecords];
 
-        let updatedRecords = [...attendanceRecords];
+            if (existingRecord) {
+                updatedRecords = updatedRecords.map(r => {
+                    if (r.employee.toLowerCase() === employee.name.toLowerCase() && r.date === dateKey) {
+                        return {
+                            ...r,
+                            timeIn: tempTimeIn,
+                            timeOut: tempTimeOut
+                        };
+                    }
+                    return r;
+                });
+            } else {
+                updatedRecords.push({
+                    employee: employee.name,
+                    date: dateKey,
+                    timeIn: tempTimeIn,
+                    timeOut: tempTimeOut
+                });
+            }
 
-        if (existingRecord) {
-            updatedRecords = updatedRecords.map(r => {
-                if (r.employee.toLowerCase() === employee.name.toLowerCase() && r.date === dateKey) {
-                    return {
-                        ...r,
-                        [type === 'in' ? 'timeIn' : 'timeOut']: value
-                    };
-                }
-                return r;
-            });
-        } else {
-            updatedRecords.push({
-                employee: employee.name,
-                date: dateKey,
-                timeIn: type === 'in' ? value : '',
-                timeOut: type === 'out' ? value : ''
-            });
-        }
-
-        onUpdateAttendance(updatedRecords);
-
-        if (type === 'in') {
-            setEditingTimeIn(null);
+            onUpdateAttendance(updatedRecords);
+            setEditingTimeBoth(null);
             setTempTimeIn('');
-        } else {
-            setEditingTimeOut(null);
             setTempTimeOut('');
+        } else {
+            const value = type === 'in' ? tempTimeIn : tempTimeOut;
+            if (!value) return;
+
+            const existingRecord = attendanceRecords.find(r => r.employee.toLowerCase() === employee.name.toLowerCase() && r.date === dateKey);
+
+            let updatedRecords = [...attendanceRecords];
+
+            if (existingRecord) {
+                updatedRecords = updatedRecords.map(r => {
+                    if (r.employee.toLowerCase() === employee.name.toLowerCase() && r.date === dateKey) {
+                        return {
+                            ...r,
+                            [type === 'in' ? 'timeIn' : 'timeOut']: value
+                        };
+                    }
+                    return r;
+                });
+            } else {
+                updatedRecords.push({
+                    employee: employee.name,
+                    date: dateKey,
+                    timeIn: type === 'in' ? value : '',
+                    timeOut: type === 'out' ? value : ''
+                });
+            }
+
+            onUpdateAttendance(updatedRecords);
+
+            if (type === 'in') {
+                setEditingTimeIn(null);
+                setTempTimeIn('');
+            } else {
+                setEditingTimeOut(null);
+                setTempTimeOut('');
+            }
         }
     };
 
@@ -727,7 +864,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                             <div className="mt-6 pt-6 border-t border-border-color">
                                 <div className="flex items-center justify-between mb-2">
                                     <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wide">Deductions</h4>
-                                    {!isAddingDeduction && (
+                                    {!isAddingDeduction && !editingDeductionId && (
                                         <button
                                             onClick={() => setIsAddingDeduction(true)}
                                             className="text-accent-blue hover:text-accent-blue/80 transition-colors"
@@ -760,6 +897,13 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                                 min="0"
                                             />
                                         </div>
+                                        <input
+                                            type="date"
+                                            placeholder="Date"
+                                            value={newDeductionDate}
+                                            onChange={(e) => setNewDeductionDate(e.target.value)}
+                                            className="w-full px-2 py-1 bg-bg-secondary border border-border-color rounded text-xs text-text-primary placeholder-text-secondary/50 focus:outline-none focus:border-accent-blue"
+                                        />
                                         <div className="flex gap-1">
                                             <button
                                                 onClick={handleAddDeduction}
@@ -772,7 +916,54 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                                     setIsAddingDeduction(false);
                                                     setNewDeductionReason('');
                                                     setNewDeductionAmount('');
+                                                    setNewDeductionDate('');
                                                 }}
+                                                className="px-2 py-1 bg-bg-secondary text-text-secondary rounded text-xs hover:bg-hover-bg border border-border-color"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {editingDeductionId && (
+                                    <div className="mb-2 p-2 bg-bg-primary/30 rounded-lg border border-border-color space-y-1.5">
+                                        <input
+                                            type="text"
+                                            placeholder="Reason"
+                                            value={newDeductionReason}
+                                            onChange={(e) => setNewDeductionReason(e.target.value)}
+                                            className="w-full px-2 py-1 bg-bg-secondary border border-border-color rounded text-xs text-text-primary placeholder-text-secondary/50 focus:outline-none focus:border-accent-blue"
+                                            autoFocus
+                                        />
+                                        <div className="relative">
+                                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-text-secondary text-xs">₱</span>
+                                            <input
+                                                type="number"
+                                                placeholder="Amount"
+                                                value={newDeductionAmount}
+                                                onChange={(e) => setNewDeductionAmount(e.target.value)}
+                                                className="w-full pl-5 pr-2 py-1 bg-bg-secondary border border-border-color rounded text-xs text-text-primary placeholder-text-secondary/50 focus:outline-none focus:border-accent-blue"
+                                                step="0.01"
+                                                min="0"
+                                            />
+                                        </div>
+                                        <input
+                                            type="date"
+                                            placeholder="Date"
+                                            value={newDeductionDate}
+                                            onChange={(e) => setNewDeductionDate(e.target.value)}
+                                            className="w-full px-2 py-1 bg-bg-secondary border border-border-color rounded text-xs text-text-primary placeholder-text-secondary/50 focus:outline-none focus:border-accent-blue"
+                                        />
+                                        <div className="flex gap-1">
+                                            <button
+                                                onClick={handleSaveDeduction}
+                                                className="flex-1 px-2 py-1 bg-accent-blue text-white rounded text-xs font-medium hover:bg-accent-blue/90"
+                                            >
+                                                Save
+                                            </button>
+                                            <button
+                                                onClick={handleCancelEditDeduction}
                                                 className="px-2 py-1 bg-bg-secondary text-text-secondary rounded text-xs hover:bg-hover-bg border border-border-color"
                                             >
                                                 Cancel
@@ -783,38 +974,50 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
 
                                 <div className="space-y-1 max-h-40 overflow-y-auto">
                                     {employee.salaryDeductions && employee.salaryDeductions.length > 0 ? (
-                                        employee.salaryDeductions.map((deduction, index) => (
-                                            <div
-                                                key={deduction.id}
-                                                className="group flex items-center justify-between p-1.5 bg-bg-secondary rounded border border-border-color hover:border-accent-red/30"
-                                            >
-                                                <div className="flex-1 min-w-0 mr-2">
-                                                    <p className="text-xs text-text-primary truncate">{deduction.description}</p>
+                                        employee.salaryDeductions
+                                            .filter(deduction => {
+                                                if (!deduction.date) return true; // Include items without dates
+                                                return deduction.date >= committedRange.start && deduction.date <= committedRange.end;
+                                            })
+                                            .map((deduction, index) => (
+                                                <div
+                                                    key={deduction.id}
+                                                    className="group flex items-center justify-between p-1.5 bg-bg-secondary rounded border border-border-color hover:border-accent-red/30 cursor-pointer"
+                                                    onClick={() => handleEditDeduction(deduction)}
+                                                >
+                                                    <div className="flex-1 min-w-0 mr-2">
+                                                        <p className="text-xs text-text-primary truncate">{deduction.description}</p>
+                                                        {deduction.date && (
+                                                            <p className="text-[10px] text-text-secondary/60">{formatDateForDisplay(deduction.date)}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-xs font-semibold text-accent-red whitespace-nowrap">
+                                                            {formatPeso(deduction.amount)}
+                                                        </span>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleRemoveDeduction(deduction.id);
+                                                            }}
+                                                            className="p-0.5 rounded text-text-secondary/40 hover:text-accent-red opacity-0 group-hover:opacity-100"
+                                                            title="Remove"
+                                                        >
+                                                            <XMarkIcon className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-1">
-                                                    <span className="text-xs font-semibold text-accent-red whitespace-nowrap">
-                                                        {formatPeso(deduction.amount)}
-                                                    </span>
-                                                    <button
-                                                        onClick={() => handleRemoveDeduction(deduction.id)}
-                                                        className="p-0.5 rounded text-text-secondary/40 hover:text-accent-red opacity-0 group-hover:opacity-100"
-                                                        title="Remove"
-                                                    >
-                                                        <XMarkIcon className="w-3 h-3" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))
+                                            ))
                                     ) : (
                                         <p className="text-xs text-text-secondary/60 text-center py-2">No deductions</p>
                                     )}
                                 </div>
 
-                                {employee.salaryDeductions && employee.salaryDeductions.length > 0 && (
+                                {employee.salaryDeductions && employee.salaryDeductions.filter(d => !d.date || (d.date >= committedRange.start && d.date <= committedRange.end)).length > 0 && (
                                     <div className="mt-2 pt-2 border-t border-border-color flex items-center justify-between">
                                         <span className="text-[10px] font-medium text-text-secondary uppercase">Total</span>
                                         <span className="text-sm font-bold text-accent-red">
-                                            {formatPeso(employee.salaryDeductions.reduce((sum, d) => sum + d.amount, 0))}
+                                            {formatPeso(employee.salaryDeductions.filter(d => !d.date || (d.date >= committedRange.start && d.date <= committedRange.end)).reduce((sum, d) => sum + d.amount, 0))}
                                         </span>
                                     </div>
                                 )}
@@ -823,7 +1026,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                             <div className="mt-4 pt-4 border-t border-border-color">
                                 <div className="flex items-center justify-between mb-2">
                                     <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wide">Additional Income</h4>
-                                    {!isAddingIncome && (
+                                    {!isAddingIncome && !editingIncomeId && (
                                         <button
                                             onClick={() => setIsAddingIncome(true)}
                                             className="text-accent-blue hover:text-accent-blue/80 transition-colors"
@@ -856,6 +1059,13 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                                 min="0"
                                             />
                                         </div>
+                                        <input
+                                            type="date"
+                                            placeholder="Date"
+                                            value={newIncomeDate}
+                                            onChange={(e) => setNewIncomeDate(e.target.value)}
+                                            className="w-full px-2 py-1 bg-bg-secondary border border-border-color rounded text-xs text-text-primary placeholder-text-secondary/50 focus:outline-none focus:border-accent-blue"
+                                        />
                                         <div className="flex gap-1">
                                             <button
                                                 onClick={handleAddIncome}
@@ -868,7 +1078,54 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                                     setIsAddingIncome(false);
                                                     setNewIncomeReason('');
                                                     setNewIncomeAmount('');
+                                                    setNewIncomeDate('');
                                                 }}
+                                                className="px-2 py-1 bg-bg-secondary text-text-secondary rounded text-xs hover:bg-hover-bg border border-border-color"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {editingIncomeId && (
+                                    <div className="mb-2 p-2 bg-bg-primary/30 rounded-lg border border-border-color space-y-1.5">
+                                        <input
+                                            type="text"
+                                            placeholder="Reason"
+                                            value={newIncomeReason}
+                                            onChange={(e) => setNewIncomeReason(e.target.value)}
+                                            className="w-full px-2 py-1 bg-bg-secondary border border-border-color rounded text-xs text-text-primary placeholder-text-secondary/50 focus:outline-none focus:border-accent-blue"
+                                            autoFocus
+                                        />
+                                        <div className="relative">
+                                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-text-secondary text-xs">₱</span>
+                                            <input
+                                                type="number"
+                                                placeholder="Amount"
+                                                value={newIncomeAmount}
+                                                onChange={(e) => setNewIncomeAmount(e.target.value)}
+                                                className="w-full pl-5 pr-2 py-1 bg-bg-secondary border border-border-color rounded text-xs text-text-primary placeholder-text-secondary/50 focus:outline-none focus:border-accent-blue"
+                                                step="0.01"
+                                                min="0"
+                                            />
+                                        </div>
+                                        <input
+                                            type="date"
+                                            placeholder="Date"
+                                            value={newIncomeDate}
+                                            onChange={(e) => setNewIncomeDate(e.target.value)}
+                                            className="w-full px-2 py-1 bg-bg-secondary border border-border-color rounded text-xs text-text-primary placeholder-text-secondary/50 focus:outline-none focus:border-accent-blue"
+                                        />
+                                        <div className="flex gap-1">
+                                            <button
+                                                onClick={handleSaveIncome}
+                                                className="flex-1 px-2 py-1 bg-accent-blue text-white rounded text-xs font-medium hover:bg-accent-blue/90"
+                                            >
+                                                Save
+                                            </button>
+                                            <button
+                                                onClick={handleCancelEditIncome}
                                                 className="px-2 py-1 bg-bg-secondary text-text-secondary rounded text-xs hover:bg-hover-bg border border-border-color"
                                             >
                                                 Cancel
@@ -879,38 +1136,50 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
 
                                 <div className="space-y-1 max-h-40 overflow-y-auto">
                                     {employee.additionalIncome && employee.additionalIncome.length > 0 ? (
-                                        employee.additionalIncome.map((income, index) => (
-                                            <div
-                                                key={income.id}
-                                                className="group flex items-center justify-between p-1.5 bg-bg-secondary rounded border border-border-color hover:border-accent-green/30"
-                                            >
-                                                <div className="flex-1 min-w-0 mr-2">
-                                                    <p className="text-xs text-text-primary truncate">{income.description}</p>
+                                        employee.additionalIncome
+                                            .filter(income => {
+                                                if (!income.date) return true; // Include items without dates
+                                                return income.date >= committedRange.start && income.date <= committedRange.end;
+                                            })
+                                            .map((income, index) => (
+                                                <div
+                                                    key={income.id}
+                                                    className="group flex items-center justify-between p-1.5 bg-bg-secondary rounded border border-border-color hover:border-accent-green/30 cursor-pointer"
+                                                    onClick={() => handleEditIncome(income)}
+                                                >
+                                                    <div className="flex-1 min-w-0 mr-2">
+                                                        <p className="text-xs text-text-primary truncate">{income.description}</p>
+                                                        {income.date && (
+                                                            <p className="text-[10px] text-text-secondary/60">{formatDateForDisplay(income.date)}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-xs font-semibold text-accent-green whitespace-nowrap">
+                                                            {formatPeso(income.amount)}
+                                                        </span>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleRemoveIncome(income.id);
+                                                            }}
+                                                            className="p-0.5 rounded text-text-secondary/40 hover:text-accent-red opacity-0 group-hover:opacity-100"
+                                                            title="Remove"
+                                                        >
+                                                            <XMarkIcon className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-1">
-                                                    <span className="text-xs font-semibold text-accent-green whitespace-nowrap">
-                                                        {formatPeso(income.amount)}
-                                                    </span>
-                                                    <button
-                                                        onClick={() => handleRemoveIncome(income.id)}
-                                                        className="p-0.5 rounded text-text-secondary/40 hover:text-accent-red opacity-0 group-hover:opacity-100"
-                                                        title="Remove"
-                                                    >
-                                                        <XMarkIcon className="w-3 h-3" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))
+                                            ))
                                     ) : (
                                         <p className="text-xs text-text-secondary/60 text-center py-2">No additional income</p>
                                     )}
                                 </div>
 
-                                {employee.additionalIncome && employee.additionalIncome.length > 0 && (
+                                {employee.additionalIncome && employee.additionalIncome.filter(i => !i.date || (i.date >= committedRange.start && i.date <= committedRange.end)).length > 0 && (
                                     <div className="mt-2 pt-2 border-t border-border-color flex items-center justify-between">
                                         <span className="text-[10px] font-medium text-text-secondary uppercase">Total</span>
                                         <span className="text-sm font-bold text-accent-green">
-                                            {formatPeso(employee.additionalIncome.reduce((sum, i) => sum + i.amount, 0))}
+                                            {formatPeso(employee.additionalIncome.filter(i => !i.date || (i.date >= committedRange.start && i.date <= committedRange.end)).reduce((sum, i) => sum + i.amount, 0))}
                                         </span>
                                     </div>
                                 )}
@@ -1053,7 +1322,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                                                                     setTempScheduleOut('OFF');
                                                                                 }
                                                                             }}
-                                                                            className="pl-2 pr-5 py-0.5 bg-bg-primary border border-border-color rounded text-[10px] appearance-none cursor-pointer"
+                                                                            className="pl-2 pr-5 py-0.5 bg-bg-primary border border-border-color rounded text-[9px] appearance-none cursor-pointer w-[72px]"
                                                                         >
                                                                             <option value="">--</option>
                                                                             <option value="OFF">OFF</option>
@@ -1075,7 +1344,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                                                                     setTempScheduleIn('OFF');
                                                                                 }
                                                                             }}
-                                                                            className="pl-2 pr-5 py-0.5 bg-bg-primary border border-border-color rounded text-[10px] appearance-none cursor-pointer"
+                                                                            className="pl-2 pr-5 py-0.5 bg-bg-primary border border-border-color rounded text-[9px] appearance-none cursor-pointer w-[72px]"
                                                                             disabled={tempScheduleIn === 'OFF'}
                                                                         >
                                                                             <option value="">--</option>
@@ -1106,60 +1375,55 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                                         </td>
                                                         <td className="px-2 py-1.5 font-semibold whitespace-nowrap text-center">{log.scheduleDuration > 0 ? formatDuration(log.scheduleDuration) : '--'}</td>
                                                         <td className="px-2 py-1.5 text-text-secondary text-xs whitespace-nowrap text-center">
-                                                            {editingTimeIn === dateKey || editingTimeOut === dateKey ? (
+                                                            {editingTimeBoth === dateKey ? (
                                                                 <div className="flex items-center gap-1 justify-center">
-                                                                    {editingTimeIn === dateKey ? (
-                                                                        <>
-                                                                            <input
-                                                                                type="time"
-                                                                                value={tempTimeIn}
-                                                                                onChange={(e) => setTempTimeIn(e.target.value)}
-                                                                                className="w-20 px-1 py-0.5 bg-bg-primary border border-border-color rounded text-[10px]"
-                                                                                autoFocus
-                                                                            />
-                                                                            <button onClick={() => handleAttendanceSave(dateKey, 'in')} className="text-accent-green hover:text-accent-green/80" title="Save">
-                                                                                <CheckIcon className="w-3 h-3" />
-                                                                            </button>
-                                                                            <button onClick={() => setEditingTimeIn(null)} className="text-accent-red hover:text-accent-red/80" title="Cancel">
-                                                                                <XMarkIcon className="w-3 h-3" />
-                                                                            </button>
-                                                                        </>
-                                                                    ) : (
-                                                                        <>
-                                                                            <input
-                                                                                type="time"
-                                                                                value={tempTimeOut}
-                                                                                onChange={(e) => setTempTimeOut(e.target.value)}
-                                                                                className="w-20 px-1 py-0.5 bg-bg-primary border border-border-color rounded text-[10px]"
-                                                                                autoFocus
-                                                                            />
-                                                                            <button onClick={() => handleAttendanceSave(dateKey, 'out')} className="text-accent-green hover:text-accent-green/80" title="Save">
-                                                                                <CheckIcon className="w-3 h-3" />
-                                                                            </button>
-                                                                            <button onClick={() => setEditingTimeOut(null)} className="text-accent-red hover:text-accent-red/80" title="Cancel">
-                                                                                <XMarkIcon className="w-3 h-3" />
-                                                                            </button>
-                                                                        </>
-                                                                    )}
+                                                                    <input
+                                                                        type="time"
+                                                                        value={tempTimeIn}
+                                                                        onChange={(e) => setTempTimeIn(e.target.value)}
+                                                                        className="w-20 px-1 py-0.5 bg-bg-primary border border-border-color rounded text-[10px]"
+                                                                        autoFocus
+                                                                    />
+                                                                    <span>-</span>
+                                                                    <input
+                                                                        type="time"
+                                                                        value={tempTimeOut}
+                                                                        onChange={(e) => setTempTimeOut(e.target.value)}
+                                                                        className="w-20 px-1 py-0.5 bg-bg-primary border border-border-color rounded text-[10px]"
+                                                                    />
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.preventDefault();
+                                                                            e.stopPropagation();
+                                                                            handleAttendanceSave(dateKey, 'both');
+                                                                        }}
+                                                                        className="text-accent-green hover:text-accent-green/80"
+                                                                        title="Save"
+                                                                    >
+                                                                        <CheckIcon className="w-3 h-3" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.preventDefault();
+                                                                            e.stopPropagation();
+                                                                            setEditingTimeBoth(null);
+                                                                            setTempTimeIn('');
+                                                                            setTempTimeOut('');
+                                                                        }}
+                                                                        className="text-accent-red hover:text-accent-red/80"
+                                                                        title="Cancel"
+                                                                    >
+                                                                        <XMarkIcon className="w-3 h-3" />
+                                                                    </button>
                                                                 </div>
                                                             ) : (
-                                                                <div className="flex items-center gap-1 justify-center">
-                                                                    <button
-                                                                        onClick={() => handleAttendanceEdit(dateKey, 'in')}
-                                                                        className="hover:text-accent-blue transition-colors"
-                                                                        disabled={log.status === 'OFF' || log.status === 'Future'}
-                                                                    >
-                                                                        {log.timeIn}
-                                                                    </button>
-                                                                    <span>-</span>
-                                                                    <button
-                                                                        onClick={() => handleAttendanceEdit(dateKey, 'out')}
-                                                                        className="hover:text-accent-blue transition-colors"
-                                                                        disabled={log.status === 'OFF' || log.status === 'Future'}
-                                                                    >
-                                                                        {log.timeOut}
-                                                                    </button>
-                                                                </div>
+                                                                <button
+                                                                    onClick={() => handleAttendanceEdit(dateKey, 'both')}
+                                                                    className="hover:text-accent-blue transition-colors"
+                                                                    disabled={log.status === 'OFF' || log.status === 'Future'}
+                                                                >
+                                                                    {log.timeIn} - {log.timeOut}
+                                                                </button>
                                                             )}
                                                         </td>
                                                         <td className="px-2 py-1.5 font-semibold whitespace-nowrap text-center">{log.worked > 0 ? formatDuration(log.worked) : '--'}</td>

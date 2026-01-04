@@ -115,6 +115,23 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
     const afterPrintHandlerRef = useRef<(() => void) | null>(null);
     const trimmedDeductionNotes = deductionNotes.trim();
 
+    // Filter additional income and deductions by pay period
+    const filteredAdditionalIncome = useMemo(() => {
+        if (!employee?.additionalIncome) return [];
+        return employee.additionalIncome.filter(income => {
+            if (!income.date) return true; // Include items without dates
+            return income.date >= payPeriod.start && income.date <= payPeriod.end;
+        });
+    }, [employee?.additionalIncome, payPeriod.start, payPeriod.end]);
+
+    const filteredSalaryDeductions = useMemo(() => {
+        if (!employee?.salaryDeductions) return [];
+        return employee.salaryDeductions.filter(deduction => {
+            if (!deduction.date) return true; // Include items without dates
+            return deduction.date >= payPeriod.start && deduction.date <= payPeriod.end;
+        });
+    }, [employee?.salaryDeductions, payPeriod.start, payPeriod.end]);
+
     useEffect(() => {
         document.body.style.overflow = 'hidden';
         return () => {
@@ -132,11 +149,16 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
     }, []);
 
     const { grossPay, netPay } = useMemo(() => {
-        const gross = record.regularPay + record.overtimePay + (record.serviceCharge || 0);
-        const appliedCustomDeduction = Math.max(0, customDeduction);
-        const net = gross - record.deductions.total - appliedCustomDeduction;
+        // Calculate total filtered additional income
+        const totalFilteredAdditionalIncome = filteredAdditionalIncome.reduce((sum, income) => sum + income.amount, 0);
+
+        // Calculate total filtered salary deductions
+        const totalFilteredSalaryDeductions = filteredSalaryDeductions.reduce((sum, deduction) => sum + deduction.amount, 0);
+
+        const gross = record.regularPay + record.overtimePay + (record.serviceCharge || 0) + totalFilteredAdditionalIncome;
+        const net = gross - record.deductions.total - totalFilteredSalaryDeductions;
         return { grossPay: gross, netPay: net };
-    }, [record.regularPay, record.overtimePay, record.serviceCharge, record.deductions.total, customDeduction]);
+    }, [record.regularPay, record.overtimePay, record.serviceCharge, record.deductions.total, filteredAdditionalIncome, filteredSalaryDeductions]);
 
     const handleDeductionToggle = () => setIsDeductionEditorOpen(prev => !prev);
     const handleDeductionNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) =>
@@ -295,7 +317,8 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
         return trimmed.length > 0 ? trimmed : 'N/A';
     };
     const mandatoryDeductionsTotal = record.deductions.total;
-    const combinedDeductions = mandatoryDeductionsTotal + customDeductionValue;
+    const totalFilteredSalaryDeductions = filteredSalaryDeductions.reduce((sum, deduction) => sum + deduction.amount, 0);
+    const combinedDeductions = mandatoryDeductionsTotal + totalFilteredSalaryDeductions;
     const formattedGrossPay = formatPeso(grossPay);
     const formattedNetPay = formatPeso(netPay);
     const formattedMandatoryDeductions = formatPeso(mandatoryDeductionsTotal);
@@ -325,11 +348,11 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
             daysAbsent: record.daysAbsent,
             daysLate: record.daysLate,
             totalHours: record.totalHours,
-            additionalIncomeItems: employee?.additionalIncome?.map(income => ({
+            additionalIncomeItems: filteredAdditionalIncome.map(income => ({
                 description: income.description,
                 amount: income.amount,
             })),
-            salaryDeductionItems: employee?.salaryDeductions?.map(deduction => ({
+            salaryDeductionItems: filteredSalaryDeductions.map(deduction => ({
                 description: deduction.description,
                 amount: deduction.amount,
             })),
@@ -731,116 +754,49 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                         }
                                         isBold
                                     />
-                                    <div className="mt-3 rounded-lg border border-dashed border-border-color/70 bg-bg-tertiary/40 p-3">
-                                        <div className="flex justify-between items-center">
-                                            <div>
-                                                <p className="text-sm font-semibold text-text-primary">Daily Allocation Details</p>
-                                                <p className="text-[11px] text-text-secondary">
-                                                    Paid hrs � adjusted team hrs � (service pool � 60%). The other 40% is split equally between 2 ghost employees (12h each).
-                                                </p>
-                                            </div>
-                                            <span className="text-sm font-semibold">{formattedServiceChargeTotal}</span>
-                                        </div>
-                                        {serviceChargeDetails.length > 0 ? (
-                                            <div className="mt-2 space-y-1 text-xs text-text-secondary">
-                                                <div className="grid grid-cols-7 gap-2 font-semibold text-[11px] uppercase tracking-wide text-text-secondary/70">
-                                                    <span>Date</span>
-                                                    <span className="text-right">Paid</span>
-                                                    <span className="text-right">Ghost</span>
-                                                    <span className="text-right">Attendance</span>
-                                                    <span className="text-right">Pool</span>
-                                                    <span className="text-right">Ghost Share</span>
-                                                    <span className="text-right">Share</span>
+
+                                    {(filteredAdditionalIncome.length > 0 || filteredSalaryDeductions.length > 0) && (
+                                        <div className="mt-3 rounded-lg border border-border-color bg-bg-tertiary/40 p-3">
+                                            {filteredAdditionalIncome.length > 0 && (
+                                                <div>
+                                                    <h4 className="text-sm font-semibold text-text-primary mb-2">Additional Income</h4>
+                                                    <div className="space-y-1">
+                                                        {filteredAdditionalIncome.map(income => (
+                                                            <div key={income.id} className="flex justify-between text-xs">
+                                                                <span className="text-text-secondary">{income.description}</span>
+                                                                <span className="text-text-primary font-medium">{formatPeso(income.amount)}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-border-color">
+                                                        <span className="text-text-primary">Total</span>
+                                                        <span className="text-text-primary">{formatPeso(filteredAdditionalIncome.reduce((sum, i) => sum + i.amount, 0))}</span>
+                                                    </div>
                                                 </div>
-                                                {serviceChargeDetails.map(detail => {
-                                                    const ghostMinutes = detail.ghostMinutes ?? 0;
-                                                    const attendanceMinutes =
-                                                        detail.attendanceMinutes ??
-                                                        Math.max(0, detail.totalMinutes - ghostMinutes);
-                                                    const ghostShareEach =
-                                                        detail.ghostSharePerGhost ??
-                                                        (detail.ghostShareTotal && detail.ghostCount
-                                                            ? detail.ghostShareTotal / detail.ghostCount
-                                                            : detail.ghostShareTotal ?? detail.deductionAmount ?? 0);
-                                                    return (
-                                                        <div key={`${detail.dateKey}-${detail.share}`} className="grid grid-cols-7 gap-2">
-                                                            <span>{formatDateForDisplay(detail.dateKey)}</span>
-                                                            <span className="text-right">{formatHours(detail.employeeMinutes)}</span>
-                                                            <span className="text-right">{formatHours(ghostMinutes)}</span>
-                                                            <span className="text-right">{formatHours(attendanceMinutes)}</span>
-                                                            <span className="text-right">{formatPeso(detail.pool)}</span>
-                                                            <span className="text-right">{formatPeso(ghostShareEach)}</span>
-                                                            <span className="text-right text-accent-green font-semibold">{formatPeso(detail.share)}</span>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        ) : (
-                                            <p className="mt-2 text-xs text-text-secondary">No service charge earned during this period.</p>
-                                        )}
-                                    </div>
-                                    {isCustomDeductionEditorOpen ? (
-                                        <DetailRow
-                                            label="Custom Deduction"
-                                            value={formatPeso(customDeductionValue)}
-                                            isInput
-                                            name="customDeduction"
-                                            inputValue={customDeduction}
-                                            onChange={handleCustomDeductionChange}
-                                            inputDisplayValue={formatPeso(customDeductionValue)}
-                                        />
-                                    ) : (
-                                        <DetailRow label="Custom Deduction" value={formatPeso(customDeductionValue)} />
+                                            )}
+
+                                            {filteredSalaryDeductions.length > 0 && (
+                                                <div className={filteredAdditionalIncome.length > 0 ? 'mt-4 pt-4 border-t border-border-color' : ''}>
+                                                    <h4 className="text-sm font-semibold text-text-primary mb-2">Salary Deductions</h4>
+                                                    <div className="space-y-1">
+                                                        {filteredSalaryDeductions.map(deduction => (
+                                                            <div key={deduction.id} className="flex justify-between text-xs">
+                                                                <span className="text-text-secondary">{deduction.description}</span>
+                                                                <span className="text-text-primary font-medium">{formatPeso(deduction.amount)}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-border-color">
+                                                        <span className="text-text-primary">Total</span>
+                                                        <span className="text-text-primary">{formatPeso(filteredSalaryDeductions.reduce((sum, d) => sum + d.amount, 0))}</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
                                     <div className="border-t border-border-color mt-2 pt-2">
                                         <DetailRow label="Gross Pay" value={formattedGrossPay} isBold />
                                     </div>
-                                    <div className="mt-3 flex flex-col gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={handleCustomDeductionToggle}
-                                            className="inline-flex items-center gap-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
-                                            aria-expanded={isCustomDeductionEditorOpen}
-                                        >
-                                            <InformationCircleIcon className="w-4 h-4" />
-                                            {customDeductionValue > 0 ? 'Edit deduction amount' : 'Add deduction amount'}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={handleDeductionToggle}
-                                            className="inline-flex items-center gap-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
-                                            aria-expanded={isDeductionEditorOpen}
-                                        >
-                                            <InformationCircleIcon className="w-4 h-4" />
-                                            {trimmedDeductionNotes ? 'Edit deduction details' : 'Add deduction details'}
-                                        </button>
-                                    </div>
-                                    {shouldShowCustomDeduction && !isCustomDeductionEditorOpen && customDeductionValue > 0 && (
-                                        <p className="mt-1 text-xs text-text-secondary">
-                                            Deducting {formatPeso(customDeductionValue)} from net pay.
-                                        </p>
-                                    )}
-                                    {shouldShowDeductionNotes && (
-                                        <div className="mt-3 space-y-2">
-                                            <label htmlFor="deduction-notes" className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                                                Deduction Notes
-                                            </label>
-                                            {isDeductionEditorOpen ? (
-                                                <textarea
-                                                    id="deduction-notes"
-                                                    value={deductionNotes}
-                                                    onChange={handleDeductionNotesChange}
-                                                    rows={4}
-                                                    className="w-full rounded-lg border border-border-color bg-bg-primary px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
-                                                    placeholder="Provide details about salary deductions (e.g., cash advance, penalties, allowances)."
-                                                />
-                                            ) : (
-                                                <p className="rounded-lg border border-border-color bg-bg-tertiary px-3 py-2 text-sm text-text-secondary whitespace-pre-wrap">
-                                                    {trimmedDeductionNotes}
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
                                 </div>
 
                                 <div className="mt-6 bg-bg-tertiary p-4 rounded-xl">

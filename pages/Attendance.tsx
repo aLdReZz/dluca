@@ -294,6 +294,16 @@ const Attendance: React.FC<AttendanceProps> = ({
     }, [isModalOpen, viewedEmployee, editingScheduleContext, editingAttendanceContext]);
 
     useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && isModalOpen) {
+                setIsModalOpen(false);
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isModalOpen]);
+
+    useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
                 setIsDatePickerOpen(false);
@@ -618,8 +628,17 @@ const Attendance: React.FC<AttendanceProps> = ({
         }
     };
 
-    const deleteEmployee = (employeeId: number) => {
-        setEmployees(employees.filter(emp => emp.id !== employeeId));
+    const deleteEmployee = async (employeeId: number) => {
+        try {
+            // Delete from Firebase
+            await employeesService.delete(String(employeeId));
+            // Update local state
+            setEmployees(employees.filter(emp => emp.id !== employeeId));
+            setOperationStatus({ type: 'success', message: 'Employee deleted successfully!' });
+        } catch (error) {
+            console.error('Error deleting employee:', error);
+            setOperationStatus({ type: 'error', message: 'Failed to delete employee. Please try again.' });
+        }
     };
     
     const handleSaveSchedules = async () => {
@@ -1035,10 +1054,20 @@ const Attendance: React.FC<AttendanceProps> = ({
         return null;
     }
 
-    const handleUpdateEmployee = (updatedEmployee: Employee) => {
+    const handleUpdateEmployee = async (updatedEmployee: Employee) => {
+        // Update local state immediately for instant UI feedback
         setEmployees(prev => prev.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp));
         if (viewedEmployee && viewedEmployee.id === updatedEmployee.id) {
             setViewedEmployee(updatedEmployee);
+        }
+
+        // Save to Firebase in the background
+        try {
+            await employeesService.update(String(updatedEmployee.id), updatedEmployee);
+            console.log('✅ Employee updated in Firebase:', updatedEmployee.name);
+        } catch (error) {
+            console.error('❌ Error updating employee in Firebase:', error);
+            alert('Warning: Changes were made locally but may not have been saved to Firebase. Please try again.');
         }
     };
 
@@ -1517,7 +1546,7 @@ const Attendance: React.FC<AttendanceProps> = ({
 
 
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-[60]">
                     <div className="bg-bg-secondary p-8 rounded-xl max-w-lg w-11/12 border border-border-color shadow-2xl">
                         <h2 className="text-2xl font-semibold mb-6">{modalType === 'add' ? 'Add New Employee' : 'Edit Employee'}</h2>
                         <div className="space-y-4">
@@ -1566,9 +1595,9 @@ const Attendance: React.FC<AttendanceProps> = ({
                              <div>
                                 {modalType === 'edit' && selectedEmployee && (
                                     <button 
-                                        onClick={() => {
+                                        onClick={async () => {
                                             if (window.confirm('Are you sure you want to delete this employee? This action cannot be undone.')) {
-                                                deleteEmployee(selectedEmployee.id);
+                                                await deleteEmployee(selectedEmployee.id);
                                                 setIsModalOpen(false);
                                             }
                                         }}
@@ -1598,7 +1627,6 @@ const Attendance: React.FC<AttendanceProps> = ({
                     onClose={() => setViewedEmployee(null)}
                     onEdit={() => {
                         openEditModal(viewedEmployee);
-                        setViewedEmployee(null);
                     }}
                     onDelete={() => {
                         if (window.confirm('Are you sure you want to delete this employee? This action cannot be undone.')) {
