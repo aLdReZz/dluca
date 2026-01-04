@@ -822,7 +822,7 @@ const Transactions: React.FC = () => {
     }
 
     return (
-        <div className="h-full flex flex-col overflow-hidden">
+        <div className="h-full flex flex-col overflow-auto">
             {/* Status Messages */}
             {operationStatus && (
                 <div className={`mx-4 lg:mx-6 mt-4 lg:mt-6 p-4 rounded-lg ${
@@ -833,7 +833,7 @@ const Transactions: React.FC = () => {
             )}
 
             {/* Bank Account Balance Cards */}
-            <div className="flex-shrink-0 px-4 lg:px-6 pt-4 lg:pt-6 pb-3">
+            <div className="px-4 lg:px-6 pt-4 lg:pt-6 pb-3">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
                     <h2 className="text-lg font-semibold text-text-primary truncate">
                         {selectedBank ? `${selectedBank} Transactions` : 'All Bank Accounts'}
@@ -874,7 +874,7 @@ const Transactions: React.FC = () => {
             </div>
 
             {/* Add Transaction Button & Batch Actions */}
-            <div className="flex-shrink-0 px-4 lg:px-6 pb-3 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+            <div className="px-4 lg:px-6 pb-3 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
                 {/* Batch Actions */}
                 {selectedTransactions.size > 0 && (
                     <div className="flex items-center gap-3 p-3 bg-accent-blue/10 border border-accent-blue/30 rounded-lg">
@@ -916,7 +916,7 @@ const Transactions: React.FC = () => {
             </div>
 
             {/* Transactions List */}
-            <div className="flex-1 min-h-0 overflow-hidden px-4 lg:px-6 pb-4">
+            <div className="px-4 lg:px-6 pb-4">
                 {transactionsWithBalance.length === 0 && !isAddingNew ? (
                     <div className="bg-bg-secondary rounded-xl border border-border-color p-8 lg:p-12 text-center">
                         <p className="text-text-secondary">No transactions yet. Click "Add Transaction" to get started.</p>
@@ -924,8 +924,8 @@ const Transactions: React.FC = () => {
                 ) : (
                     <>
                         {/* Desktop Table */}
-                        <div className="hidden lg:block bg-bg-secondary rounded-xl border border-border-color overflow-hidden h-full flex flex-col">
-                            <div className="flex-1 min-h-0 overflow-auto">
+                        <div className="hidden lg:block bg-bg-secondary rounded-xl border border-border-color overflow-hidden">
+                            <div className="overflow-auto">
                                 <table className="w-full" style={{ tableLayout: 'fixed' }}>
                                     <thead className="bg-bg-tertiary sticky top-0 z-10">
                                         <tr>

@@ -41,6 +41,7 @@ const TABLE_BORDER = { r: 195, g: 197, b: 201 };
 
 const LOGO_PATHS = ['/dlc-sublogo.png', '/favicon.png'];
 const HEADER_FONT = 'helvetica';
+const BODY_FONT = 'helvetica'; // Apple-like font (Helvetica is similar to San Francisco)
 
 const formatMoney = (value: number) =>
     (Number.isFinite(value) ? value : 0).toLocaleString('en-US', {
@@ -71,12 +72,12 @@ const drawInfoColumn = (
         const label = String(row.label || '');
         const value = String(row.value || 'N/A');
 
-        doc.setFont('helvetica', 'bold');
+        doc.setFont(BODY_FONT, 'bold');
         doc.setFontSize(11);
         doc.text(label, startX, y);
         doc.text(':', colonX, y);
 
-        doc.setFont('helvetica', 'normal');
+        doc.setFont(BODY_FONT, 'normal');
         doc.text(value, valueX, y, { maxWidth: maxValueWidth });
     });
 };
@@ -239,7 +240,7 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
     setTextColor(doc, TEXT_COLOR);
 
     cursorY += logoHeight + 40;
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(BODY_FONT, 'bold');
     doc.setFontSize(30);
     doc.text('EMPLOYEE PAYSLIP', pageWidth / 2, cursorY, { align: 'center' });
 
@@ -262,45 +263,163 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
     drawInfoColumn(doc, rightRows, MARGIN + columnWidth + columnGap, cursorY, columnWidth);
     cursorY += 90;
 
+    // Summary section - minimalist design
+    const summaryBoxHeight = 70;
+    const summaryBoxWidth = pageWidth - MARGIN * 2;
+
+    // Simple header bar
+    const headerHeight = 24;
+    doc.setFillColor(TABLE_HEADER_FILL.r, TABLE_HEADER_FILL.g, TABLE_HEADER_FILL.b);
+    doc.rect(MARGIN, cursorY, summaryBoxWidth, headerHeight, 'F');
+    doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
+    doc.setLineWidth(0.5);
+    doc.rect(MARGIN, cursorY, summaryBoxWidth, headerHeight, 'S');
+
+    doc.setFont(BODY_FONT, 'bold');
+    doc.setFontSize(11);
+    setTextColor(doc, TEXT_COLOR);
+    doc.text('SUMMARY', MARGIN + 12, cursorY + 16);
+
+    // Stats row
+    const statsY = cursorY + headerHeight;
+    const statsHeight = summaryBoxHeight - headerHeight;
+
+    doc.setFillColor(TABLE_ROW_FILL.r, TABLE_ROW_FILL.g, TABLE_ROW_FILL.b);
+    doc.rect(MARGIN, statsY, summaryBoxWidth, statsHeight, 'F');
+    doc.rect(MARGIN, statsY, summaryBoxWidth, statsHeight, 'S');
+
+    // Four columns for stats
+    const colWidth = summaryBoxWidth / 4;
+    const summaryStats = [
+        { label: 'Present', value: String(data.daysPresent) },
+        { label: 'Absent', value: String(data.daysAbsent) },
+        { label: 'Late', value: String(data.daysLate) },
+        { label: 'Total Hours', value: data.totalHours.toFixed(2) + ' hrs' }
+    ];
+
+    summaryStats.forEach((stat, index) => {
+        const colX = MARGIN + (index * colWidth);
+        const centerX = colX + colWidth / 2;
+
+        // Draw vertical separator lines between columns
+        if (index > 0) {
+            doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
+            doc.setLineWidth(0.5);
+            doc.line(colX, statsY, colX, statsY + statsHeight);
+        }
+
+        // Label
+        doc.setFont(BODY_FONT, 'normal');
+        doc.setFontSize(9);
+        setTextColor(doc, SUBTEXT_COLOR);
+        doc.text(stat.label, centerX, statsY + 18, { align: 'center' });
+
+        // Value
+        doc.setFont(BODY_FONT, 'bold');
+        doc.setFontSize(14);
+        setTextColor(doc, EMPHASIS_TEXT);
+        doc.text(stat.value, centerX, statsY + 36, { align: 'center' });
+    });
+
+    cursorY += summaryBoxHeight + 20;
+
     // Combine earnings with individual additional income items
     let finalEarnings = [...data.earnings];
     if (data.additionalIncomeItems && data.additionalIncomeItems.length > 0) {
-        // Remove the aggregated "Additional Income" row if it exists
         finalEarnings = finalEarnings.filter(row => row.description !== 'Additional Income');
-        // Add individual additional income items
         finalEarnings.push(...data.additionalIncomeItems);
     }
-
-    cursorY = drawTable({
-        doc,
-        title: 'EARNINGS',
-        rows: finalEarnings,
-        totalLabel: 'Total Earnings',
-        totalValue: data.totalEarnings,
-        startY: cursorY,
-        pageWidth,
-    });
 
     // Combine deductions with individual salary deduction items
     let finalDeductions = [...data.deductions];
     if (data.salaryDeductionItems && data.salaryDeductionItems.length > 0) {
-        // Remove the aggregated "Custom Deduction" row if it exists
         finalDeductions = finalDeductions.filter(row => row.description !== 'Custom Deduction');
-        // Add individual salary deduction items
         finalDeductions.push(...data.salaryDeductionItems);
     }
 
-    cursorY = drawTable({
-        doc,
-        title: 'Deductions',
-        rows: finalDeductions,
-        totalLabel: 'Total Deductions',
-        totalValue: data.totalDeductions,
-        startY: cursorY + 10,
-        pageWidth,
-    });
+    // Draw earnings and deductions side by side
+    const containerWidth = pageWidth - MARGIN * 2;
+    const earningsColumnGap = 20;
+    const earningsColumnWidth = (containerWidth - earningsColumnGap) / 2;
 
-    cursorY += 20;
+    // Header row
+    const earningsHeaderHeight = 24;
+    doc.setFillColor(TABLE_HEADER_FILL.r, TABLE_HEADER_FILL.g, TABLE_HEADER_FILL.b);
+    doc.rect(MARGIN, cursorY, earningsColumnWidth, earningsHeaderHeight, 'F');
+    doc.rect(MARGIN + earningsColumnWidth + earningsColumnGap, cursorY, earningsColumnWidth, earningsHeaderHeight, 'F');
+    doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
+    doc.setLineWidth(0.5);
+    doc.rect(MARGIN, cursorY, earningsColumnWidth, earningsHeaderHeight, 'S');
+    doc.rect(MARGIN + earningsColumnWidth + earningsColumnGap, cursorY, earningsColumnWidth, earningsHeaderHeight, 'S');
+
+    doc.setFont(BODY_FONT, 'bold');
+    doc.setFontSize(11);
+    setTextColor(doc, TEXT_COLOR);
+    doc.text('EARNINGS', MARGIN + 12, cursorY + 16);
+    doc.text('DEDUCTIONS', MARGIN + earningsColumnWidth + earningsColumnGap + 12, cursorY + 16);
+
+    cursorY += earningsHeaderHeight;
+
+    // Content rows
+    const maxRows = Math.max(finalEarnings.length, finalDeductions.length);
+    const safeEarnings = finalEarnings.length > 0 ? finalEarnings : [{ description: 'No entries recorded', amount: 0 }];
+    const safeDeductions = finalDeductions.length > 0 ? finalDeductions : [{ description: 'No entries recorded', amount: 0 }];
+    const rowHeight = 20;
+
+    const actualMaxRows = Math.max(safeEarnings.length, safeDeductions.length);
+
+    for (let i = 0; i < actualMaxRows; i++) {
+        const isEven = i % 2 === 0;
+        const fillColor = isEven ? TABLE_ROW_FILL : TABLE_ALT_ROW_FILL;
+
+        // Earnings row
+        const earningRow = safeEarnings[i];
+        if (earningRow) {
+            doc.setFillColor(fillColor.r, fillColor.g, fillColor.b);
+            doc.rect(MARGIN, cursorY, earningsColumnWidth, rowHeight, 'F');
+            doc.rect(MARGIN, cursorY, earningsColumnWidth, rowHeight, 'S');
+
+            doc.setFont(BODY_FONT, 'normal');
+            doc.setFontSize(10);
+            setTextColor(doc, TEXT_COLOR);
+            doc.text(String(earningRow.description || 'N/A'), MARGIN + 12, cursorY + rowHeight - 7, { maxWidth: earningsColumnWidth * 0.6 });
+            doc.text(formatMoney(earningRow.amount), MARGIN + earningsColumnWidth - 12, cursorY + rowHeight - 7, { align: 'right' });
+        }
+
+        // Deductions row
+        const deductionRow = safeDeductions[i];
+        if (deductionRow) {
+            doc.setFillColor(fillColor.r, fillColor.g, fillColor.b);
+            doc.rect(MARGIN + earningsColumnWidth + earningsColumnGap, cursorY, earningsColumnWidth, rowHeight, 'F');
+            doc.rect(MARGIN + earningsColumnWidth + earningsColumnGap, cursorY, earningsColumnWidth, rowHeight, 'S');
+
+            doc.setFont(BODY_FONT, 'normal');
+            doc.setFontSize(10);
+            setTextColor(doc, TEXT_COLOR);
+            doc.text(String(deductionRow.description || 'N/A'), MARGIN + earningsColumnWidth + earningsColumnGap + 12, cursorY + rowHeight - 7, { maxWidth: earningsColumnWidth * 0.6 });
+            doc.text(formatMoney(deductionRow.amount), MARGIN + earningsColumnWidth + earningsColumnGap + earningsColumnWidth - 12, cursorY + rowHeight - 7, { align: 'right' });
+        }
+
+        cursorY += rowHeight;
+    }
+
+    // Total rows
+    doc.setFont(BODY_FONT, 'bold');
+    doc.setFontSize(10);
+    setTextColor(doc, EMPHASIS_TEXT);
+    doc.setFillColor(TABLE_TOTAL_FILL.r, TABLE_TOTAL_FILL.g, TABLE_TOTAL_FILL.b);
+
+    doc.rect(MARGIN, cursorY, earningsColumnWidth, rowHeight, 'F');
+    doc.rect(MARGIN, cursorY, earningsColumnWidth, rowHeight, 'S');
+    doc.text('TOTAL EARNINGS', MARGIN + 12, cursorY + rowHeight - 7);
+    doc.text(formatMoney(data.totalEarnings), MARGIN + earningsColumnWidth - 12, cursorY + rowHeight - 7, { align: 'right' });
+
+    doc.rect(MARGIN + earningsColumnWidth + earningsColumnGap, cursorY, earningsColumnWidth, rowHeight, 'F');
+    doc.rect(MARGIN + earningsColumnWidth + earningsColumnGap, cursorY, earningsColumnWidth, rowHeight, 'S');
+    doc.text('TOTAL DEDUCTIONS', MARGIN + earningsColumnWidth + earningsColumnGap + 12, cursorY + rowHeight - 7);
+    doc.text(formatMoney(data.totalDeductions), MARGIN + earningsColumnWidth + earningsColumnGap + earningsColumnWidth - 12, cursorY + rowHeight - 7, { align: 'right' });
+
+    cursorY += rowHeight + 20;
 
     // Net Salary Box - matching table style
     const tableWidth = pageWidth - MARGIN * 2;
@@ -312,7 +431,7 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
     doc.setLineWidth(1);
     doc.rect(MARGIN, cursorY, tableWidth, netSalaryHeight, 'S');
 
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(BODY_FONT, 'bold');
     doc.setFontSize(16);
     setTextColor(doc, TEXT_COLOR);
     doc.text('NET SALARY', MARGIN + 12, cursorY + netSalaryHeight - 11);
@@ -323,7 +442,7 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
     cursorY += netSalaryHeight + 40;
 
     // Bottom note
-    doc.setFont('helvetica', 'italic');
+    doc.setFont(BODY_FONT, 'italic');
     doc.setFontSize(9);
     setTextColor(doc, SUBTEXT_COLOR);
     const noteText = 'This is a computer-generated payslip and does not require a signature.';

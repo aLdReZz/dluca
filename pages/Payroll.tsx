@@ -396,6 +396,11 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
                 earnings.push({ description: 'Service Charge', amount: record.serviceCharge });
             }
 
+            // Add aggregated Additional Income (will be replaced with individual items by PDF generator)
+            if (record.additionalIncome && record.additionalIncome > 0) {
+                earnings.push({ description: 'Additional Income', amount: record.additionalIncome });
+            }
+
             const deductions: { description: string; amount: number }[] = [];
             if (record.deductions.sss > 0) {
                 deductions.push({ description: 'SSS Contribution', amount: record.deductions.sss });
@@ -407,13 +412,41 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
                 deductions.push({ description: 'Pag-IBIG Contribution', amount: record.deductions.pagibig });
             }
 
-            // Add salary deductions with their actual descriptions
-            const employee = employees.find(e => e.id === record.id);
-            if (employee?.salaryDeductions && employee.salaryDeductions.length > 0) {
-                employee.salaryDeductions.forEach(deduction => {
-                    deductions.push({ description: deduction.description, amount: deduction.amount });
-                });
+            // Add aggregated Custom Deduction (will be replaced with individual items by PDF generator)
+            if (record.customDeduction && record.customDeduction > 0) {
+                deductions.push({ description: 'Custom Deduction', amount: record.customDeduction });
             }
+
+            // Get employee data for individual items
+            // Match by name since employee.id from Firebase is a string but record.id is typed as number
+            const employee = employees.find(e => e.name === record.employee);
+
+            // Filter additional income and deductions by pay period
+            const filteredAdditionalIncome = employee?.additionalIncome?.filter(income => {
+                if (!income.date) return true; // Include items without dates
+                return income.date >= payPeriod.start && income.date <= payPeriod.end;
+            }) || [];
+
+            const filteredSalaryDeductions = employee?.salaryDeductions?.filter(deduction => {
+                if (!deduction.date) return true; // Include items without dates
+                return deduction.date >= payPeriod.start && deduction.date <= payPeriod.end;
+            }) || [];
+
+            console.log('Export All PDFs - Employee:', {
+                name: record.employee,
+                recordId: record.id,
+                hasEmployee: !!employee,
+                employeeFound: employee?.name,
+                employeeId: employee?.id,
+                hasAdditionalIncome: !!employee?.additionalIncome,
+                additionalIncomeCount: employee?.additionalIncome?.length || 0,
+                filteredAdditionalIncomeCount: filteredAdditionalIncome.length,
+                additionalIncomeItems: filteredAdditionalIncome,
+                hasSalaryDeductions: !!employee?.salaryDeductions,
+                salaryDeductionsCount: employee?.salaryDeductions?.length || 0,
+                filteredSalaryDeductionsCount: filteredSalaryDeductions.length,
+                salaryDeductionItems: filteredSalaryDeductions,
+            });
 
             return {
                 companyName: "D'Luca Bistro X Cafe",
@@ -434,6 +467,14 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
                 daysAbsent: record.daysAbsent,
                 daysLate: record.daysLate,
                 totalHours: record.totalHours,
+                additionalIncomeItems: filteredAdditionalIncome.map(income => ({
+                    description: income.date ? `${income.description} (${formatDateForDisplay(income.date)})` : income.description,
+                    amount: income.amount,
+                })),
+                salaryDeductionItems: filteredSalaryDeductions.map(deduction => ({
+                    description: deduction.date ? `${deduction.description} (${formatDateForDisplay(deduction.date)})` : deduction.description,
+                    amount: deduction.amount,
+                })),
             };
         });
 

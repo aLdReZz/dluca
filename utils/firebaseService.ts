@@ -858,7 +858,7 @@ export async function syncDataToFirestore(appData: {
 // ==================== DASHBOARD PREFERENCES ====================
 
 export interface DashboardPreference {
-    filter: 'daily' | 'weekly' | 'monthly' | 'lastMonth' | 'yearlyByMonth' | 'custom';
+    filter: 'daily' | 'weekly' | 'monthly' | 'lastMonth' | 'yearlyByMonth' | 'yearlyByWeek' | 'custom';
     startDate: string;
     endDate: string;
     updatedAt?: Date;
