@@ -113,9 +113,9 @@ const drawTable = ({
 
     const headerHeight = 26;
     doc.setFillColor(TABLE_HEADER_FILL.r, TABLE_HEADER_FILL.g, TABLE_HEADER_FILL.b);
-    doc.rect(MARGIN, y, tableWidth, headerHeight, 'F');
     doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
-    doc.rect(MARGIN, y, tableWidth, headerHeight, 'S');
+    doc.setLineWidth(0.5);
+    doc.rect(MARGIN, y, tableWidth, headerHeight, 'FD');
 
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
@@ -134,8 +134,9 @@ const drawTable = ({
         const isEven = index % 2 === 0;
         const fillColor = isEven ? TABLE_ROW_FILL : TABLE_ALT_ROW_FILL;
         doc.setFillColor(fillColor.r, fillColor.g, fillColor.b);
-        doc.rect(MARGIN, y, tableWidth, rowHeight, 'F');
-        doc.rect(MARGIN, y, tableWidth, rowHeight, 'S');
+        doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
+        doc.setLineWidth(0.5);
+        doc.rect(MARGIN, y, tableWidth, rowHeight, 'FD');
 
         // Ensure description is a valid string
         const description = String(row.description || 'N/A');
@@ -151,8 +152,9 @@ const drawTable = ({
     doc.setFont('helvetica', 'bold');
     setTextColor(doc, EMPHASIS_TEXT);
     doc.setFillColor(TABLE_TOTAL_FILL.r, TABLE_TOTAL_FILL.g, TABLE_TOTAL_FILL.b);
-    doc.rect(MARGIN, y, tableWidth, rowHeight, 'F');
-    doc.rect(MARGIN, y, tableWidth, rowHeight, 'S');
+    doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
+    doc.setLineWidth(0.5);
+    doc.rect(MARGIN, y, tableWidth, rowHeight, 'FD');
     doc.text(totalLabel.toUpperCase(), MARGIN + 12, y + rowHeight - 7);
     doc.text(formatMoney(totalValue), MARGIN + tableWidth - 12, y + rowHeight - 7, {
         align: 'right',
@@ -272,10 +274,9 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
     // Simple header bar
     const headerHeight = 24;
     doc.setFillColor(TABLE_HEADER_FILL.r, TABLE_HEADER_FILL.g, TABLE_HEADER_FILL.b);
-    doc.rect(MARGIN, cursorY, summaryBoxWidth, headerHeight, 'F');
     doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
     doc.setLineWidth(0.5);
-    doc.rect(MARGIN, cursorY, summaryBoxWidth, headerHeight, 'S');
+    doc.rect(MARGIN, cursorY, summaryBoxWidth, headerHeight, 'FD');
 
     doc.setFont(BODY_FONT, 'bold');
     doc.setFontSize(11);
@@ -287,8 +288,9 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
     const statsHeight = summaryBoxHeight - headerHeight;
 
     doc.setFillColor(TABLE_ROW_FILL.r, TABLE_ROW_FILL.g, TABLE_ROW_FILL.b);
-    doc.rect(MARGIN, statsY, summaryBoxWidth, statsHeight, 'F');
-    doc.rect(MARGIN, statsY, summaryBoxWidth, statsHeight, 'S');
+    doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
+    doc.setLineWidth(0.5);
+    doc.rect(MARGIN, statsY, summaryBoxWidth, statsHeight, 'FD');
 
     // Four columns for stats
     const colWidth = summaryBoxWidth / 4;
@@ -334,33 +336,34 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
 
     // Combine deductions with individual salary deduction items
     let finalDeductions = [...data.deductions];
+    console.log('PDF Generation - Initial deductions:', finalDeductions);
+    console.log('PDF Generation - Late data:', { lateMinutes: data.lateMinutes, lateDeduction: data.lateDeduction });
+    console.log('PDF Generation - Salary deduction items:', data.salaryDeductionItems);
+
     if (data.salaryDeductionItems && data.salaryDeductionItems.length > 0) {
         finalDeductions = finalDeductions.filter(row => row.description !== 'Custom Deduction');
         finalDeductions.push(...data.salaryDeductionItems);
     }
 
-    // Add late deduction if available
-    if (data.lateDeduction && data.lateDeduction > 0 && data.lateMinutes && data.lateMinutes > 0) {
-        finalDeductions.push({
-            description: `late (${data.lateMinutes} min)`,
-            amount: data.lateDeduction
-        });
-    }
+    console.log('PDF Generation - Final deductions:', finalDeductions);
 
     // Draw earnings and deductions side by side
     const containerWidth = pageWidth - MARGIN * 2;
     const earningsColumnGap = 20;
     const earningsColumnWidth = (containerWidth - earningsColumnGap) / 2;
 
+    // Reset graphics state to ensure clean colors
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
+    doc.setLineWidth(0.5);
+
     // Header row
     const earningsHeaderHeight = 24;
     doc.setFillColor(TABLE_HEADER_FILL.r, TABLE_HEADER_FILL.g, TABLE_HEADER_FILL.b);
-    doc.rect(MARGIN, cursorY, earningsColumnWidth, earningsHeaderHeight, 'F');
-    doc.rect(MARGIN + earningsColumnWidth + earningsColumnGap, cursorY, earningsColumnWidth, earningsHeaderHeight, 'F');
     doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
     doc.setLineWidth(0.5);
-    doc.rect(MARGIN, cursorY, earningsColumnWidth, earningsHeaderHeight, 'S');
-    doc.rect(MARGIN + earningsColumnWidth + earningsColumnGap, cursorY, earningsColumnWidth, earningsHeaderHeight, 'S');
+    doc.rect(MARGIN, cursorY, earningsColumnWidth, earningsHeaderHeight, 'FD');
+    doc.rect(MARGIN + earningsColumnWidth + earningsColumnGap, cursorY, earningsColumnWidth, earningsHeaderHeight, 'FD');
 
     doc.setFont(BODY_FONT, 'bold');
     doc.setFontSize(11);
@@ -370,7 +373,7 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
 
     cursorY += earningsHeaderHeight;
 
-    // Content rows
+    // Content rows - draw both columns always to ensure consistent rendering
     const maxRows = Math.max(finalEarnings.length, finalDeductions.length);
     const safeEarnings = finalEarnings.length > 0 ? finalEarnings : [{ description: 'No entries recorded', amount: 0 }];
     const safeDeductions = finalDeductions.length > 0 ? finalDeductions : [{ description: 'No entries recorded', amount: 0 }];
@@ -382,13 +385,20 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
         const isEven = i % 2 === 0;
         const fillColor = isEven ? TABLE_ROW_FILL : TABLE_ALT_ROW_FILL;
 
-        // Earnings row
+        // ALWAYS draw both earnings and deductions rectangles to maintain consistent state
+        doc.setFillColor(fillColor.r, fillColor.g, fillColor.b);
+        doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
+        doc.setLineWidth(0.5);
+
+        // Draw earnings rectangle
+        doc.rect(MARGIN, cursorY, earningsColumnWidth, rowHeight, 'FD');
+
+        // Draw deductions rectangle
+        doc.rect(MARGIN + earningsColumnWidth + earningsColumnGap, cursorY, earningsColumnWidth, rowHeight, 'FD');
+
+        // Now add text content
         const earningRow = safeEarnings[i];
         if (earningRow) {
-            doc.setFillColor(fillColor.r, fillColor.g, fillColor.b);
-            doc.rect(MARGIN, cursorY, earningsColumnWidth, rowHeight, 'F');
-            doc.rect(MARGIN, cursorY, earningsColumnWidth, rowHeight, 'S');
-
             doc.setFont(BODY_FONT, 'normal');
             doc.setFontSize(10);
             setTextColor(doc, TEXT_COLOR);
@@ -396,13 +406,8 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
             doc.text(formatMoney(earningRow.amount), MARGIN + earningsColumnWidth - 12, cursorY + rowHeight - 7, { align: 'right' });
         }
 
-        // Deductions row
         const deductionRow = safeDeductions[i];
         if (deductionRow) {
-            doc.setFillColor(fillColor.r, fillColor.g, fillColor.b);
-            doc.rect(MARGIN + earningsColumnWidth + earningsColumnGap, cursorY, earningsColumnWidth, rowHeight, 'F');
-            doc.rect(MARGIN + earningsColumnWidth + earningsColumnGap, cursorY, earningsColumnWidth, rowHeight, 'S');
-
             doc.setFont(BODY_FONT, 'normal');
             doc.setFontSize(10);
             setTextColor(doc, TEXT_COLOR);
@@ -413,19 +418,20 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
         cursorY += rowHeight;
     }
 
-    // Total rows
+    // Total rows - set fill/draw colors FIRST, then draw rectangles, THEN set text properties
+    doc.setFillColor(TABLE_TOTAL_FILL.r, TABLE_TOTAL_FILL.g, TABLE_TOTAL_FILL.b);
+    doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
+    doc.setLineWidth(0.5);
+
+    doc.rect(MARGIN, cursorY, earningsColumnWidth, rowHeight, 'FD');
+    doc.rect(MARGIN + earningsColumnWidth + earningsColumnGap, cursorY, earningsColumnWidth, rowHeight, 'FD');
+
+    // Now set text properties and add text
     doc.setFont(BODY_FONT, 'bold');
     doc.setFontSize(10);
     setTextColor(doc, EMPHASIS_TEXT);
-    doc.setFillColor(TABLE_TOTAL_FILL.r, TABLE_TOTAL_FILL.g, TABLE_TOTAL_FILL.b);
-
-    doc.rect(MARGIN, cursorY, earningsColumnWidth, rowHeight, 'F');
-    doc.rect(MARGIN, cursorY, earningsColumnWidth, rowHeight, 'S');
     doc.text('TOTAL EARNINGS', MARGIN + 12, cursorY + rowHeight - 7);
     doc.text(formatMoney(data.totalEarnings), MARGIN + earningsColumnWidth - 12, cursorY + rowHeight - 7, { align: 'right' });
-
-    doc.rect(MARGIN + earningsColumnWidth + earningsColumnGap, cursorY, earningsColumnWidth, rowHeight, 'F');
-    doc.rect(MARGIN + earningsColumnWidth + earningsColumnGap, cursorY, earningsColumnWidth, rowHeight, 'S');
     doc.text('TOTAL DEDUCTIONS', MARGIN + earningsColumnWidth + earningsColumnGap + 12, cursorY + rowHeight - 7);
     doc.text(formatMoney(data.totalDeductions), MARGIN + earningsColumnWidth + earningsColumnGap + earningsColumnWidth - 12, cursorY + rowHeight - 7, { align: 'right' });
 
@@ -436,10 +442,9 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
     const netSalaryHeight = 35;
 
     doc.setFillColor(TABLE_TOTAL_FILL.r, TABLE_TOTAL_FILL.g, TABLE_TOTAL_FILL.b);
-    doc.rect(MARGIN, cursorY, tableWidth, netSalaryHeight, 'F');
     doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
     doc.setLineWidth(1);
-    doc.rect(MARGIN, cursorY, tableWidth, netSalaryHeight, 'S');
+    doc.rect(MARGIN, cursorY, tableWidth, netSalaryHeight, 'FD');
 
     doc.setFont(BODY_FONT, 'bold');
     doc.setFontSize(16);
