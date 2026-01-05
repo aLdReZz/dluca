@@ -744,12 +744,24 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         let daysAbsent = 0;
         let daysLate = 0;
         let paidRegularMinutes = 0;
+        let totalLateMinutes = 0;
 
         dailyLog.forEach(log => {
             if (log.status === 'Present' || log.status === 'Late') daysPresent++;
-            if (log.status === 'Late') daysLate++;
+            if (log.status === 'Late') {
+                daysLate++;
+
+                // Calculate late minutes
+                const [start] = log.scheduled.split(' - ');
+                const scheduledInMinutes = timeStringToMinutes(start);
+                const actualInMinutes = timeStringToMinutes(log.timeIn);
+
+                if (scheduledInMinutes !== null && actualInMinutes !== null && actualInMinutes > scheduledInMinutes) {
+                    totalLateMinutes += (actualInMinutes - scheduledInMinutes);
+                }
+            }
             if (log.status === 'Absent') daysAbsent++;
-            
+
             const dateKey = log.date.toISOString().split('T')[0];
             const approvedOTMinutes = employee.approvedOvertime?.[dateKey] || 0;
 
@@ -764,17 +776,20 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             if (totalDailyLoginDuration > 4 * 60) {
                 dailyPaidRegularMinutes = Math.max(0, log.worked - 60);
             }
-            
+
             paidRegularMinutes += dailyPaidRegularMinutes;
             totalOvertimeHours += approvedOTMinutes / 60;
         });
         
         totalRegularHours = paidRegularMinutes / 60;
-        
+
         const regularPay = totalRegularHours * employee.rate;
         const overtimePay = totalOvertimeHours * employee.rate * OVERTIME_RATE_MULTIPLIER;
         const serviceChargeShare = employeeServiceChargeBreakdown?.totalShare ?? 0;
         const grossPay = regularPay + overtimePay + serviceChargeShare;
+
+        // Calculate late deduction
+        const lateDeduction = totalLateMinutes * 0.02;
 
         // Calculate total salary deductions
         const totalSalaryDeductions = (employee.salaryDeductions || []).reduce((sum, d) => sum + d.amount, 0);
@@ -802,6 +817,8 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             deductionNotes: '',
             customDeduction: totalSalaryDeductions,
             serviceChargeBreakdown: employeeServiceChargeBreakdown,
+            lateMinutes: totalLateMinutes,
+            lateDeduction: lateDeduction,
         };
         
         setPayslipRecord(newRecord);

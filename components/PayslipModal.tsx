@@ -324,7 +324,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
     const mandatoryDeductionsTotal = record.deductions.total;
     const totalFilteredSalaryDeductions = filteredSalaryDeductions.reduce((sum, deduction) => sum + deduction.amount, 0);
     const lateDeductionAmount = record.lateDeduction || 0;
-    const combinedDeductions = mandatoryDeductionsTotal + totalFilteredSalaryDeductions + lateDeductionAmount;
+    const combinedDeductions = mandatoryDeductionsTotal + totalFilteredSalaryDeductions;
     const formattedGrossPay = formatPeso(grossPay);
     const formattedNetPay = formatPeso(netPay);
     const formattedMandatoryDeductions = formatPeso(mandatoryDeductionsTotal);
@@ -368,6 +368,10 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
 
         console.log('PDF Data:', {
             employee: employee?.name,
+            recordLateMinutes: record.lateMinutes,
+            recordLateDeduction: record.lateDeduction,
+            deductionRows: deductionRows,
+            deductionsInPdf: pdfData.deductions,
             hasAdditionalIncome: !!employee?.additionalIncome,
             additionalIncomeCount: employee?.additionalIncome?.length || 0,
             additionalIncomeItems: pdfData.additionalIncomeItems,
@@ -770,6 +774,25 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                                     </div>
                                                 </div>
                                             )}
+                                        </div>
+                                    )}
+
+                                    {record.lateDeduction && record.lateDeduction > 0 && record.lateMinutes && record.lateMinutes > 0 && (
+                                        <div className="mt-3 rounded-lg border border-accent-yellow/30 bg-accent-yellow/5 p-3">
+                                            <h4 className="text-sm font-semibold text-text-primary mb-2">Late Information</h4>
+                                            <div className="space-y-1">
+                                                <div className="flex justify-between text-xs">
+                                                    <span className="text-text-secondary">Total Late Minutes</span>
+                                                    <span className="text-text-primary font-medium">{record.lateMinutes} min</span>
+                                                </div>
+                                                <div className="flex justify-between text-xs">
+                                                    <span className="text-text-secondary">Late Deduction (₱0.02/min)</span>
+                                                    <span className="text-text-primary font-medium">{formatPeso(record.lateDeduction)}</span>
+                                                </div>
+                                            </div>
+                                            <div className="mt-2 pt-2 border-t border-accent-yellow/20">
+                                                <p className="text-[10px] text-text-secondary/60 italic">For informational purposes only - not included in deductions</p>
+                                            </div>
                                         </div>
                                     )}
                                     <div className="border-t border-border-color mt-2 pt-2">
