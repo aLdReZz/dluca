@@ -46,11 +46,16 @@ const ProfitAndLoss: React.FC = () => {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+    const [dateFilter, setDateFilter] = useState('this-month');
     const calendarRef = React.useRef<HTMLDivElement>(null);
 
     // Expanded categories state
     const [expandedRevenue, setExpandedRevenue] = useState<Set<number>>(new Set());
     const [expandedExpenses, setExpandedExpenses] = useState<Set<number>>(new Set());
+
+    // Transaction detail modal state
+    const [selectedTransactions, setSelectedTransactions] = useState<AccountingTransaction[] | null>(null);
+    const [modalTitle, setModalTitle] = useState('');
 
     const toggleRevenueCategory = (index: number) => {
         const newExpanded = new Set(expandedRevenue);
@@ -72,13 +77,55 @@ const ProfitAndLoss: React.FC = () => {
         setExpandedExpenses(newExpanded);
     };
 
-    // Initialize date range to current month
-    useEffect(() => {
+    // Function to apply date filter
+    const applyDateFilter = (filter: string) => {
         const now = new Date();
-        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        let firstDay: Date;
+        let lastDay: Date;
+
+        switch (filter) {
+            case 'all':
+                // Set to a very wide range (e.g., 10 years back)
+                firstDay = new Date(now.getFullYear() - 10, 0, 1);
+                lastDay = now;
+                break;
+            case 'this-month':
+                firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                break;
+            case 'last-month':
+                firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
+                break;
+            case 'this-quarter':
+                const currentQuarter = Math.floor(now.getMonth() / 3);
+                firstDay = new Date(now.getFullYear(), currentQuarter * 3, 1);
+                lastDay = new Date(now.getFullYear(), (currentQuarter + 1) * 3, 0);
+                break;
+            case 'this-year':
+                firstDay = new Date(now.getFullYear(), 0, 1);
+                lastDay = new Date(now.getFullYear(), 11, 31);
+                break;
+            case 'last-year':
+                firstDay = new Date(now.getFullYear() - 1, 0, 1);
+                lastDay = new Date(now.getFullYear() - 1, 11, 31);
+                break;
+            case 'custom':
+                // Don't change dates for custom
+                return;
+            default:
+                firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        }
+
         setStartDate(formatDateForInput(firstDay));
         setEndDate(formatDateForInput(lastDay));
+        setDateFilter(filter);
+    };
+
+    // Initialize date range to current month
+    useEffect(() => {
+        applyDateFilter('this-month');
     }, []);
 
     // Close calendar on outside click
@@ -96,7 +143,33 @@ const ProfitAndLoss: React.FC = () => {
     const handleRangeComplete = (range: { start: string; end: string }) => {
         setStartDate(range.start);
         setEndDate(range.end);
+        setDateFilter('custom');
         setIsCalendarOpen(false);
+    };
+
+    // Function to show transaction details
+    const showTransactionDetails = (accountName: string, accountId?: string) => {
+        if (!startDate || !endDate) return;
+
+        const start = new Date(startDate + 'T00:00:00');
+        const end = new Date(endDate + 'T23:59:59');
+
+        // Filter transactions for this account
+        const accountTransactions = transactions.filter(txn => {
+            const txnDate = new Date(txn.date);
+            if (txnDate < start || txnDate > end) return false;
+
+            // Match by account ID or account name
+            if (accountId && txn.accountId === accountId) return true;
+            if ((txn as any).category === accountName) return true;
+
+            // Check if transaction belongs to this account
+            const account = accounts.find(acc => acc.id === txn.accountId);
+            return account?.name === accountName;
+        });
+
+        setSelectedTransactions(accountTransactions);
+        setModalTitle(accountName);
     };
 
     // Calculate P&L data
@@ -249,33 +322,102 @@ const ProfitAndLoss: React.FC = () => {
         <div className="h-full flex flex-col">
             {/* Header */}
             <div className="p-4 lg:p-6 border-b border-border-color">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold text-text-primary">Profit and Loss</h1>
-                        <p className="text-sm text-text-secondary mt-1">Income statement for the selected period</p>
+                <div className="flex flex-col gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <h1 className="text-2xl font-bold text-text-primary">Profit and Loss</h1>
+                            <p className="text-sm text-text-secondary mt-1">Income statement for the selected period</p>
+                        </div>
+
+                        {/* Date Range Selector */}
+                        <div className="relative" ref={calendarRef}>
+                            <button
+                                onClick={() => {
+                                    setDateFilter('custom');
+                                    setIsCalendarOpen(!isCalendarOpen);
+                                }}
+                                className="w-full sm:w-auto bg-bg-tertiary border border-border-color rounded-lg px-3 py-2 text-sm font-medium flex items-center justify-between sm:justify-start gap-2 hover:bg-hover-bg transition"
+                            >
+                                <CalendarDaysIcon className="w-5 h-5 text-text-secondary flex-shrink-0" />
+                                <span className="text-text-primary">
+                                    {startDate && endDate
+                                        ? `${formatDateForDisplay(startDate)} - ${formatDateForDisplay(endDate)}`
+                                        : 'Select range'}
+                                </span>
+                                <ChevronDownIcon className={`w-4 h-4 text-text-secondary transition-transform ${isCalendarOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            {isCalendarOpen && (
+                                <CalendarPopup
+                                    initialRange={{ start: startDate || endDate, end: endDate || startDate }}
+                                    onRangeComplete={handleRangeComplete}
+                                    onClose={() => setIsCalendarOpen(false)}
+                                />
+                            )}
+                        </div>
                     </div>
 
-                    {/* Date Range Selector */}
-                    <div className="relative" ref={calendarRef}>
+                    {/* Date Filter Buttons */}
+                    <div className="flex flex-wrap gap-2">
                         <button
-                            onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-                            className="w-full sm:w-auto bg-bg-tertiary border border-border-color rounded-lg px-3 py-2 text-sm font-medium flex items-center justify-between sm:justify-start gap-2 hover:bg-hover-bg transition"
+                            onClick={() => applyDateFilter('all')}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                                dateFilter === 'all'
+                                    ? 'bg-accent-blue text-white'
+                                    : 'bg-bg-tertiary text-text-secondary hover:bg-hover-bg'
+                            }`}
                         >
-                            <CalendarDaysIcon className="w-5 h-5 text-text-secondary flex-shrink-0" />
-                            <span className="text-text-primary">
-                                {startDate && endDate
-                                    ? `${formatDateForDisplay(startDate)} - ${formatDateForDisplay(endDate)}`
-                                    : 'Select range'}
-                            </span>
-                            <ChevronDownIcon className={`w-4 h-4 text-text-secondary transition-transform ${isCalendarOpen ? 'rotate-180' : ''}`} />
+                            All Dates
                         </button>
-                        {isCalendarOpen && (
-                            <CalendarPopup
-                                initialRange={{ start: startDate || endDate, end: endDate || startDate }}
-                                onRangeComplete={handleRangeComplete}
-                                onClose={() => setIsCalendarOpen(false)}
-                            />
-                        )}
+                        <button
+                            onClick={() => applyDateFilter('this-month')}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                                dateFilter === 'this-month'
+                                    ? 'bg-accent-blue text-white'
+                                    : 'bg-bg-tertiary text-text-secondary hover:bg-hover-bg'
+                            }`}
+                        >
+                            This Month
+                        </button>
+                        <button
+                            onClick={() => applyDateFilter('last-month')}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                                dateFilter === 'last-month'
+                                    ? 'bg-accent-blue text-white'
+                                    : 'bg-bg-tertiary text-text-secondary hover:bg-hover-bg'
+                            }`}
+                        >
+                            Last Month
+                        </button>
+                        <button
+                            onClick={() => applyDateFilter('this-quarter')}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                                dateFilter === 'this-quarter'
+                                    ? 'bg-accent-blue text-white'
+                                    : 'bg-bg-tertiary text-text-secondary hover:bg-hover-bg'
+                            }`}
+                        >
+                            This Quarter
+                        </button>
+                        <button
+                            onClick={() => applyDateFilter('this-year')}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                                dateFilter === 'this-year'
+                                    ? 'bg-accent-blue text-white'
+                                    : 'bg-bg-tertiary text-text-secondary hover:bg-hover-bg'
+                            }`}
+                        >
+                            This Year
+                        </button>
+                        <button
+                            onClick={() => applyDateFilter('last-year')}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                                dateFilter === 'last-year'
+                                    ? 'bg-accent-blue text-white'
+                                    : 'bg-bg-tertiary text-text-secondary hover:bg-hover-bg'
+                            }`}
+                        >
+                            Last Year
+                        </button>
                     </div>
                 </div>
             </div>
@@ -310,24 +452,37 @@ const ProfitAndLoss: React.FC = () => {
                                     ) : (
                                         profitLossData.revenueCategories.map((category, index) => (
                                             <div key={index} className="space-y-1">
-                                                <div
-                                                    className={`flex justify-between font-medium ${category.children.length > 0 ? 'cursor-pointer hover:bg-hover-bg rounded px-2 py-1 -mx-2' : ''}`}
-                                                    onClick={() => category.children.length > 0 && toggleRevenueCategory(index)}
-                                                >
-                                                    <div className="flex items-center gap-2">
+                                                <div className="flex justify-between font-medium">
+                                                    <div
+                                                        className={`flex items-center gap-2 ${category.children.length > 0 ? 'cursor-pointer hover:bg-hover-bg rounded px-2 py-1 -mx-2' : ''}`}
+                                                        onClick={() => category.children.length > 0 && toggleRevenueCategory(index)}
+                                                    >
                                                         {category.children.length > 0 && (
                                                             <ChevronDownIcon className={`w-4 h-4 text-text-secondary transition-transform ${expandedRevenue.has(index) ? '' : '-rotate-90'}`} />
                                                         )}
                                                         <span className="text-text-primary">{category.name}</span>
                                                     </div>
-                                                    <span className="text-text-primary">{formatPeso(category.amount)}</span>
+                                                    <span
+                                                        className="text-text-primary cursor-pointer hover:text-accent-blue hover:underline select-none"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            showTransactionDetails(category.name);
+                                                        }}
+                                                    >
+                                                        {formatPeso(category.amount)}
+                                                    </span>
                                                 </div>
                                                 {category.children.length > 0 && expandedRevenue.has(index) && (
                                                     <div className="pl-6 space-y-1">
                                                         {category.children.map((child, childIndex) => (
                                                             <div key={childIndex} className="flex justify-between text-xs">
                                                                 <span className="text-text-secondary">{child.name}</span>
-                                                                <span className="text-text-secondary">{formatPeso(child.amount)}</span>
+                                                                <span
+                                                                    className="text-text-secondary cursor-pointer hover:text-accent-blue hover:underline select-none"
+                                                                    onClick={() => showTransactionDetails(child.name)}
+                                                                >
+                                                                    {formatPeso(child.amount)}
+                                                                </span>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -359,24 +514,37 @@ const ProfitAndLoss: React.FC = () => {
                                     ) : (
                                         profitLossData.expenseCategories.map((category, index) => (
                                             <div key={index} className="space-y-1">
-                                                <div
-                                                    className={`flex justify-between font-medium ${category.children.length > 0 ? 'cursor-pointer hover:bg-hover-bg rounded px-2 py-1 -mx-2' : ''}`}
-                                                    onClick={() => category.children.length > 0 && toggleExpenseCategory(index)}
-                                                >
-                                                    <div className="flex items-center gap-2">
+                                                <div className="flex justify-between font-medium">
+                                                    <div
+                                                        className={`flex items-center gap-2 ${category.children.length > 0 ? 'cursor-pointer hover:bg-hover-bg rounded px-2 py-1 -mx-2' : ''}`}
+                                                        onClick={() => category.children.length > 0 && toggleExpenseCategory(index)}
+                                                    >
                                                         {category.children.length > 0 && (
                                                             <ChevronDownIcon className={`w-4 h-4 text-text-secondary transition-transform ${expandedExpenses.has(index) ? '' : '-rotate-90'}`} />
                                                         )}
                                                         <span className="text-text-primary">{category.name}</span>
                                                     </div>
-                                                    <span className="text-text-primary">{formatPeso(category.amount)}</span>
+                                                    <span
+                                                        className="text-text-primary cursor-pointer hover:text-accent-blue hover:underline select-none"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            showTransactionDetails(category.name);
+                                                        }}
+                                                    >
+                                                        {formatPeso(category.amount)}
+                                                    </span>
                                                 </div>
                                                 {category.children.length > 0 && expandedExpenses.has(index) && (
                                                     <div className="pl-6 space-y-1">
                                                         {category.children.map((child, childIndex) => (
                                                             <div key={childIndex} className="flex justify-between text-xs">
                                                                 <span className="text-text-secondary">{child.name}</span>
-                                                                <span className="text-text-secondary">{formatPeso(child.amount)}</span>
+                                                                <span
+                                                                    className="text-text-secondary cursor-pointer hover:text-accent-blue hover:underline select-none"
+                                                                    onClick={() => showTransactionDetails(child.name)}
+                                                                >
+                                                                    {formatPeso(child.amount)}
+                                                                </span>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -423,6 +591,59 @@ const ProfitAndLoss: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {/* Transaction Details Modal */}
+            {selectedTransactions && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedTransactions(null)}>
+                    <div className="bg-bg-secondary rounded-xl border border-border-color max-w-4xl w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                        <div className="p-4 border-b border-border-color flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-text-primary">Transactions - {modalTitle}</h3>
+                            <button
+                                onClick={() => setSelectedTransactions(null)}
+                                className="p-1 rounded-lg hover:bg-hover-bg transition"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="overflow-auto max-h-[calc(80vh-120px)] p-4">
+                            {selectedTransactions.length === 0 ? (
+                                <p className="text-text-secondary text-center py-8">No transactions found for this category.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {selectedTransactions.map((txn, index) => (
+                                        <div key={index} className="bg-bg-tertiary/40 p-3 rounded-lg border border-border-color hover:bg-hover-bg transition">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <div className="font-medium text-text-primary">{txn.description}</div>
+                                                    <div className="text-xs text-text-secondary mt-1">
+                                                        {formatDateForDisplay(txn.date)}
+                                                    </div>
+                                                </div>
+                                                <div className={`font-semibold ${txn.type === 'credit' ? 'text-accent-green' : 'text-accent-red'}`}>
+                                                    {txn.type === 'credit' ? '+' : '-'}{formatPeso(txn.amount)}
+                                                </div>
+                                            </div>
+                                            {txn.notes && (
+                                                <div className="text-xs text-text-secondary mt-2 pt-2 border-t border-border-color">
+                                                    {txn.notes}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 border-t border-border-color">
+                            <div className="flex justify-between items-center">
+                                <span className="text-sm font-medium text-text-secondary">Total Transactions:</span>
+                                <span className="text-sm font-bold text-text-primary">{selectedTransactions.length}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

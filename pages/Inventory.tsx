@@ -550,9 +550,25 @@ const Inventory: React.FC<InventoryProps> = ({ inventoryItems: propInventoryItem
         }
     };
 
-    const handleSaveNewProduct = (newProductData: Omit<ProductInventoryItem, 'id'>) => {
-        onAddProduct(newProductData);
-        setIsAddModalOpen(false);
+    const handleSaveNewProduct = async (newProductData: Omit<ProductInventoryItem, 'id'>) => {
+        try {
+            // Add to Firebase
+            await addProduct(newProductData);
+            setOperationStatus({ type: 'success', message: 'Product added successfully' });
+            setIsAddModalOpen(false);
+
+            // Trigger data refresh
+            setRefreshCounter(prev => prev + 1);
+            setTimeout(() => setOperationStatus(null), 3000);
+
+            // Call onAddProduct for backward compatibility
+            if (onAddProduct) {
+                onAddProduct(newProductData);
+            }
+        } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : 'Failed to add product';
+            setOperationStatus({ type: 'error', message: errorMsg });
+        }
     };
 
     const parseCsvLine = (line: string): string[] => {

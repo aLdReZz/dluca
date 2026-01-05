@@ -5,7 +5,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import RecipeCostingModal from '../components/RecipeCostingModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
-import { recipesService } from '../utils/firebaseService';
+import { recipesService, productInventoryService } from '../utils/firebaseService';
 
 interface CostingProps {
     recipeCostings?: RecipeCosting[];
@@ -41,12 +41,12 @@ const RecipeCard: React.FC<{ recipe: RecipeCosting; onEdit: () => void; onDelete
                         <span className="font-medium">{formatPeso(recipe.sellingPrice)}</span>
                     </div>
                      <div className="flex justify-between text-xs mt-2 pt-2 border-t border-border-color/50">
-                        <span className="text-text-secondary">Food Cost %:</span>
+                        <span className="text-text-secondary">Mark Up:</span>
                         <span className="font-medium">{recipe.foodCostPercentage.toFixed(2)}%</span>
                     </div>
                     <div className="flex justify-between items-center">
-                        <span className="text-text-secondary font-semibold">Final Cost %:</span>
-                        <span className={`font-bold text-lg ${recipe.finalCostPercentage > 100 ? 'text-accent-red' : 'text-accent-green'}`}>{recipe.finalCostPercentage.toFixed(2)}%</span>
+                        <span className="text-text-secondary font-semibold">Profit:</span>
+                        <span className={`font-bold text-lg ${(recipe.sellingPrice - recipe.totalCost) > 0 ? 'text-accent-green' : 'text-accent-red'}`}>{formatPeso(recipe.sellingPrice - recipe.totalCost)}</span>
                     </div>
                 </div>
             </div>
@@ -59,10 +59,16 @@ const RecipeCard: React.FC<{ recipe: RecipeCosting; onEdit: () => void; onDelete
 };
 
 
-const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, setRecipeCostings: setPropRecipeCostings, productInventoryItems }) => {
+const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, setRecipeCostings: setPropRecipeCostings, productInventoryItems: propProductInventoryItems }) => {
     // Fetch recipes from Firebase
-    const { data: firebaseRecipes = [], loading: recipesLoading, error: recipesError } = useFirebaseData(
+    const { data: firebaseRecipes = [], loading: recipesLoading, error: recipesError, refetch } = useFirebaseData(
         () => recipesService.getAll(),
+        []
+    );
+
+    // Fetch products from Firebase
+    const { data: firebaseProducts = [], loading: productsLoading, error: productsError } = useFirebaseData(
+        () => productInventoryService.getAll(),
         []
     );
 
@@ -83,6 +89,9 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
 
     // Use Firebase recipes if available, otherwise use prop recipes (for backward compatibility)
     const recipeCostings = (Array.isArray(firebaseRecipes) && firebaseRecipes.length > 0) ? firebaseRecipes : (propRecipeCostings || []);
+
+    // Use Firebase products if available, otherwise use prop products (for backward compatibility)
+    const productInventoryItems = (Array.isArray(firebaseProducts) && firebaseProducts.length > 0) ? firebaseProducts : (propProductInventoryItems || []);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -114,6 +123,9 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
                 setRecipeToDelete(null);
                 setTimeout(() => setOperationStatus(null), 3000);
 
+                // Refetch data from Firebase
+                refetch();
+
                 // Update prop for backward compatibility
                 if (setPropRecipeCostings) {
                     setPropRecipeCostings(recipeCostings.filter(r => String(r.id) !== String(recipeToDelete.id)));
@@ -142,6 +154,9 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
             setIsModalOpen(false);
             setTimeout(() => setOperationStatus(null), 3000);
 
+            // Refetch data from Firebase
+            refetch();
+
             // Update prop for backward compatibility
             if (setPropRecipeCostings) {
                 setPropRecipeCostings(recipeCostings);
@@ -159,21 +174,21 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
     }, [recipeCostings]);
 
     // Show loading state
-    if (recipesLoading) {
+    if (recipesLoading || productsLoading) {
         return (
             <div className="fixed inset-0 flex items-center justify-center">
-                <LoadingSpinner message="Loading recipe costings..." />
+                <LoadingSpinner message="Loading data..." />
             </div>
         );
     }
 
     // Show error state
-    if (recipesError) {
+    if (recipesError || productsError) {
         return (
             <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
                 <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
-                    <p className="text-red-500 font-medium">Error loading recipe costings</p>
-                    <p className="text-text-secondary text-sm mt-1">{recipesError}</p>
+                    <p className="text-red-500 font-medium">Error loading data</p>
+                    <p className="text-text-secondary text-sm mt-1">{recipesError || productsError}</p>
                 </div>
             </div>
         );

@@ -51,6 +51,13 @@ const formatDateMonthYear = (dateString?: string) => {
         timeZone: 'UTC',
     });
 };
+
+const formatHoursToTime = (hours: number): string => {
+    const totalMinutes = Math.round(hours * 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return `${h}h ${m}m`;
+};
 const formatDateShort = (dateString?: string) => {
 
     if (!dateString) return null;
@@ -299,9 +306,6 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                 { label: 'SSS Contribution', amount: record.deductions.sss },
                 { label: 'PhilHealth Contribution', amount: record.deductions.philhealth },
                 { label: 'Pag-IBIG Contribution', amount: record.deductions.pagibig },
-                ...(record.lateMinutes && record.lateMinutes > 0 && record.lateDeduction && record.lateDeduction > 0
-                    ? [{ label: `late (${record.lateMinutes} min)`, amount: record.lateDeduction }] as { label: string; amount: number }[]
-                    : []),
                 ...(customDeductionValue > 0
                     ? [{ label: 'Custom Deduction', amount: customDeductionValue }] as { label: string; amount: number }[]
                     : []),
@@ -310,8 +314,6 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
             record.deductions.pagibig,
             record.deductions.philhealth,
             record.deductions.sss,
-            record.lateMinutes,
-            record.lateDeduction,
             customDeductionValue,
         ],
     );
@@ -351,6 +353,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
             totalDeductions: combinedDeductions,
             netSalary: netPay,
             daysPresent: record.daysPresent,
+            daysPresentAmount: record.regularPay + record.overtimePay,
             daysAbsent: record.daysAbsent,
             daysLate: record.daysLate,
             totalHours: record.totalHours,
@@ -364,6 +367,8 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
             })),
             lateMinutes: record.lateMinutes,
             lateDeduction: record.lateDeduction,
+            regularHours: record.regularHours,
+            overtimeHours: record.overtimeHours,
         };
 
         console.log('PDF Data:', {
@@ -673,14 +678,17 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                 <div>
                                     <span>Days Present</span>
                                     <strong>{record.daysPresent}</strong>
+                                    <span className="text-xs text-text-secondary/70">{formatPeso(record.regularPay + record.overtimePay)} | {formatHoursToTime(record.regularHours + record.overtimeHours)}</span>
                                 </div>
                                 <div>
                                     <span>Days Absent</span>
                                     <strong>{record.daysAbsent}</strong>
+                                    <span className="text-xs text-text-secondary/70">{formatPeso(0)} | 0h 0m</span>
                                 </div>
                                 <div>
-                                    <span>Total Hours</span>
-                                    <strong>{record.totalHours.toFixed(2)} hrs</strong>
+                                    <span>Days Late</span>
+                                    <strong>{record.daysLate}</strong>
+                                    <span className="text-xs text-text-secondary/70">{formatPeso(record.lateDeduction || 0)} | {record.lateMinutes ? formatHoursToTime(record.lateMinutes / 60) : '0h 0m'}</span>
                                 </div>
                             </div>
 
@@ -777,24 +785,6 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                         </div>
                                     )}
 
-                                    {record.lateDeduction && record.lateDeduction > 0 && record.lateMinutes && record.lateMinutes > 0 && (
-                                        <div className="mt-3 rounded-lg border border-accent-yellow/30 bg-accent-yellow/5 p-3">
-                                            <h4 className="text-sm font-semibold text-text-primary mb-2">Late Information</h4>
-                                            <div className="space-y-1">
-                                                <div className="flex justify-between text-xs">
-                                                    <span className="text-text-secondary">Total Late Minutes</span>
-                                                    <span className="text-text-primary font-medium">{record.lateMinutes} min</span>
-                                                </div>
-                                                <div className="flex justify-between text-xs">
-                                                    <span className="text-text-secondary">Late Deduction (₱0.02/min)</span>
-                                                    <span className="text-text-primary font-medium">{formatPeso(record.lateDeduction)}</span>
-                                                </div>
-                                            </div>
-                                            <div className="mt-2 pt-2 border-t border-accent-yellow/20">
-                                                <p className="text-[10px] text-text-secondary/60 italic">For informational purposes only - not included in deductions</p>
-                                            </div>
-                                        </div>
-                                    )}
                                     <div className="border-t border-border-color mt-2 pt-2">
                                         <DetailRow label="Gross Pay" value={formattedGrossPay} isBold />
                                     </div>
@@ -813,18 +803,24 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                         <div>
                                             <div className="text-xl font-bold">{record.daysPresent}</div>
                                             <div className="text-xs text-text-secondary">Present</div>
+                                            <div className="text-xs text-text-secondary/70 mt-1">
+                                                {formatPeso(record.regularPay + record.overtimePay)} | {formatHoursToTime(record.regularHours + record.overtimeHours)}
+                                            </div>
                                         </div>
                                         <div>
                                             <div className="text-xl font-bold">{record.daysAbsent}</div>
                                             <div className="text-xs text-text-secondary">Absent</div>
+                                            <div className="text-xs text-text-secondary/70 mt-1">
+                                                {formatPeso(0)} | 0h 0m
+                                            </div>
                                         </div>
                                         <div>
                                             <div className="text-xl font-bold">{record.daysLate}</div>
                                             <div className="text-xs text-text-secondary">Late</div>
+                                            <div className="text-xs text-text-secondary/70 mt-1">
+                                                {formatPeso(record.lateDeduction || 0)} | {record.lateMinutes ? formatHoursToTime(record.lateMinutes / 60) : '0h 0m'}
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="border-t border-border-color mt-4 pt-2">
-                                        <DetailRow label="Total Hours" value={`${record.totalHours.toFixed(2)} hrs`} isBold />
                                     </div>
                                 </div>
                             </div>

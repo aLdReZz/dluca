@@ -21,6 +21,7 @@ export interface PayslipPdfData {
     totalDeductions: number;
     netSalary: number;
     daysPresent: number;
+    daysPresentAmount: number;
     daysAbsent: number;
     daysLate: number;
     totalHours: number;
@@ -28,6 +29,8 @@ export interface PayslipPdfData {
     salaryDeductionItems?: PayslipPdfTableRow[];
     lateMinutes?: number;
     lateDeduction?: number;
+    regularHours?: number;
+    overtimeHours?: number;
 }
 
 const MARGIN = 72; // 1 inch margin on A4 (72pt = 1in)
@@ -50,6 +53,19 @@ const formatMoney = (value: number) =>
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     });
+
+const formatMoneyWithPeso = (value: number) =>
+    'P ' + (Number.isFinite(value) ? value : 0).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+
+const formatHoursToTime = (hours: number): string => {
+    const totalMinutes = Math.round(hours * 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return `${h}h ${m}m`;
+};
 
 const setTextColor = (doc: jsPDF, color: typeof TEXT_COLOR) => {
     doc.setTextColor(color.r, color.g, color.b);
@@ -292,13 +308,35 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
     doc.setLineWidth(0.5);
     doc.rect(MARGIN, statsY, summaryBoxWidth, statsHeight, 'FD');
 
-    // Four columns for stats
-    const colWidth = summaryBoxWidth / 4;
+    // Three columns for stats (removed Total Hours)
+    const colWidth = summaryBoxWidth / 3;
+
+    // Calculate time strings for each category
+    const presentHours = (data.regularHours || 0) + (data.overtimeHours || 0);
+    const lateHours = (data.lateMinutes || 0) / 60;
+
     const summaryStats = [
-        { label: 'Present', value: String(data.daysPresent) },
-        { label: 'Absent', value: String(data.daysAbsent) },
-        { label: 'Late', value: String(data.daysLate) },
-        { label: 'Total Hours', value: data.totalHours.toFixed(2) + ' hrs' }
+        {
+            label: 'Present',
+            value: String(data.daysPresent),
+            amount: formatMoneyWithPeso(data.daysPresentAmount),
+            time: formatHoursToTime(presentHours),
+            showAmount: true
+        },
+        {
+            label: 'Absent',
+            value: String(data.daysAbsent),
+            amount: formatMoneyWithPeso(0),
+            time: '0h 0m',
+            showAmount: true
+        },
+        {
+            label: 'Late',
+            value: String(data.daysLate),
+            amount: formatMoneyWithPeso(data.lateDeduction || 0),
+            time: formatHoursToTime(lateHours),
+            showAmount: true
+        }
     ];
 
     summaryStats.forEach((stat, index) => {
@@ -316,13 +354,22 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
         doc.setFont(BODY_FONT, 'normal');
         doc.setFontSize(9);
         setTextColor(doc, SUBTEXT_COLOR);
-        doc.text(stat.label, centerX, statsY + 18, { align: 'center' });
+        doc.text(stat.label, centerX, statsY + 14, { align: 'center' });
 
         // Value
         doc.setFont(BODY_FONT, 'bold');
         doc.setFontSize(14);
         setTextColor(doc, EMPHASIS_TEXT);
-        doc.text(stat.value, centerX, statsY + 36, { align: 'center' });
+        doc.text(stat.value, centerX, statsY + 30, { align: 'center' });
+
+        // Amount and time (if applicable) - subtle gray color
+        if (stat.showAmount && stat.amount) {
+            doc.setFont(BODY_FONT, 'normal');
+            doc.setFontSize(8);
+            setTextColor(doc, SUBTEXT_COLOR);
+            const amountTimeText = `${stat.amount} | ${stat.time}`;
+            doc.text(amountTimeText, centerX, statsY + 42, { align: 'center' });
+        }
     });
 
     cursorY += summaryBoxHeight + 20;
@@ -375,8 +422,8 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
 
     // Content rows - draw both columns always to ensure consistent rendering
     const maxRows = Math.max(finalEarnings.length, finalDeductions.length);
-    const safeEarnings = finalEarnings.length > 0 ? finalEarnings : [{ description: 'No entries recorded', amount: 0 }];
-    const safeDeductions = finalDeductions.length > 0 ? finalDeductions : [{ description: 'No entries recorded', amount: 0 }];
+    const safeEarnings = finalEarnings;
+    const safeDeductions = finalDeductions;
     const rowHeight = 20;
 
     const actualMaxRows = Math.max(safeEarnings.length, safeDeductions.length);

@@ -69,7 +69,7 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
     const foodCostPercentage = useMemo(() => {
         const price = parseFloat(sellingPrice);
         if (!price || !totalCost) return 0;
-        return (totalCost / price) * 100;
+        return (price / totalCost) * 100;
     }, [totalCost, sellingPrice]);
 
     const finalCostPercentage = useMemo(() => {
@@ -80,11 +80,71 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
 
 
     const handleAddIngredient = () => {
-        setIngredients([...ingredients, { itemId: 0, name: '', quantity: 1, unit: '', cost: 0 }]);
+        setIngredients([...ingredients, { itemId: 0, name: '', quantity: 1, unit: 'g', cost: 0 }]);
     };
 
     const handleRemoveIngredient = (index: number) => {
         setIngredients(ingredients.filter((_, i) => i !== index));
+    };
+
+    // Unit conversion function
+    const convertUnit = (quantity: number, fromUnit: string, toUnit: string): number => {
+        // Normalize units to lowercase
+        const from = fromUnit.toLowerCase();
+        const to = toUnit.toLowerCase();
+
+        // If same unit, no conversion needed
+        if (from === to) return quantity;
+
+        // Weight conversions
+        const weightUnits: { [key: string]: number } = {
+            'kg': 1000,
+            'g': 1,
+            'mg': 0.001,
+            'lb': 453.592,
+            'oz': 28.3495,
+        };
+
+        // Volume conversions (to mL)
+        const volumeUnits: { [key: string]: number } = {
+            'l': 1000,
+            'ml': 1,
+            'gal': 3785.41,
+            'qt': 946.353,
+            'pt': 473.176,
+            'cup': 236.588,
+            'tbsp': 14.7868,
+            'tsp': 4.92892,
+        };
+
+        // For "pcs", "pack", "box" - no conversion, use as-is
+        if (from === 'pcs' || from === 'pack' || from === 'box' || to === 'pcs' || to === 'pack' || to === 'box') {
+            // If trying to convert between count units and weight/volume, just return quantity as-is
+            return quantity;
+        }
+
+        // Check if both units are in weight category
+        if (weightUnits[from] && weightUnits[to]) {
+            // Convert from -> grams -> to
+            const inGrams = quantity * weightUnits[from];
+            return inGrams / weightUnits[to];
+        }
+
+        // Check if both units are in volume category
+        if (volumeUnits[from] && volumeUnits[to]) {
+            // Convert from -> mL -> to
+            const inML = quantity * volumeUnits[from];
+            return inML / volumeUnits[to];
+        }
+
+        // If units are from different categories or unknown, return original quantity
+        return quantity;
+    };
+
+    const calculateCost = (product: ProductInventoryItem, quantity: number, recipeUnit: string): number => {
+        // Convert the recipe quantity to the product's unit
+        const convertedQuantity = convertUnit(quantity, recipeUnit, product.unit);
+        return convertedQuantity * product.price;
     };
 
     const handleIngredientChange = (index: number, field: keyof RecipeIngredient, value: any) => {
@@ -105,23 +165,30 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
             const product = products.find(p => p.id === currentIngredient.itemId);
             currentIngredient.quantity = parseFloat(value) || 0;
             if (product) {
-                currentIngredient.cost = currentIngredient.quantity * product.price;
+                currentIngredient.cost = calculateCost(product, currentIngredient.quantity, currentIngredient.unit);
+            }
+        } else if (field === 'unit') {
+            currentIngredient.unit = value;
+            const product = products.find(p => p.id === currentIngredient.itemId);
+            if (product && currentIngredient.quantity > 0) {
+                currentIngredient.cost = calculateCost(product, currentIngredient.quantity, currentIngredient.unit);
             }
         }
-        
+
         newIngredients[index] = currentIngredient;
         setIngredients(newIngredients);
     };
     
     const handleSuggestionClick = (index: number, suggestion: ProductInventoryItem) => {
         const newIngredients = [...ingredients];
+        const currentUnit = newIngredients[index].unit || 'g';
         const quantity = newIngredients[index].quantity || 1;
         newIngredients[index] = {
             itemId: suggestion.id,
             name: suggestion.name,
             quantity: quantity,
-            unit: suggestion.unit,
-            cost: quantity * suggestion.price,
+            unit: currentUnit,
+            cost: calculateCost(suggestion, quantity, currentUnit),
         };
         setIngredients(newIngredients);
         setActiveIngredientIndex(null);
@@ -148,26 +215,42 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
         const newErrors: { [key: string]: string } = {};
         if (!name.trim()) newErrors.name = "Recipe name is required";
         if (!sellingPrice || parseFloat(sellingPrice) <= 0) newErrors.sellingPrice = "Selling price must be greater than 0";
-        if (ingredients.length === 0 || ingredients.some(i => i.itemId === 0)) newErrors.ingredients = "Please add at least one valid ingredient";
-        
+        if (ingredients.length === 0) newErrors.ingredients = "Please add at least one ingredient";
+        if (ingredients.some(i => i.itemId === 0 || !i.name)) newErrors.ingredients = "Please select valid ingredients from the dropdown";
+        if (ingredients.some(i => !i.unit || i.unit.trim() === '')) newErrors.ingredients = "All ingredients must have a unit";
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
 
     const handleSave = () => {
         if (!validate()) return;
-        
-        const recipeData = {
-            name,
-            sellingPrice: parseFloat(sellingPrice),
-            ingredients,
-            totalCost,
-            totalCostWithAllocation,
-            foodCostPercentage,
-            finalCostPercentage,
+
+        // Sanitize ingredients to ensure no undefined fields
+        const sanitizedIngredients = ingredients.map(ing => ({
+            itemId: ing.itemId || 0,
+            name: ing.name || '',
+            quantity: ing.quantity || 0,
+            unit: ing.unit || 'g',
+            cost: ing.cost || 0,
+        }));
+
+        const recipeData: any = {
+            name: name.trim(),
+            sellingPrice: parseFloat(sellingPrice) || 0,
+            ingredients: sanitizedIngredients,
+            totalCost: totalCost || 0,
+            totalCostWithAllocation: totalCostWithAllocation || 0,
+            foodCostPercentage: foodCostPercentage || 0,
+            finalCostPercentage: finalCostPercentage || 0,
         };
 
-        onSave({ id: recipeToEdit?.id, ...recipeData });
+        // Only include id if editing an existing recipe
+        if (recipeToEdit?.id) {
+            recipeData.id = recipeToEdit.id;
+        }
+
+        onSave(recipeData);
     };
 
     if (!isOpen) return null;
@@ -222,7 +305,33 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
                                                 <input type="number" placeholder="Qty" value={ing.quantity} onChange={e => handleIngredientChange(index, 'quantity', e.target.value)} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 text-sm focus:ring-accent-blue focus:border-accent-blue" />
                                             </div>
                                             <div className="col-span-2">
-                                                <div className="w-full bg-bg-primary border border-border-color rounded-lg p-2 text-sm text-text-secondary h-full flex items-center">{ing.unit || 'Unit'}</div>
+                                                <select
+                                                    value={ing.unit}
+                                                    onChange={e => handleIngredientChange(index, 'unit', e.target.value)}
+                                                    className="w-full bg-bg-primary border border-border-color rounded-lg p-2 text-sm focus:ring-accent-blue focus:border-accent-blue"
+                                                >
+                                                    <optgroup label="Weight">
+                                                        <option value="kg">kg</option>
+                                                        <option value="g">g</option>
+                                                        <option value="mg">mg</option>
+                                                        <option value="lb">lb</option>
+                                                        <option value="oz">oz</option>
+                                                    </optgroup>
+                                                    <optgroup label="Volume">
+                                                        <option value="L">L</option>
+                                                        <option value="mL">mL</option>
+                                                        <option value="gal">gal</option>
+                                                        <option value="qt">qt</option>
+                                                        <option value="cup">cup</option>
+                                                        <option value="tbsp">tbsp</option>
+                                                        <option value="tsp">tsp</option>
+                                                    </optgroup>
+                                                    <optgroup label="Count">
+                                                        <option value="pcs">pcs</option>
+                                                        <option value="pack">pack</option>
+                                                        <option value="box">box</option>
+                                                    </optgroup>
+                                                </select>
                                             </div>
                                             <div className="col-span-2">
                                                 <div className="w-full bg-bg-primary border border-border-color rounded-lg p-2 text-sm text-right text-text-primary h-full flex items-center justify-end font-semibold">

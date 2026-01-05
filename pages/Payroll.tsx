@@ -419,11 +419,6 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
                 deductions.push({ description: 'Pag-IBIG Contribution', amount: record.deductions.pagibig });
             }
 
-            // Add late deduction if available
-            if (record.lateMinutes && record.lateMinutes > 0 && record.lateDeduction && record.lateDeduction > 0) {
-                deductions.push({ description: `late (${record.lateMinutes} min)`, amount: record.lateDeduction });
-            }
-
             // Add aggregated Custom Deduction (will be replaced with individual items by PDF generator)
             if (record.customDeduction && record.customDeduction > 0) {
                 deductions.push({ description: 'Custom Deduction', amount: record.customDeduction });
@@ -473,9 +468,10 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
                 earnings,
                 deductions,
                 totalEarnings: record.grossPay,
-                totalDeductions: record.deductions.total + (record.customDeduction || 0) + (record.lateDeduction || 0),
+                totalDeductions: record.deductions.total + (record.customDeduction || 0),
                 netSalary: record.netPay,
                 daysPresent: record.daysPresent,
+                daysPresentAmount: record.regularPay + record.overtimePay,
                 daysAbsent: record.daysAbsent,
                 daysLate: record.daysLate,
                 totalHours: record.totalHours,
@@ -489,6 +485,8 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
                 })),
                 lateMinutes: record.lateMinutes,
                 lateDeduction: record.lateDeduction,
+                regularHours: record.regularHours,
+                overtimeHours: record.overtimeHours,
             };
         });
 
