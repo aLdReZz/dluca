@@ -318,7 +318,8 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
     };
     const mandatoryDeductionsTotal = record.deductions.total;
     const totalFilteredSalaryDeductions = filteredSalaryDeductions.reduce((sum, deduction) => sum + deduction.amount, 0);
-    const combinedDeductions = mandatoryDeductionsTotal + totalFilteredSalaryDeductions;
+    const lateDeductionAmount = record.lateDeduction || 0;
+    const combinedDeductions = mandatoryDeductionsTotal + totalFilteredSalaryDeductions + lateDeductionAmount;
     const formattedGrossPay = formatPeso(grossPay);
     const formattedNetPay = formatPeso(netPay);
     const formattedMandatoryDeductions = formatPeso(mandatoryDeductionsTotal);
@@ -356,6 +357,8 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                 description: deduction.description,
                 amount: deduction.amount,
             })),
+            lateMinutes: record.lateMinutes,
+            lateDeduction: record.lateDeduction,
         };
 
         console.log('PDF Data:', {

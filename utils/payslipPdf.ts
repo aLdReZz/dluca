@@ -26,6 +26,8 @@ export interface PayslipPdfData {
     totalHours: number;
     additionalIncomeItems?: PayslipPdfTableRow[];
     salaryDeductionItems?: PayslipPdfTableRow[];
+    lateMinutes?: number;
+    lateDeduction?: number;
 }
 
 const MARGIN = 72; // 1 inch margin on A4 (72pt = 1in)
@@ -335,6 +337,14 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
     if (data.salaryDeductionItems && data.salaryDeductionItems.length > 0) {
         finalDeductions = finalDeductions.filter(row => row.description !== 'Custom Deduction');
         finalDeductions.push(...data.salaryDeductionItems);
+    }
+
+    // Add late deduction if available
+    if (data.lateDeduction && data.lateDeduction > 0 && data.lateMinutes && data.lateMinutes > 0) {
+        finalDeductions.push({
+            description: `late (${data.lateMinutes} min)`,
+            amount: data.lateDeduction
+        });
     }
 
     // Draw earnings and deductions side by side

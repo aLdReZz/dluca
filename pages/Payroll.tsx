@@ -208,6 +208,7 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
             let daysPresent = 0;
             let daysAbsent = 0;
             let daysLate = 0;
+            let totalLateMinutes = 0;
 
             for (let d = new Date(startDate); d <= endDate; d.setUTCDate(d.getUTCDate() + 1)) {
                 const dateKey = d.toISOString().split('T')[0];
@@ -223,6 +224,7 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
                         const actualInMinutes = timeStringToMinutes(record.timeIn);
                         if (scheduledInMinutes !== null && actualInMinutes !== null && actualInMinutes > scheduledInMinutes) {
                             daysLate++;
+                            totalLateMinutes += (actualInMinutes - scheduledInMinutes);
                         }
                     } else {
                         const today = new Date();
@@ -271,6 +273,9 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
             // Calculate total salary deductions
             const totalSalaryDeductions = (employee.salaryDeductions || []).reduce((sum, d) => sum + d.amount, 0);
 
+            // Calculate late deduction (0.02 per minute)
+            const lateDeduction = totalLateMinutes * 0.02;
+
             const deductions = {
                 sss: 0,
                 philhealth: 0,
@@ -278,7 +283,7 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
                 total: 0
             };
 
-            const netPay = grossPay - deductions.total - totalSalaryDeductions;
+            const netPay = grossPay - deductions.total - totalSalaryDeductions - lateDeduction;
 
             return {
                 id: employee.id,
@@ -302,7 +307,9 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
                 daysLate,
                 additionalIncome: totalAdditionalIncome,
                 deductionNotes: '',
-                customDeduction: totalSalaryDeductions
+                customDeduction: totalSalaryDeductions,
+                lateMinutes: totalLateMinutes,
+                lateDeduction: lateDeduction
             };
         });
 

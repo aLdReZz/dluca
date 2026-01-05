@@ -149,6 +149,8 @@ export interface PayrollRecord {
     customDeduction?: number;
     serviceChargeBreakdown?: ServiceChargeBreakdown;
     additionalIncome?: number;
+    lateMinutes?: number;
+    lateDeduction?: number;
 }
 
 export interface RecipeIngredient {
