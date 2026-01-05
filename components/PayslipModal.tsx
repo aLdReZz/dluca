@@ -299,6 +299,9 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                 { label: 'SSS Contribution', amount: record.deductions.sss },
                 { label: 'PhilHealth Contribution', amount: record.deductions.philhealth },
                 { label: 'Pag-IBIG Contribution', amount: record.deductions.pagibig },
+                ...(record.lateMinutes && record.lateMinutes > 0 && record.lateDeduction && record.lateDeduction > 0
+                    ? [{ label: `late (${record.lateMinutes} min)`, amount: record.lateDeduction }] as { label: string; amount: number }[]
+                    : []),
                 ...(customDeductionValue > 0
                     ? [{ label: 'Custom Deduction', amount: customDeductionValue }] as { label: string; amount: number }[]
                     : []),
@@ -307,6 +310,8 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
             record.deductions.pagibig,
             record.deductions.philhealth,
             record.deductions.sss,
+            record.lateMinutes,
+            record.lateDeduction,
             customDeductionValue,
         ],
     );
@@ -613,36 +618,6 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                 </div>
                             )}
 
-                            {employee?.salaryDeductions && employee.salaryDeductions.length > 0 && (
-                                <div className="payslip-export-section">
-                                    <h3>Deductions</h3>
-                                    <table className="payslip-export-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Description</th>
-                                                <th>Amount</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {employee.salaryDeductions.map(deduction => (
-                                                <tr key={deduction.id}>
-                                                    <td>{deduction.description}</td>
-                                                    <td className="text-right">{formatPeso(deduction.amount)}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                        <tfoot>
-                                            <tr>
-                                                <th>Total</th>
-                                                <th className="text-right">
-                                                    {formatPeso(employee.salaryDeductions.reduce((sum, d) => sum + d.amount, 0))}
-                                                </th>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            )}
-
                             <div className="payslip-export-section">
                                 <h3>Deductions</h3>
                                 <table className="payslip-export-table">
@@ -654,12 +629,20 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                     </thead>
                                     <tbody>
                                         {deductionRows.length > 0 ? (
-                                            deductionRows.map(row => (
-                                                <tr key={row.label}>
-                                                    <td>{row.label}</td>
-                                                    <td className="text-right">{formatPeso(row.amount)}</td>
-                                                </tr>
-                                            ))
+                                            <>
+                                                {deductionRows.map(row => (
+                                                    <tr key={row.label}>
+                                                        <td>{row.label}</td>
+                                                        <td className="text-right">{formatPeso(row.amount)}</td>
+                                                    </tr>
+                                                ))}
+                                                {filteredSalaryDeductions.map(deduction => (
+                                                    <tr key={deduction.id}>
+                                                        <td>{deduction.description}</td>
+                                                        <td className="text-right">{formatPeso(deduction.amount)}</td>
+                                                    </tr>
+                                                ))}
+                                            </>
                                         ) : (
                                             <tr>
                                                 <td colSpan={2} className="text-center text-sm text-text-secondary py-4">
@@ -670,17 +653,9 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                     </tbody>
                                     <tfoot>
                                         <tr>
-                                            <th>{customDeductionValue > 0 ? 'Mandatory Deductions' : 'Total Deductions'}</th>
-                                            <th className="text-right">
-                                                {customDeductionValue > 0 ? formattedMandatoryDeductions : formattedCombinedDeductions}
-                                            </th>
+                                            <th>Total Deductions</th>
+                                            <th className="text-right">{formattedCombinedDeductions}</th>
                                         </tr>
-                                        {customDeductionValue > 0 && (
-                                            <tr>
-                                                <th>Total Deductions</th>
-                                                <th className="text-right">{formattedCombinedDeductions}</th>
-                                            </tr>
-                                        )}
                                     </tfoot>
                                 </table>
                             </div>
