@@ -6,6 +6,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import EmployeeProfile from '../components/EmployeeProfile';
 import ScheduleEditModal from '../components/ScheduleEditModal';
 import AttendanceEditModal from '../components/AttendanceEditModal';
+import WeekScheduleCreator from '../components/WeekScheduleCreator';
 import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
 import { attendanceService, salesService, employeesService } from '../utils/firebaseService';
 import { parsePaidHoursCsv, mapPaidHoursToEmployees, parseCsvText } from '../utils/paidHours';
@@ -270,6 +271,7 @@ const Attendance: React.FC<AttendanceProps> = ({
     const [editingScheduleContext, setEditingScheduleContext] = useState<{ emp: Employee, dateKey: string, date: Date } | null>(null);
     const [isAttendanceLocked, setIsAttendanceLocked] = useState(true);
     const [editingAttendanceContext, setEditingAttendanceContext] = useState<{ emp: Employee, dateKey: string, date: Date } | null>(null);
+    const [isWeekScheduleCreatorOpen, setIsWeekScheduleCreatorOpen] = useState(false);
 
     const getEmployeeListKey = (employee: Employee, index: number) => {
         const baseIdentifier = employee?.id ?? employee?.name ?? index;
@@ -650,6 +652,33 @@ const Attendance: React.FC<AttendanceProps> = ({
 
     const handleEditSchedules = () => {
         setIsScheduleLocked(false);
+    };
+
+    const handleCreateWeekSchedule = async (weekStart: Date, schedules: { [employeeId: number]: { [dateKey: string]: Schedule } }) => {
+        // Update all employees with the new schedule
+        const updatedEmployees = employees.map(emp => {
+            const empSchedules = schedules[emp.id] || {};
+            return {
+                ...emp,
+                schedule: {
+                    ...emp.schedule,
+                    ...empSchedules,
+                },
+            };
+        });
+
+        // Save to Firebase
+        await syncEmployees(updatedEmployees);
+
+        // Navigate to the created week
+        const mondayDateString = weekStart.toISOString().split('T')[0];
+        setScheduleWeekStart(mondayDateString);
+
+        setOperationStatus({
+            type: 'success',
+            message: `Successfully created schedule for the week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+        });
+        setTimeout(() => setOperationStatus(null), 5000);
     };
 
     const handleOpenScheduleModal = (emp: Employee, dateKey: string, date: Date) => {
@@ -1198,38 +1227,18 @@ const Attendance: React.FC<AttendanceProps> = ({
                         >
                             <span className="text-sm leading-none">&gt;</span>
                         </button>
-                        <label htmlFor="schedule-csv-input" className="cursor-pointer bg-bg-tertiary text-text-primary px-3 py-2 rounded-lg font-medium text-xs hover:bg-hover-bg transition flex items-center gap-1.5 border border-border-color">
-                            <UploadIcon className="w-4 h-4"/>
-                            <span className="hidden sm:inline">Schedule CSV</span>
-                        </label>
-                        <input type="file" id="schedule-csv-input" accept=".csv" className="hidden" onChange={handleScheduleUpload} />
-                        <label htmlFor="attendance-csv-input" className="cursor-pointer bg-bg-tertiary text-text-primary px-3 py-2 rounded-lg font-medium text-xs hover:bg-hover-bg transition flex items-center gap-1.5 border border-border-color">
+                        <label htmlFor="attendance-csv-input" className="cursor-pointer bg-accent-blue text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-blue/30">
                             <UploadIcon className="w-4 h-4"/>
                             <span className="hidden sm:inline">Attendance CSV</span>
                         </label>
                         <input type="file" id="attendance-csv-input" accept=".csv" className="hidden" onChange={handleAttendanceUpload} />
-                         {isScheduleLocked ? (
-                            <button onClick={handleEditSchedules} className="bg-accent-orange text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-orange/30">
-                                <PencilSquareIcon className="w-4 h-4"/>
-                                Edit Schedule
-                            </button>
-                        ) : (
-                            <button onClick={handleSaveSchedules} className="bg-accent-green text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-green/30">
-                                <CheckIcon className="w-4 h-4" />
-                                Save Schedule
-                            </button>
-                        )}
-                        {isAttendanceLocked ? (
-                            <button onClick={() => setIsAttendanceLocked(false)} className="bg-accent-orange text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-orange/30">
-                                <PencilSquareIcon className="w-4 h-4"/>
-                                Edit Attendance
-                            </button>
-                        ) : (
-                            <button onClick={() => setIsAttendanceLocked(true)} className="bg-accent-green text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-green/30">
-                                <CheckIcon className="w-4 h-4" />
-                                Save Attendance
-                            </button>
-                        )}
+                        <button
+                            onClick={() => setIsWeekScheduleCreatorOpen(true)}
+                            className="bg-accent-blue text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-blue/30"
+                        >
+                            <PlusIcon className="w-4 h-4"/>
+                            <span className="hidden sm:inline">Create Schedule</span>
+                        </button>
                     </div>
                 </div>
                 <div className="relative">
@@ -1660,6 +1669,13 @@ const Attendance: React.FC<AttendanceProps> = ({
                     initialRecord={attendanceRecords.find(r => r.employee.toLowerCase() === editingAttendanceContext.emp.name.toLowerCase() && r.date === editingAttendanceContext.dateKey)}
                 />
             )}
+
+            <WeekScheduleCreator
+                isOpen={isWeekScheduleCreatorOpen}
+                onClose={() => setIsWeekScheduleCreatorOpen(false)}
+                onSave={handleCreateWeekSchedule}
+                employees={employees}
+            />
         </div>
     );
 };
