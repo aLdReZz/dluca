@@ -1,11 +1,12 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Employee, AttendanceRecord, PayrollRecord, Schedule, SalesData } from '../types';
-import { UploadIcon, CalendarDaysIcon, PencilSquareIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon, PlusIcon, CheckIcon } from '../components/Icons';
+import { UploadIcon, DownloadIcon, CalendarDaysIcon, PencilSquareIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon, PlusIcon, CheckIcon } from '../components/Icons';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmployeeProfile from '../components/EmployeeProfile';
 import ScheduleEditModal from '../components/ScheduleEditModal';
 import AttendanceEditModal from '../components/AttendanceEditModal';
+import html2canvas from 'html2canvas';
 import WeekScheduleCreator from '../components/WeekScheduleCreator';
 import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
 import { attendanceService, salesService, employeesService } from '../utils/firebaseService';
@@ -268,6 +269,7 @@ const Attendance: React.FC<AttendanceProps> = ({
     const [isScheduleTotalHrsVisible, setScheduleTotalHrsVisible] = useState(false);
     const [isAttendanceTotalHrsVisible, setAttendanceTotalHrsVisible] = useState(false);
     const datePickerRef = useRef<HTMLDivElement>(null);
+    const scheduleTableRef = useRef<HTMLDivElement>(null);
     const [editingScheduleContext, setEditingScheduleContext] = useState<{ emp: Employee, dateKey: string, date: Date } | null>(null);
     const [isAttendanceLocked, setIsAttendanceLocked] = useState(true);
     const [editingAttendanceContext, setEditingAttendanceContext] = useState<{ emp: Employee, dateKey: string, date: Date } | null>(null);
@@ -667,11 +669,17 @@ const Attendance: React.FC<AttendanceProps> = ({
             };
         });
 
+        // Update local state immediately
+        setEmployees(updatedEmployees);
+
         // Save to Firebase
         await syncEmployees(updatedEmployees);
 
-        // Navigate to the created week
-        const mondayDateString = weekStart.toISOString().split('T')[0];
+        // Navigate to the created week - use local timezone
+        const year = weekStart.getFullYear();
+        const month = String(weekStart.getMonth() + 1).padStart(2, '0');
+        const day = String(weekStart.getDate()).padStart(2, '0');
+        const mondayDateString = `${year}-${month}-${day}`;
         setScheduleWeekStart(mondayDateString);
 
         setOperationStatus({
@@ -679,6 +687,185 @@ const Attendance: React.FC<AttendanceProps> = ({
             message: `Successfully created schedule for the week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
         });
         setTimeout(() => setOperationStatus(null), 5000);
+    };
+
+    const handleExportSchedule = async () => {
+        try {
+            // Format time to 12-hour format
+            const formatTime = (time: string) => {
+                if (!time) return '';
+                const [hours, minutes] = time.split(':');
+                const hour = parseInt(hours, 10);
+                const ampm = hour >= 12 ? 'PM' : 'AM';
+                const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+                return `${displayHour}:${minutes} ${ampm}`;
+            };
+
+            // Create canvas
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            // Excel-like styling with 1080p resolution
+            const scale = 3; // High DPI for crisp 1080p output
+            const cellWidth = 140 * scale;
+            const cellHeight = 35 * scale; // Reduced height
+            const headerHeight = 40 * scale; // Reduced header height
+            const nameColumnWidth = 180 * scale;
+            const totalWidth = nameColumnWidth + (weekDates.length * cellWidth);
+            const totalHeight = headerHeight + (employees.length * cellHeight);
+
+            canvas.width = totalWidth;
+            canvas.height = totalHeight;
+
+            // White background (Excel-like)
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, totalWidth, totalHeight);
+
+            // Set font (scaled) - Apple-style font
+            ctx.font = `${14 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif`;
+
+            // Draw header row
+            ctx.fillStyle = '#4472C4'; // Excel blue
+            ctx.fillRect(0, 0, totalWidth, headerHeight);
+
+            // Header text - Employee
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = `600 ${14 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('EMPLOYEE', nameColumnWidth / 2, headerHeight / 2);
+
+            // Draw vertical line after employee column
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 2 * scale;
+            ctx.beginPath();
+            ctx.moveTo(nameColumnWidth, 0);
+            ctx.lineTo(nameColumnWidth, headerHeight);
+            ctx.stroke();
+
+            // Header text - Days
+            weekDates.forEach((dateInfo, idx) => {
+                const x = nameColumnWidth + (idx * cellWidth);
+                const dayStr = dateInfo.date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+                const dateStr = dateInfo.date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' });
+
+                // Draw vertical line
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2 * scale;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, headerHeight);
+                ctx.stroke();
+
+                // Draw day text
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = `600 ${13 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif`;
+                ctx.fillText(dayStr, x + cellWidth / 2, headerHeight / 2 - (10 * scale));
+                ctx.font = `${11 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif`;
+                ctx.fillText(dateStr, x + cellWidth / 2, headerHeight / 2 + (10 * scale));
+            });
+
+            // Draw employee rows
+            employees.forEach((emp, empIdx) => {
+                const y = headerHeight + (empIdx * cellHeight);
+
+                // Alternating row colors (Excel-like)
+                ctx.fillStyle = empIdx % 2 === 0 ? '#FFFFFF' : '#F2F2F2';
+                ctx.fillRect(0, y, totalWidth, cellHeight);
+
+                // Draw horizontal line
+                ctx.strokeStyle = '#D0D0D0';
+                ctx.lineWidth = 1 * scale;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(totalWidth, y);
+                ctx.stroke();
+
+                // Employee name
+                ctx.fillStyle = '#000000';
+                ctx.font = `600 ${13 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif`;
+                ctx.textAlign = 'left';
+                ctx.fillText(emp.name, 10 * scale, y + cellHeight / 2);
+
+                // Draw vertical line after name
+                ctx.strokeStyle = '#D0D0D0';
+                ctx.lineWidth = 1 * scale;
+                ctx.beginPath();
+                ctx.moveTo(nameColumnWidth, y);
+                ctx.lineTo(nameColumnWidth, y + cellHeight);
+                ctx.stroke();
+
+                // Schedule cells
+                weekDates.forEach((dateInfo, dayIdx) => {
+                    const x = nameColumnWidth + (dayIdx * cellWidth);
+                    const dateKey = dateToKey(dateInfo.date);
+                    const schedule = emp.schedule[dateKey];
+
+                    // Draw vertical line
+                    ctx.strokeStyle = '#D0D0D0';
+                    ctx.lineWidth = 1 * scale;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x, y + cellHeight);
+                    ctx.stroke();
+
+                    ctx.textAlign = 'center';
+                    if (schedule?.off) {
+                        ctx.fillStyle = '#000000';
+                        ctx.font = `600 ${12 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif`;
+                        ctx.fillText('OFF', x + cellWidth / 2, y + cellHeight / 2);
+                    } else if (schedule?.timeIn && schedule?.timeOut) {
+                        ctx.fillStyle = '#2C3E50';
+                        ctx.font = `${10 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif`;
+                        const timeText = `${formatTime(schedule.timeIn)} - ${formatTime(schedule.timeOut)}`;
+                        ctx.fillText(timeText, x + cellWidth / 2, y + cellHeight / 2);
+                    }
+                });
+            });
+
+            // Draw bottom border
+            ctx.strokeStyle = '#D0D0D0';
+            ctx.lineWidth = 1 * scale;
+            ctx.beginPath();
+            ctx.moveTo(0, totalHeight);
+            ctx.lineTo(totalWidth, totalHeight);
+            ctx.stroke();
+
+            // Draw right border
+            ctx.beginPath();
+            ctx.moveTo(totalWidth, 0);
+            ctx.lineTo(totalWidth, totalHeight);
+            ctx.stroke();
+
+            // Convert to blob and download
+            canvas.toBlob((blob) => {
+                if (!blob) {
+                    alert('Failed to generate image. Please try again.');
+                    return;
+                }
+
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+
+                const weekStart = weekDates[0].date;
+                const weekEnd = weekDates[6].date;
+                const fileName = `schedule_${weekStart.toISOString().split('T')[0]}_to_${weekEnd.toISOString().split('T')[0]}.png`;
+
+                link.setAttribute('href', url);
+                link.setAttribute('download', fileName);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+
+                console.log('✅ Schedule exported successfully as PNG');
+            }, 'image/png');
+        } catch (error) {
+            console.error('Error exporting schedule:', error);
+            alert('Failed to export schedule. Please try again.');
+        }
     };
 
     const handleOpenScheduleModal = (emp: Employee, dateKey: string, date: Date) => {
@@ -887,9 +1074,16 @@ const Attendance: React.FC<AttendanceProps> = ({
                 const colIndex = parseInt(key, 10);
                 const dateKey = dateMap[colIndex];
                 if (dateKey) {
+                    // Check if schedule already exists for this date - if so, preserve it
+                    const existingSchedule = employee.schedule[dateKey];
+                    if (existingSchedule && (existingSchedule.timeIn || existingSchedule.timeOut || existingSchedule.off)) {
+                        // Schedule already exists for this date - skip to preserve manual edits
+                        return;
+                    }
+
                     const timeIn = values[colIndex] || '';
                     const timeOut = values[colIndex + 1] || '';
-    
+
                     if (timeIn.toUpperCase() === 'OFF') {
                         employee.schedule[dateKey] = { timeIn: '', timeOut: '', off: true };
                     } else if (timeIn && timeOut) {
@@ -1165,7 +1359,15 @@ const Attendance: React.FC<AttendanceProps> = ({
                          {employees.length > 0 ? employees.map((emp, empIndex) => {
                             const employeeKey = getEmployeeListKey(emp, empIndex);
                             return (
-                            <div key={employeeKey} className="relative flex flex-col items-center group w-full max-w-[90px]">
+                            <div
+                                key={employeeKey}
+                                draggable
+                                onDragStart={() => handleDragStart(empIndex)}
+                                onDragOver={(e) => handleDragOver(e, empIndex)}
+                                onDragLeave={handleDragLeave}
+                                onDrop={(e) => handleDrop(e, empIndex)}
+                                className={`relative flex flex-col items-center group w-full max-w-[90px] cursor-move transition-all ${draggedEmployee === empIndex ? 'opacity-50 scale-95' : ''} ${dragOverIndex === empIndex ? 'scale-105 ring-2 ring-accent-blue rounded-lg' : ''}`}
+                            >
                                <button
                                     onClick={() => setViewedEmployee(emp)}
                                     className="relative w-16 h-16 rounded-full bg-gradient-to-br from-accent-blue/20 to-accent-blue/10 text-accent-blue flex items-center justify-center font-bold text-xl transition-all hover:scale-110 hover:shadow-xl hover:shadow-accent-blue/40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-secondary focus:ring-accent-blue border-2 border-accent-blue/30"
@@ -1197,16 +1399,18 @@ const Attendance: React.FC<AttendanceProps> = ({
                         {/* Previous Week Button */}
                         <button
                             onClick={handlePreviousWeek}
-                            className="bg-bg-tertiary border border-border-color rounded-md py-1.5 px-2.5 text-xs font-medium hover:bg-hover-bg transition flex items-center justify-center text-text-secondary hover:text-text-primary"
+                            className="w-9 h-9 rounded-lg bg-bg-tertiary border border-border-color hover:bg-hover-bg hover:border-accent-blue/30 transition flex items-center justify-center text-text-secondary hover:text-text-primary group"
                             title="Previous week"
                         >
-                            <span className="text-sm leading-none">&lt;</span>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                            </svg>
                         </button>
 
                         <div className="relative" ref={datePickerRef}>
                              <button
                                 onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                                className="flex items-center gap-1.5 bg-bg-tertiary border border-border-color rounded-md py-1.5 px-3 text-xs font-medium hover:bg-hover-bg transition"
+                                className="flex items-center gap-1.5 bg-bg-tertiary border border-border-color rounded-md py-2 px-3 text-xs font-medium hover:bg-hover-bg transition h-[38px]"
                             >
                                 <CalendarDaysIcon className="w-4 h-4 text-text-secondary" />
                                 <span className={slideDirection === 'left' ? 'date-slide-left' : slideDirection === 'right' ? 'date-slide-right' : ''}>{new Date(scheduleWeekStart + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</span>
@@ -1222,10 +1426,19 @@ const Attendance: React.FC<AttendanceProps> = ({
                         {/* Next Week Button */}
                         <button
                             onClick={handleNextWeek}
-                            className="bg-bg-tertiary border border-border-color rounded-md py-1.5 px-2.5 text-xs font-medium hover:bg-hover-bg transition flex items-center justify-center text-text-secondary hover:text-text-primary"
+                            className="w-9 h-9 rounded-lg bg-bg-tertiary border border-border-color hover:bg-hover-bg hover:border-accent-blue/30 transition flex items-center justify-center text-text-secondary hover:text-text-primary group"
                             title="Next week"
                         >
-                            <span className="text-sm leading-none">&gt;</span>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                        <button
+                            onClick={handleExportSchedule}
+                            className="bg-bg-tertiary border border-border-color text-text-primary px-4 py-2 rounded-lg font-semibold text-xs hover:bg-hover-bg transition flex items-center gap-1.5"
+                        >
+                            <DownloadIcon className="w-4 h-4"/>
+                            <span className="hidden sm:inline">Export Schedule</span>
                         </button>
                         <label htmlFor="attendance-csv-input" className="cursor-pointer bg-accent-blue text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-blue/30">
                             <UploadIcon className="w-4 h-4"/>
@@ -1241,7 +1454,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                         </button>
                     </div>
                 </div>
-                <div className="relative">
+                <div className="relative" ref={scheduleTableRef}>
                     <div className={`bg-bg-secondary rounded-xl border overflow-hidden transition-all duration-300 ${slideDirection === 'left' ? 'table-slide-left' : slideDirection === 'right' ? 'table-slide-right' : ''} ${!isScheduleLocked ? 'border-accent-blue ring-2 ring-accent-blue/30' : 'border-border-color'}`}>
                         {/* Desktop Table View */}
                         <div className="overflow-x-auto hidden lg:block">

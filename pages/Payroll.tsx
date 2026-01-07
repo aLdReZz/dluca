@@ -265,13 +265,23 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
             const regularPay = totalRegularHours * employee.rate;
             const overtimePay = totalOvertimeHours * employee.rate * OVERTIME_RATE_MULTIPLIER;
 
-            // Calculate total additional income
-            const totalAdditionalIncome = (employee.additionalIncome || []).reduce((sum, i) => sum + i.amount, 0);
+            // Calculate total additional income - filter by pay period
+            const totalAdditionalIncome = (employee.additionalIncome || [])
+                .filter(income => {
+                    if (!income.date) return true; // Include items without dates
+                    return income.date >= payPeriod.start && income.date <= payPeriod.end;
+                })
+                .reduce((sum, i) => sum + i.amount, 0);
 
             const grossPay = regularPay + overtimePay + totalAdditionalIncome;
 
-            // Calculate total salary deductions
-            const totalSalaryDeductions = (employee.salaryDeductions || []).reduce((sum, d) => sum + d.amount, 0);
+            // Calculate total salary deductions - filter by pay period
+            const totalSalaryDeductions = (employee.salaryDeductions || [])
+                .filter(deduction => {
+                    if (!deduction.date) return true; // Include items without dates
+                    return deduction.date >= payPeriod.start && deduction.date <= payPeriod.end;
+                })
+                .reduce((sum, d) => sum + d.amount, 0);
 
             // Calculate late deduction (0.02 per minute)
             const lateDeduction = totalLateMinutes * 0.02;
@@ -331,7 +341,8 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
             const serviceChargeShare = allocation ? roundCurrency(allocation.totalShare) : 0;
             const grossPayWithService = record.regularPay + record.overtimePay + serviceChargeShare + (record.additionalIncome || 0);
             const appliedCustomDeduction = Math.max(0, record.customDeduction ?? 0);
-            const netPayWithService = grossPayWithService - record.deductions.total - appliedCustomDeduction;
+            const appliedLateDeduction = Math.max(0, record.lateDeduction ?? 0);
+            const netPayWithService = grossPayWithService - record.deductions.total - appliedCustomDeduction - appliedLateDeduction;
             const normalizedBreakdown = allocation
                 ? {
                       ...allocation,
