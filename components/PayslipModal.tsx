@@ -309,12 +309,16 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                 ...(customDeductionValue > 0
                     ? [{ label: 'Custom Deduction', amount: customDeductionValue }] as { label: string; amount: number }[]
                     : []),
+                ...((record.lateDeduction || 0) > 0
+                    ? [{ label: 'Late Deduction', amount: record.lateDeduction || 0 }] as { label: string; amount: number }[]
+                    : []),
             ].filter(row => Math.abs(row.amount) > 0.009),
         [
             record.deductions.pagibig,
             record.deductions.philhealth,
             record.deductions.sss,
             customDeductionValue,
+            record.lateDeduction,
         ],
     );
 
@@ -326,7 +330,13 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
     const mandatoryDeductionsTotal = record.deductions.total;
     const totalFilteredSalaryDeductions = filteredSalaryDeductions.reduce((sum, deduction) => sum + deduction.amount, 0);
     const lateDeductionAmount = record.lateDeduction || 0;
-    const combinedDeductions = mandatoryDeductionsTotal + totalFilteredSalaryDeductions;
+    console.log('Late Deduction Debug:', {
+        recordLateDeduction: record.lateDeduction,
+        lateDeductionAmount,
+        recordLateMinutes: record.lateMinutes,
+        recordDaysLate: record.daysLate
+    });
+    const combinedDeductions = mandatoryDeductionsTotal + totalFilteredSalaryDeductions + lateDeductionAmount;
     const formattedGrossPay = formatPeso(grossPay);
     const formattedNetPay = formatPeso(netPay);
     const formattedMandatoryDeductions = formatPeso(mandatoryDeductionsTotal);
@@ -361,10 +371,26 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                 description: income.description,
                 amount: income.amount,
             })),
-            salaryDeductionItems: filteredSalaryDeductions.map(deduction => ({
-                description: deduction.description,
-                amount: deduction.amount,
-            })),
+            salaryDeductionItems: (() => {
+                const items = [];
+                console.log('Building salaryDeductionItems:', {
+                    lateMinutes: record.lateMinutes,
+                    lateDeduction: record.lateDeduction,
+                    willAddLate: !!(record.lateMinutes && record.lateMinutes > 0)
+                });
+                if (record.lateMinutes && record.lateMinutes > 0) {
+                    items.push({
+                        description: `Late Deduction (${record.lateMinutes} min)`,
+                        amount: record.lateDeduction || 0
+                    });
+                }
+                items.push(...filteredSalaryDeductions.map(deduction => ({
+                    description: deduction.description,
+                    amount: deduction.amount,
+                })));
+                console.log('Final salaryDeductionItems:', items);
+                return items;
+            })(),
             lateMinutes: record.lateMinutes,
             lateDeduction: record.lateDeduction,
             regularHours: record.regularHours,
@@ -745,6 +771,30 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                         isBold
                                     />
 
+                                    {(record.lateMinutes && record.lateMinutes > 0) ? (
+                                        <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+                                            <h4 className="text-sm font-semibold text-text-primary mb-2">Late Information</h4>
+                                            <div className="space-y-1">
+                                                <div className="flex justify-between text-xs">
+                                                    <span className="text-text-secondary">Late Minutes</span>
+                                                    <span className="text-text-primary font-medium">{record.lateMinutes} min</span>
+                                                </div>
+                                                <div className="flex justify-between text-xs">
+                                                    <span className="text-text-secondary">Days Late</span>
+                                                    <span className="text-text-primary font-medium">{record.daysLate || 0}</span>
+                                                </div>
+                                                <div className="flex justify-between text-xs">
+                                                    <span className="text-text-secondary">Late Hours</span>
+                                                    <span className="text-text-primary font-medium">{formatHoursToTime((record.lateMinutes || 0) / 60)}</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-red-500/30">
+                                                <span className="text-red-600">Late Deduction</span>
+                                                <span className="text-red-600">{formatPeso(record.lateDeduction || 0)}</span>
+                                            </div>
+                                        </div>
+                                    ) : null}
+
                                     {(filteredAdditionalIncome.length > 0 || filteredSalaryDeductions.length > 0) && (
                                         <div className="mt-3 rounded-lg border border-border-color bg-bg-tertiary/40 p-3">
                                             {filteredAdditionalIncome.length > 0 && (
@@ -765,7 +815,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                                 </div>
                                             )}
 
-                                            {filteredSalaryDeductions.length > 0 && (
+                                            {(filteredSalaryDeductions.length > 0 || lateDeductionAmount > 0.001) && (
                                                 <div className={filteredAdditionalIncome.length > 0 ? 'mt-4 pt-4 border-t border-border-color' : ''}>
                                                     <h4 className="text-sm font-semibold text-text-primary mb-2">Salary Deductions</h4>
                                                     <div className="space-y-1">
@@ -775,10 +825,16 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                                                 <span className="text-text-primary font-medium">{formatPeso(deduction.amount)}</span>
                                                             </div>
                                                         ))}
+                                                        {record.lateMinutes > 0 && (
+                                                            <div className="flex justify-between text-xs">
+                                                                <span className="text-text-secondary">Late Deduction ({record.lateMinutes} min)</span>
+                                                                <span className="text-text-primary font-medium">{formatPeso(record.lateDeduction || 0)}</span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                     <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-border-color">
                                                         <span className="text-text-primary">Total</span>
-                                                        <span className="text-text-primary">{formatPeso(filteredSalaryDeductions.reduce((sum, d) => sum + d.amount, 0))}</span>
+                                                        <span className="text-text-primary">{formatPeso(filteredSalaryDeductions.reduce((sum, d) => sum + d.amount, 0) + lateDeductionAmount)}</span>
                                                     </div>
                                                 </div>
                                             )}

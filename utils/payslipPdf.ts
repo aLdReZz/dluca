@@ -363,7 +363,7 @@ const renderPayslipPage = async (doc: jsPDF, data: PayslipPdfData, logoDataUrl: 
         doc.text(stat.value, centerX, statsY + 30, { align: 'center' });
 
         // Amount and time (if applicable) - subtle gray color
-        if (stat.showAmount && stat.amount) {
+        if (stat.showAmount) {
             doc.setFont(BODY_FONT, 'normal');
             doc.setFontSize(8);
             setTextColor(doc, SUBTEXT_COLOR);
