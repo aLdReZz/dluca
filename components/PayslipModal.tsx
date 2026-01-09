@@ -162,10 +162,11 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
         // Calculate total filtered salary deductions
         const totalFilteredSalaryDeductions = filteredSalaryDeductions.reduce((sum, deduction) => sum + deduction.amount, 0);
 
+        const lateDeductionAmount = record.lateDeduction || 0;
         const gross = record.regularPay + record.overtimePay + (record.serviceCharge || 0) + totalFilteredAdditionalIncome;
-        const net = gross - record.deductions.total - totalFilteredSalaryDeductions;
+        const net = gross - record.deductions.total - totalFilteredSalaryDeductions - lateDeductionAmount;
         return { grossPay: gross, netPay: net };
-    }, [record.regularPay, record.overtimePay, record.serviceCharge, record.deductions.total, filteredAdditionalIncome, filteredSalaryDeductions]);
+    }, [record.regularPay, record.overtimePay, record.serviceCharge, record.deductions.total, filteredAdditionalIncome, filteredSalaryDeductions, record.lateDeduction]);
 
     const handleDeductionToggle = () => setIsDeductionEditorOpen(prev => !prev);
     const handleDeductionNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) =>
@@ -309,16 +310,12 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                 ...(customDeductionValue > 0
                     ? [{ label: 'Custom Deduction', amount: customDeductionValue }] as { label: string; amount: number }[]
                     : []),
-                ...((record.lateDeduction || 0) > 0
-                    ? [{ label: 'Late Deduction', amount: record.lateDeduction || 0 }] as { label: string; amount: number }[]
-                    : []),
             ].filter(row => Math.abs(row.amount) > 0.009),
         [
             record.deductions.pagibig,
             record.deductions.philhealth,
             record.deductions.sss,
             customDeductionValue,
-            record.lateDeduction,
         ],
     );
 
@@ -771,31 +768,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                                         isBold
                                     />
 
-                                    {(record.lateMinutes && record.lateMinutes > 0) ? (
-                                        <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
-                                            <h4 className="text-sm font-semibold text-text-primary mb-2">Late Information</h4>
-                                            <div className="space-y-1">
-                                                <div className="flex justify-between text-xs">
-                                                    <span className="text-text-secondary">Late Minutes</span>
-                                                    <span className="text-text-primary font-medium">{record.lateMinutes} min</span>
-                                                </div>
-                                                <div className="flex justify-between text-xs">
-                                                    <span className="text-text-secondary">Days Late</span>
-                                                    <span className="text-text-primary font-medium">{record.daysLate || 0}</span>
-                                                </div>
-                                                <div className="flex justify-between text-xs">
-                                                    <span className="text-text-secondary">Late Hours</span>
-                                                    <span className="text-text-primary font-medium">{formatHoursToTime((record.lateMinutes || 0) / 60)}</span>
-                                                </div>
-                                            </div>
-                                            <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-red-500/30">
-                                                <span className="text-red-600">Late Deduction</span>
-                                                <span className="text-red-600">{formatPeso(record.lateDeduction || 0)}</span>
-                                            </div>
-                                        </div>
-                                    ) : null}
-
-                                    {(filteredAdditionalIncome.length > 0 || filteredSalaryDeductions.length > 0) && (
+                                    {(filteredAdditionalIncome.length > 0 || filteredSalaryDeductions.length > 0 || lateDeductionAmount > 0.001) && (
                                         <div className="mt-3 rounded-lg border border-border-color bg-bg-tertiary/40 p-3">
                                             {filteredAdditionalIncome.length > 0 && (
                                                 <div>
