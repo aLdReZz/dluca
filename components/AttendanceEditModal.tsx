@@ -22,12 +22,39 @@ const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
     const [timeIn, setTimeIn] = useState('');
     const [timeOut, setTimeOut] = useState('');
     const [isClosing, setIsClosing] = useState(false);
-    const timeInRef = useRef<HTMLSelectElement>(null);
+    const timeInRef = useRef<HTMLInputElement>(null);
+
+    // Convert 12-hour format to 24-hour format for the time input
+    const convertTo24Hour = (time12h: string): string => {
+        if (!time12h) return '';
+
+        // If already in 24-hour format (HH:MM), return as is
+        if (/^\d{1,2}:\d{2}$/.test(time12h)) {
+            const [hours, minutes] = time12h.split(':');
+            return `${hours.padStart(2, '0')}:${minutes}`;
+        }
+
+        // Parse 12-hour format (e.g., "10:49 AM" or "8:03 PM")
+        const match = time12h.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+        if (!match) return '';
+
+        let hours = parseInt(match[1]);
+        const minutes = match[2];
+        const period = match[3].toUpperCase();
+
+        if (period === 'PM' && hours !== 12) {
+            hours += 12;
+        } else if (period === 'AM' && hours === 12) {
+            hours = 0;
+        }
+
+        return `${hours.toString().padStart(2, '0')}:${minutes}`;
+    };
 
     useEffect(() => {
         if (isOpen) {
-            setTimeIn(initialRecord?.timeIn || '');
-            setTimeOut(initialRecord?.timeOut || '');
+            setTimeIn(convertTo24Hour(initialRecord?.timeIn || ''));
+            setTimeOut(convertTo24Hour(initialRecord?.timeOut || ''));
             setIsClosing(false);
         }
     }, [initialRecord, isOpen]);
@@ -96,58 +123,22 @@ const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-text-secondary mb-2">Time In</label>
-                            <select
+                            <input
                                 ref={timeInRef}
+                                type="time"
                                 value={timeIn}
                                 onChange={(e) => setTimeIn(e.target.value)}
-                                className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2.5 focus:outline-none cursor-pointer appearance-none transition-all duration-200 text-text-primary text-sm"
-                            >
-                                <option value="">--:--</option>
-                                {Array.from({ length: 24 }, (_, i) => {
-                                    const hour = String(i).padStart(2, '0');
-                                    const time = `${hour}:00`;
-                                    const display = new Date(`2000-01-01T${time}`).toLocaleTimeString('en-US', {
-                                        hour: 'numeric',
-                                        minute: '2-digit',
-                                        hour12: true
-                                    });
-                                    return (
-                                        <option key={time} value={time}>{display}</option>
-                                    );
-                                })}
-                            </select>
+                                className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent-blue/50 transition-all duration-200 text-text-primary text-sm"
+                            />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-text-secondary mb-2">Time Out</label>
-                            <select
+                            <input
+                                type="time"
                                 value={timeOut}
                                 onChange={(e) => setTimeOut(e.target.value)}
-                                className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2.5 focus:outline-none cursor-pointer appearance-none transition-all duration-200 text-text-primary text-sm"
-                            >
-                                <option value="">--:--</option>
-                                {Array.from({ length: 24 }, (_, i) => {
-                                    const hour = String(i).padStart(2, '0');
-                                    const time = `${hour}:00`;
-
-                                    // Get the hour from timeIn (e.g., "09:00" -> 9)
-                                    const timeInHour = timeIn ? parseInt(timeIn.split(':')[0]) : -1;
-                                    const currentHour = parseInt(hour);
-
-                                    // Only show times that are after timeIn
-                                    if (timeInHour >= 0 && currentHour <= timeInHour) {
-                                        return null;
-                                    }
-
-                                    const display = new Date(`2000-01-01T${time}`).toLocaleTimeString('en-US', {
-                                        hour: 'numeric',
-                                        minute: '2-digit',
-                                        hour12: true
-                                    });
-                                    return (
-                                        <option key={time} value={time}>{display}</option>
-                                    );
-                                })}
-                            </select>
+                                className="w-full bg-bg-primary border border-border-color rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent-blue/50 transition-all duration-200 text-text-primary text-sm"
+                            />
                         </div>
                     </div>
                      <div className="pt-4 border-t border-border-color">

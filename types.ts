@@ -85,6 +85,7 @@ export interface Employee {
     order?: number; // Position in the employee list
     salaryDeductions?: SalaryDeduction[];
     additionalIncome?: AdditionalIncome[];
+    serviceChargeEnabled?: boolean; // Whether employee receives service charge distribution
 }
 
 export interface AttendanceRecord {

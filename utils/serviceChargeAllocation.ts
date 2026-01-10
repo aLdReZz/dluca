@@ -232,6 +232,11 @@ export const calculateServiceChargeDistribution = ({
 
         if (usingManual) {
             for (const employee of employees) {
+                // Skip employees who don't have service charge enabled
+                if (employee.serviceChargeEnabled === false) {
+                    continue;
+                }
+
                 const minutes = manualEntriesForDate?.[employee.id] ?? 0;
                 if (minutes !== 0) {
                     perDay.teamMinutes += minutes;
@@ -245,6 +250,11 @@ export const calculateServiceChargeDistribution = ({
             }
         } else {
             for (const employee of employees) {
+                // Skip employees who don't have service charge enabled
+                if (employee.serviceChargeEnabled === false) {
+                    continue;
+                }
+
                 const records = attendanceByEmployee[employee.name.trim().toLowerCase()] || [];
                 const attendance = records.find(r => r.date === dateKey);
                 const schedule = employee.schedule?.[dateKey];

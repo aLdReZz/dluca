@@ -274,6 +274,7 @@ const Attendance: React.FC<AttendanceProps> = ({
     const [isAttendanceLocked, setIsAttendanceLocked] = useState(true);
     const [editingAttendanceContext, setEditingAttendanceContext] = useState<{ emp: Employee, dateKey: string, date: Date } | null>(null);
     const [isWeekScheduleCreatorOpen, setIsWeekScheduleCreatorOpen] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(false);
 
     const getEmployeeListKey = (employee: Employee, index: number) => {
         const baseIdentifier = employee?.id ?? employee?.name ?? index;
@@ -1434,6 +1435,19 @@ const Attendance: React.FC<AttendanceProps> = ({
                             </svg>
                         </button>
                         <button
+                            onClick={() => setIsEditMode(!isEditMode)}
+                            className={`px-4 py-2 rounded-lg font-semibold text-xs transition flex items-center gap-1.5 ${
+                                isEditMode
+                                    ? 'bg-accent-blue text-white hover:bg-opacity-90 shadow-md shadow-accent-blue/30'
+                                    : 'bg-bg-tertiary border border-border-color text-text-primary hover:bg-hover-bg'
+                            }`}
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            <span className="hidden sm:inline">{isEditMode ? 'Exit Edit' : 'Edit Mode'}</span>
+                        </button>
+                        <button
                             onClick={handleExportSchedule}
                             className="bg-bg-tertiary border border-border-color text-text-primary px-4 py-2 rounded-lg font-semibold text-xs hover:bg-hover-bg transition flex items-center gap-1.5"
                         >
@@ -1577,28 +1591,26 @@ const Attendance: React.FC<AttendanceProps> = ({
                                                         return (
                                                             <td
                                                                 key={`${emp.id}-${currentDayKey}`}
-                                                                className={`${cellClasses} ${isEditing ? 'p-1' : 'p-0'} align-middle`}
+                                                                className={`${cellClasses} ${isEditMode ? 'p-1' : 'p-0'} align-middle`}
                                                             >
-                                                                <div className={`flex flex-col items-center justify-center h-full ${isEditing ? 'gap-1 px-1 py-1' : 'px-1 py-1'}`}>
+                                                                <div className={`flex flex-col items-center justify-center ${isEditMode ? 'gap-1 px-1 py-1' : 'px-1 py-1'}`}>
                                                                     {renderCombinedContent(highlightMode)}
-                                                                    {isEditing && (
+
+                                                                    {/* Edit buttons - only show in edit mode */}
+                                                                    {isEditMode && (
                                                                         <div className="flex flex-col gap-0.5 w-full">
-                                                                            {!isScheduleLocked && (
-                                                                                <button
-                                                                                    onClick={() => handleOpenScheduleModal(emp, currentDayKey, dateInfo.date)}
-                                                                                    className="w-full text-center bg-accent-orange/10 border border-accent-orange/30 rounded-md hover:bg-accent-orange/20 transition-all px-1 py-0.5 text-[9px] text-accent-orange"
-                                                                                >
-                                                                                    Edit Schedule
-                                                                                </button>
-                                                                            )}
-                                                                            {!isAttendanceLocked && (
-                                                                                <button
-                                                                                    onClick={() => handleOpenAttendanceModal(emp, currentDayKey, dateInfo.date)}
-                                                                                    className="w-full text-center bg-accent-blue/10 border border-accent-blue/30 rounded-md hover:bg-accent-blue/20 transition-all px-1 py-0.5 text-[9px] text-accent-blue"
-                                                                                >
-                                                                                    Edit Attendance
-                                                                                </button>
-                                                                            )}
+                                                                            <button
+                                                                                onClick={() => handleOpenScheduleModal(emp, currentDayKey, dateInfo.date)}
+                                                                                className="w-full text-center bg-accent-orange/10 border border-accent-orange/30 rounded-md hover:bg-accent-orange/20 transition-all px-1 py-0.5 text-[9px] text-accent-orange font-semibold"
+                                                                            >
+                                                                                Edit Schedule
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleOpenAttendanceModal(emp, currentDayKey, dateInfo.date)}
+                                                                                className="w-full text-center bg-accent-blue/10 border border-accent-blue/30 rounded-md hover:bg-accent-blue/20 transition-all px-1 py-0.5 text-[9px] text-accent-blue font-semibold"
+                                                                            >
+                                                                                Edit Attendance
+                                                                            </button>
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -1722,26 +1734,34 @@ const Attendance: React.FC<AttendanceProps> = ({
                                                         }
                                                     }
 
-                                                    const scheduleContent = isScheduleLocked ? (
-                                                        <div className="flex items-center justify-end h-full">
-                                                          {renderCellContent()}
-                                                        </div>
-                                                    ) : (
-                                                        <button 
-                                                            onClick={() => handleOpenScheduleModal(emp, currentDayKey, dateInfo.date)}
-                                                            className="w-48 text-right p-1 -m-1 bg-bg-primary/50 border border-border-color rounded-md flex justify-end items-center"
-                                                        >
-                                                            {renderCellContent()}
-                                                        </button>
-                                                    );
-                                                    
                                                     return (
-                                                <div key={`${emp.id}-${currentDayKey}`} className={dayClasses}>
+                                                        <div
+                                                            key={`${emp.id}-${currentDayKey}`}
+                                                            className={dayClasses}
+                                                        >
                                                             <div className={`text-sm font-medium ${dateInfo.isToday ? 'text-text-primary' : 'text-text-secondary'}`}>
                                                                 {dateInfo.date.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })}
                                                                 <span className="ml-2 text-text-secondary/70">{dateInfo.date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', timeZone: 'UTC' })}</span>
                                                             </div>
-                                                            <div>{scheduleContent}</div>
+                                                            <div className="flex flex-col items-end gap-1">
+                                                                {renderCellContent()}
+                                                                {isEditMode && (
+                                                                    <div className="flex gap-1">
+                                                                        <button
+                                                                            onClick={() => handleOpenScheduleModal(emp, currentDayKey, dateInfo.date)}
+                                                                            className="px-2 py-0.5 text-[9px] bg-accent-orange/10 border border-accent-orange/30 rounded text-accent-orange hover:bg-accent-orange/20 font-semibold"
+                                                                        >
+                                                                            Schedule
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleOpenAttendanceModal(emp, currentDayKey, dateInfo.date)}
+                                                                            className="px-2 py-0.5 text-[9px] bg-accent-blue/10 border border-accent-blue/30 rounded text-accent-blue hover:bg-accent-blue/20 font-semibold"
+                                                                        >
+                                                                            Attendance
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     );
                                                 })}
