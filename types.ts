@@ -171,6 +171,7 @@ export interface RecipeCosting {
     sellingPrice: number;
     foodCostPercentage: number;
     finalCostPercentage: number;
+    isTemplate?: boolean; // True if this is a template recipe (not sold individually)
 }
 
 export type ContentType = 'Post' | 'Story' | 'Reel' | 'Ad';

@@ -75,6 +75,10 @@ const ProductItemModal: React.FC<ProductItemModalProps> = ({ isOpen, onClose, on
     };
     const [formData, setFormData] = useState(initialState);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
+    const [showPriceHelper, setShowPriceHelper] = useState(false);
+    const [helperPackagePrice, setHelperPackagePrice] = useState('');
+    const [helperPackageSize, setHelperPackageSize] = useState('');
+    const [helperPackageUnit, setHelperPackageUnit] = useState('g');
     const nameInputRef = useRef<HTMLInputElement>(null);
 
     // State for suggestions visibility
@@ -224,6 +228,21 @@ const ProductItemModal: React.FC<ProductItemModalProps> = ({ isOpen, onClose, on
         if (validate()) onSave(formData);
     };
 
+    // Calculate price per unit from package info
+    const calculatePricePerUnit = () => {
+        const packagePrice = parseFloat(helperPackagePrice);
+        const packageSize = parseFloat(helperPackageSize);
+
+        if (!packagePrice || !packageSize || !formData.unit) return;
+
+        // Calculate price per package unit
+        const pricePerPackageUnit = packagePrice / packageSize;
+
+        // Set the calculated price
+        setFormData({ ...formData, price: parseFloat(pricePerPackageUnit.toFixed(4)) });
+        setShowPriceHelper(false);
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -303,6 +322,69 @@ const ProductItemModal: React.FC<ProductItemModalProps> = ({ isOpen, onClose, on
                                 <label className="block text-sm font-medium text-text-secondary mb-1">Price (₱)</label>
                                 <input type="number" name="price" value={String(formData.price)} onChange={handleChange} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue" />
                             </div>
+                        </div>
+
+                        {/* Price Calculator Helper */}
+                        <div className="mt-4 bg-bg-tertiary/50 border border-border-color rounded-lg p-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowPriceHelper(!showPriceHelper)}
+                                className="flex items-center gap-2 text-sm text-accent-blue hover:underline"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                </svg>
+                                Price Calculator {showPriceHelper ? '−' : '+'}
+                            </button>
+
+                            {showPriceHelper && (
+                                <div className="mt-3 space-y-3">
+                                    <p className="text-xs text-text-secondary">
+                                        Calculate price per {formData.unit || 'unit'} from package price
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs text-text-secondary mb-1">Package Price (₱)</label>
+                                            <input
+                                                type="number"
+                                                placeholder="65"
+                                                value={helperPackagePrice}
+                                                onChange={(e) => setHelperPackagePrice(e.target.value)}
+                                                className="w-full bg-bg-primary border border-border-color rounded-md p-2 text-sm focus:ring-accent-blue focus:border-accent-blue"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-text-secondary mb-1">Package Size</label>
+                                            <input
+                                                type="number"
+                                                placeholder="155"
+                                                value={helperPackageSize}
+                                                onChange={(e) => setHelperPackageSize(e.target.value)}
+                                                className="w-full bg-bg-primary border border-border-color rounded-md p-2 text-sm focus:ring-accent-blue focus:border-accent-blue"
+                                            />
+                                        </div>
+                                    </div>
+                                    {helperPackagePrice && helperPackageSize && (
+                                        <div className="bg-bg-primary border border-accent-blue/30 rounded-md p-2">
+                                            <p className="text-xs text-text-secondary">Calculated price per {formData.unit || 'unit'}:</p>
+                                            <p className="text-sm font-semibold text-accent-blue">
+                                                ₱{(parseFloat(helperPackagePrice) / parseFloat(helperPackageSize)).toFixed(4)}
+                                            </p>
+                                            <p className="text-xs text-text-secondary mt-1">
+                                                Example: {formData.unit === 'g' ? '5g' : '1 unit'} = ₱{((parseFloat(helperPackagePrice) / parseFloat(helperPackageSize)) * (formData.unit === 'g' ? 5 : 1)).toFixed(2)}
+                                            </p>
+                                        </div>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={calculatePricePerUnit}
+                                        disabled={!helperPackagePrice || !helperPackageSize}
+                                        className="w-full bg-accent-blue text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Use This Price
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </form>
                 </div>

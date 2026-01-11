@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { RecipeCosting, RecipeIngredient, ProductInventoryItem } from '../types';
+import type { RecipeCosting, RecipeIngredient, RecipeComponent, ProductInventoryItem } from '../types';
 import { XMarkIcon, PlusIcon, TrashIcon } from './Icons';
 
 interface RecipeCostingModalProps {
@@ -8,9 +8,10 @@ interface RecipeCostingModalProps {
     onSave: (data: Omit<RecipeCosting, 'id'> & { id?: number }) => void;
     recipeToEdit: RecipeCosting | null;
     products: ProductInventoryItem[];
+    recipes?: RecipeCosting[]; // For using template recipes as ingredients
 }
 
-const ALLOCATIONS = [
+const DEFAULT_ALLOCATIONS = [
     { name: 'Overhead/Utilities', percentage: 20 },
     { name: 'Labor', percentage: 20 },
     { name: 'VAT', percentage: 12 },
@@ -18,20 +19,20 @@ const ALLOCATIONS = [
     { name: 'Others', percentage: 15 },
     { name: 'S.C. Disc', percentage: 20 },
 ];
-const TOTAL_ALLOCATION_PERCENTAGE = ALLOCATIONS.reduce((sum, item) => sum + item.percentage, 0);
-const ALLOCATION_MULTIPLIER = 1 + TOTAL_ALLOCATION_PERCENTAGE / 100;
 
-
-const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose, onSave, recipeToEdit, products }) => {
+const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose, onSave, recipeToEdit, products, recipes = [] }) => {
     const [name, setName] = useState('');
     const [sellingPrice, setSellingPrice] = useState('');
-    const [ingredients, setIngredients] = useState<RecipeIngredient[]>([]);
+    const [isTemplate, setIsTemplate] = useState(false);
+    const [components, setComponents] = useState<RecipeComponent[]>([{ id: '1', name: '', ingredients: [], cost: 0 }]);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
+    const [allocations, setAllocations] = useState(DEFAULT_ALLOCATIONS);
+    const [editingAllocationIndex, setEditingAllocationIndex] = useState<number | null>(null);
 
-    const [activeIngredientIndex, setActiveIngredientIndex] = useState<number | null>(null);
-    const [suggestions, setSuggestions] = useState<ProductInventoryItem[]>([]);
+    const [activeIngredientIndex, setActiveIngredientIndex] = useState<string | null>(null); // Changed to string to support componentId-ingredientIndex
+    const [suggestions, setSuggestions] = useState<(ProductInventoryItem | RecipeCosting)[]>([]);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
-    
+
     const nameInputRef = useRef<HTMLInputElement>(null);
     
     const formatPeso = (amount: number) => `₱${amount.toFixed(2)}`;
@@ -39,14 +40,46 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
     useEffect(() => {
         if (isOpen) {
             document.body.style.overflow = 'hidden';
+            setAllocations(DEFAULT_ALLOCATIONS); // Reset allocations when opening modal
             if (recipeToEdit) {
                 setName(recipeToEdit.name);
                 setSellingPrice(String(recipeToEdit.sellingPrice));
-                setIngredients(recipeToEdit.ingredients);
+                setIsTemplate(recipeToEdit.isTemplate || false);
+
+                // Check if recipe has components or legacy ingredients
+                if (recipeToEdit.components && recipeToEdit.components.length > 0) {
+                    // Recalculate costs for components
+                    const updatedComponents = recipeToEdit.components.map(comp => {
+                        const updatedIngredients = comp.ingredients.map(ing => {
+                            const product = products.find(p => p.id === ing.itemId);
+                            if (product) {
+                                const recalculatedCost = calculateCost(product, ing.quantity, ing.unit);
+                                return { ...ing, cost: recalculatedCost };
+                            }
+                            return ing;
+                        });
+                        const componentCost = updatedIngredients.reduce((sum, ing) => sum + ing.cost, 0);
+                        return { ...comp, ingredients: updatedIngredients, cost: componentCost };
+                    });
+                    setComponents(updatedComponents);
+                } else {
+                    // Legacy: single component with all ingredients
+                    const updatedIngredients = recipeToEdit.ingredients.map(ing => {
+                        const product = products.find(p => p.id === ing.itemId);
+                        if (product) {
+                            const recalculatedCost = calculateCost(product, ing.quantity, ing.unit);
+                            return { ...ing, cost: recalculatedCost };
+                        }
+                        return ing;
+                    });
+                    const componentCost = updatedIngredients.reduce((sum, ing) => sum + ing.cost, 0);
+                    setComponents([{ id: '1', name: '', ingredients: updatedIngredients, cost: componentCost }]);
+                }
             } else {
                 setName('');
                 setSellingPrice('');
-                setIngredients([]);
+                setIsTemplate(false);
+                setComponents([{ id: '1', name: '', ingredients: [], cost: 0 }]);
             }
             setErrors({});
             setTimeout(() => nameInputRef.current?.focus(), 100);
@@ -56,15 +89,23 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
         return () => {
             document.body.style.overflow = 'unset';
         };
-    }, [isOpen, recipeToEdit]);
+    }, [isOpen, recipeToEdit, products]);
 
     const totalCost = useMemo(() => {
-        return ingredients.reduce((sum, ing) => sum + ing.cost, 0);
-    }, [ingredients]);
+        return components.reduce((sum, comp) => sum + comp.cost, 0);
+    }, [components]);
+
+    const totalAllocationPercentage = useMemo(() => {
+        return allocations.reduce((sum, item) => sum + item.percentage, 0);
+    }, [allocations]);
+
+    const allocationMultiplier = useMemo(() => {
+        return 1 + totalAllocationPercentage / 100;
+    }, [totalAllocationPercentage]);
 
     const totalCostWithAllocation = useMemo(() => {
-        return totalCost * ALLOCATION_MULTIPLIER;
-    }, [totalCost]);
+        return totalCost * allocationMultiplier;
+    }, [totalCost, allocationMultiplier]);
 
     const foodCostPercentage = useMemo(() => {
         const price = parseFloat(sellingPrice);
@@ -78,14 +119,6 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
         return (totalCostWithAllocation / price) * 100;
     }, [totalCostWithAllocation, sellingPrice]);
 
-
-    const handleAddIngredient = () => {
-        setIngredients([...ingredients, { itemId: 0, name: '', quantity: 1, unit: 'g', cost: 0 }]);
-    };
-
-    const handleRemoveIngredient = (index: number) => {
-        setIngredients(ingredients.filter((_, i) => i !== index));
-    };
 
     // Unit conversion function
     const convertUnit = (quantity: number, fromUnit: string, toUnit: string): number => {
@@ -144,57 +177,133 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
     const calculateCost = (product: ProductInventoryItem, quantity: number, recipeUnit: string): number => {
         // Convert the recipe quantity to the product's unit
         const convertedQuantity = convertUnit(quantity, recipeUnit, product.unit);
-        return convertedQuantity * product.price;
+        // Calculate price per unit, then multiply by converted quantity
+        const pricePerUnit = product.quantity > 0 ? product.price / product.quantity : 0;
+        return convertedQuantity * pricePerUnit;
     };
 
-    const handleIngredientChange = (index: number, field: keyof RecipeIngredient, value: any) => {
-        const newIngredients = [...ingredients];
-        const currentIngredient = { ...newIngredients[index] };
+    // Component management functions
+    const handleAddComponent = () => {
+        const newId = String(Date.now());
+        setComponents([...components, { id: newId, name: '', ingredients: [], cost: 0 }]);
+    };
 
-        if (field === 'name') {
-            currentIngredient.name = value;
-            currentIngredient.itemId = 0; // Reset ID on name change
-            setActiveIngredientIndex(index);
-            setHighlightedIndex(-1);
-            if (value) {
-                setSuggestions(products.filter(p => p.name.toLowerCase().includes(value.toLowerCase())));
+    const handleRemoveComponent = (componentId: string) => {
+        setComponents(components.filter(c => c.id !== componentId));
+    };
+
+    const handleComponentNameChange = (componentId: string, newName: string) => {
+        setComponents(components.map(c => c.id === componentId ? { ...c, name: newName } : c));
+    };
+
+    const handleAddIngredient = (componentId: string) => {
+        setComponents(components.map(c => {
+            if (c.id === componentId) {
+                return {
+                    ...c,
+                    ingredients: [...c.ingredients, { itemId: 0, name: '', quantity: 1, unit: 'g', cost: 0 }]
+                };
+            }
+            return c;
+        }));
+    };
+
+    const handleRemoveIngredient = (componentId: string, ingredientIndex: number) => {
+        setComponents(components.map(c => {
+            if (c.id === componentId) {
+                const newIngredients = c.ingredients.filter((_, i) => i !== ingredientIndex);
+                const newCost = newIngredients.reduce((sum, ing) => sum + ing.cost, 0);
+                return { ...c, ingredients: newIngredients, cost: newCost };
+            }
+            return c;
+        }));
+    };
+
+    const handleIngredientChange = (componentId: string, ingredientIndex: number, field: keyof RecipeIngredient, value: any) => {
+        setComponents(components.map(c => {
+            if (c.id !== componentId) return c;
+
+            const newIngredients = [...c.ingredients];
+            const currentIngredient = { ...newIngredients[ingredientIndex] };
+
+            if (field === 'name') {
+                currentIngredient.name = value;
+                currentIngredient.itemId = 0; // Reset ID on name change
+                setActiveIngredientIndex(`${componentId}-${ingredientIndex}`);
+                setHighlightedIndex(-1);
+                if (value) {
+                    // Search both products and template recipes
+                    const productSuggestions = products.filter(p =>
+                        p.name.toLowerCase().includes(value.toLowerCase())
+                    );
+                    const templateRecipes = recipes.filter(r =>
+                        r.isTemplate &&
+                        r.name.toLowerCase().includes(value.toLowerCase()) &&
+                        r.id !== recipeToEdit?.id // Don't allow circular references
+                    );
+                    setSuggestions([...productSuggestions, ...templateRecipes]);
+                } else {
+                    setSuggestions([]);
+                }
+            } else if (field === 'quantity') {
+                const product = products.find(p => p.id === currentIngredient.itemId);
+                currentIngredient.quantity = parseFloat(value) || 0;
+                if (product) {
+                    currentIngredient.cost = calculateCost(product, currentIngredient.quantity, currentIngredient.unit);
+                }
+            } else if (field === 'unit') {
+                currentIngredient.unit = value;
+                const product = products.find(p => p.id === currentIngredient.itemId);
+                if (product && currentIngredient.quantity > 0) {
+                    currentIngredient.cost = calculateCost(product, currentIngredient.quantity, currentIngredient.unit);
+                }
+            }
+
+            newIngredients[ingredientIndex] = currentIngredient;
+            const newCost = newIngredients.reduce((sum, ing) => sum + ing.cost, 0);
+            return { ...c, ingredients: newIngredients, cost: newCost };
+        }));
+    };
+
+    const handleSuggestionClick = (componentId: string, ingredientIndex: number, suggestion: ProductInventoryItem | RecipeCosting) => {
+        setComponents(components.map(c => {
+            if (c.id !== componentId) return c;
+
+            const newIngredients = [...c.ingredients];
+            const currentUnit = newIngredients[ingredientIndex].unit || 'g';
+            const quantity = newIngredients[ingredientIndex].quantity || 1;
+
+            // Check if suggestion is a template recipe
+            const isRecipe = 'totalCostWithAllocation' in suggestion;
+
+            if (isRecipe) {
+                // Using a template recipe as ingredient
+                // Use totalCost (without markup) to avoid double markup
+                newIngredients[ingredientIndex] = {
+                    itemId: suggestion.id,
+                    name: suggestion.name,
+                    quantity: quantity,
+                    unit: 'pcs', // Template recipes are counted as pieces
+                    cost: suggestion.totalCost * quantity,
+                };
             } else {
-                setSuggestions([]);
+                // Using a regular product as ingredient
+                newIngredients[ingredientIndex] = {
+                    itemId: suggestion.id,
+                    name: suggestion.name,
+                    quantity: quantity,
+                    unit: currentUnit,
+                    cost: calculateCost(suggestion, quantity, currentUnit),
+                };
             }
-        } else if (field === 'quantity') {
-            const product = products.find(p => p.id === currentIngredient.itemId);
-            currentIngredient.quantity = parseFloat(value) || 0;
-            if (product) {
-                currentIngredient.cost = calculateCost(product, currentIngredient.quantity, currentIngredient.unit);
-            }
-        } else if (field === 'unit') {
-            currentIngredient.unit = value;
-            const product = products.find(p => p.id === currentIngredient.itemId);
-            if (product && currentIngredient.quantity > 0) {
-                currentIngredient.cost = calculateCost(product, currentIngredient.quantity, currentIngredient.unit);
-            }
-        }
 
-        newIngredients[index] = currentIngredient;
-        setIngredients(newIngredients);
-    };
-    
-    const handleSuggestionClick = (index: number, suggestion: ProductInventoryItem) => {
-        const newIngredients = [...ingredients];
-        const currentUnit = newIngredients[index].unit || 'g';
-        const quantity = newIngredients[index].quantity || 1;
-        newIngredients[index] = {
-            itemId: suggestion.id,
-            name: suggestion.name,
-            quantity: quantity,
-            unit: currentUnit,
-            cost: calculateCost(suggestion, quantity, currentUnit),
-        };
-        setIngredients(newIngredients);
-        setActiveIngredientIndex(null);
+            const newCost = newIngredients.reduce((sum, ing) => sum + ing.cost, 0);
+            setActiveIngredientIndex(null);
+            return { ...c, ingredients: newIngredients, cost: newCost };
+        }));
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, componentId: string, ingredientIndex: number) => {
         if (!suggestions.length && e.key !== 'Tab') return;
 
         if (e.key === 'ArrowDown') {
@@ -206,18 +315,31 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
         } else if (e.key === 'Enter' || e.key === 'Tab') {
             if (highlightedIndex >= 0 && suggestions.length > 0) {
                 e.preventDefault();
-                handleSuggestionClick(index, suggestions[highlightedIndex]);
+                handleSuggestionClick(componentId, ingredientIndex, suggestions[highlightedIndex]);
             }
         }
+    };
+
+    const handleAllocationPercentageChange = (index: number, newPercentage: string) => {
+        const percentage = parseFloat(newPercentage) || 0;
+        const newAllocations = [...allocations];
+        newAllocations[index] = { ...newAllocations[index], percentage };
+        setAllocations(newAllocations);
     };
     
     const validate = () => {
         const newErrors: { [key: string]: string } = {};
         if (!name.trim()) newErrors.name = "Recipe name is required";
-        if (!sellingPrice || parseFloat(sellingPrice) <= 0) newErrors.sellingPrice = "Selling price must be greater than 0";
-        if (ingredients.length === 0) newErrors.ingredients = "Please add at least one ingredient";
-        if (ingredients.some(i => i.itemId === 0 || !i.name)) newErrors.ingredients = "Please select valid ingredients from the dropdown";
-        if (ingredients.some(i => !i.unit || i.unit.trim() === '')) newErrors.ingredients = "All ingredients must have a unit";
+
+        // Selling price is only required for non-template recipes
+        if (!isTemplate && (!sellingPrice || parseFloat(sellingPrice) <= 0)) {
+            newErrors.sellingPrice = "Selling price must be greater than 0";
+        }
+
+        const allIngredients = components.flatMap(c => c.ingredients);
+        if (allIngredients.length === 0) newErrors.ingredients = "Please add at least one ingredient";
+        if (allIngredients.some(i => i.itemId === 0 || !i.name)) newErrors.ingredients = "Please select valid ingredients from the dropdown";
+        if (allIngredients.some(i => !i.unit || i.unit.trim() === '')) newErrors.ingredients = "All ingredients must have a unit";
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -226,23 +348,33 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
     const handleSave = () => {
         if (!validate()) return;
 
-        // Sanitize ingredients to ensure no undefined fields
-        const sanitizedIngredients = ingredients.map(ing => ({
-            itemId: ing.itemId || 0,
-            name: ing.name || '',
-            quantity: ing.quantity || 0,
-            unit: ing.unit || 'g',
-            cost: ing.cost || 0,
+        // Sanitize components and ingredients
+        const sanitizedComponents = components.map(comp => ({
+            id: comp.id,
+            name: comp.name || '',
+            ingredients: comp.ingredients.map(ing => ({
+                itemId: ing.itemId || 0,
+                name: ing.name || '',
+                quantity: ing.quantity || 0,
+                unit: ing.unit || 'g',
+                cost: ing.cost || 0,
+            })),
+            cost: comp.cost || 0,
         }));
+
+        // For backward compatibility, also flatten to ingredients array
+        const allIngredients = sanitizedComponents.flatMap(c => c.ingredients);
 
         const recipeData: any = {
             name: name.trim(),
             sellingPrice: parseFloat(sellingPrice) || 0,
-            ingredients: sanitizedIngredients,
+            ingredients: allIngredients, // Legacy support
+            components: sanitizedComponents, // New structure
             totalCost: totalCost || 0,
             totalCostWithAllocation: totalCostWithAllocation || 0,
             foodCostPercentage: foodCostPercentage || 0,
             finalCostPercentage: finalCostPercentage || 0,
+            isTemplate: isTemplate,
         };
 
         // Only include id if editing an existing recipe
@@ -274,87 +406,229 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
                                 {errors.name && <p className="text-xs text-accent-red mt-1">{errors.name}</p>}
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-text-secondary mb-1">Selling Price (₱)*</label>
-                                <input type="number" value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} className={`w-full bg-bg-primary border rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue ${errors.sellingPrice ? 'border-accent-red' : 'border-border-color'}`} />
+                                <label className="block text-sm font-medium text-text-secondary mb-1">
+                                    Selling Price (₱){!isTemplate && '*'}
+                                </label>
+                                <input
+                                    type="number"
+                                    value={sellingPrice}
+                                    onChange={e => setSellingPrice(e.target.value)}
+                                    disabled={isTemplate}
+                                    className={`w-full bg-bg-primary border rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue ${errors.sellingPrice ? 'border-accent-red' : 'border-border-color'} ${isTemplate ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                />
                                 {errors.sellingPrice && <p className="text-xs text-accent-red mt-1">{errors.sellingPrice}</p>}
                             </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 p-3 bg-bg-tertiary/30 rounded-lg border border-border-color/50">
+                            <input
+                                type="checkbox"
+                                id="isTemplate"
+                                checked={isTemplate}
+                                onChange={e => setIsTemplate(e.target.checked)}
+                                className="w-4 h-4 text-accent-blue rounded focus:ring-2 focus:ring-accent-blue"
+                            />
+                            <label htmlFor="isTemplate" className="text-sm text-text-primary cursor-pointer select-none">
+                                <span className="font-medium">Template Recipe</span>
+                                <span className="text-text-secondary ml-2">(Not sold individually, used as ingredient in other recipes)</span>
+                            </label>
                         </div>
                         
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
                             <div className="lg:col-span-2">
                                 <h3 className="text-md font-semibold text-text-primary mb-2">Ingredients</h3>
-                                <div className="space-y-3">
-                                    {ingredients.map((ing, index) => (
-                                        <div key={index} className="grid grid-cols-12 gap-2 items-center">
-                                            <div className="col-span-1 flex justify-center">
-                                                <button type="button" onClick={() => handleRemoveIngredient(index)} className="p-2 text-text-secondary hover:text-accent-red hover:bg-accent-red/10 rounded-full transition-colors"><TrashIcon className="w-5 h-5"/></button>
-                                            </div>
-                                            <div className="col-span-5 relative">
-                                                <input type="text" placeholder="Search ingredient..." value={ing.name} onChange={e => handleIngredientChange(index, 'name', e.target.value)} onFocus={() => setActiveIngredientIndex(index)} onBlur={() => setTimeout(() => setActiveIngredientIndex(null), 150)} onKeyDown={e => handleKeyDown(e, index)} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 text-sm focus:ring-accent-blue focus:border-accent-blue"/>
-                                                {activeIngredientIndex === index && suggestions.length > 0 && (
-                                                    <div className="absolute top-full left-0 right-0 bg-bg-tertiary border-x border-b border-border-color rounded-b-lg z-20 max-h-40 overflow-y-auto mt-1">
-                                                        {suggestions.map((s, sIndex) => (
-                                                            <div key={s.id} onMouseDown={() => handleSuggestionClick(index, s)} onMouseEnter={() => setHighlightedIndex(sIndex)} className={`p-2 text-sm cursor-pointer ${sIndex === highlightedIndex ? 'bg-hover-bg' : 'hover:bg-hover-bg'}`}>
-                                                                {s.name} <span className="text-text-secondary/70">({s.brand})</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="col-span-2">
-                                                <input type="number" placeholder="Qty" value={ing.quantity} onChange={e => handleIngredientChange(index, 'quantity', e.target.value)} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 text-sm focus:ring-accent-blue focus:border-accent-blue" />
-                                            </div>
-                                            <div className="col-span-2">
-                                                <select
-                                                    value={ing.unit}
-                                                    onChange={e => handleIngredientChange(index, 'unit', e.target.value)}
-                                                    className="w-full bg-bg-primary border border-border-color rounded-lg p-2 text-sm focus:ring-accent-blue focus:border-accent-blue"
+                                {components.map((component, compIndex) => (
+                                    <div key={component.id} className="mb-4">
+                                        {/* Component Name Header */}
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Component name (e.g., Pasta, Garlic Bread)..."
+                                                value={component.name}
+                                                onChange={e => handleComponentNameChange(component.id, e.target.value)}
+                                                className="flex-1 bg-bg-primary border border-border-color rounded-md px-3 py-1.5 text-sm font-semibold text-accent-blue focus:ring-accent-blue focus:border-accent-blue"
+                                            />
+                                            {components.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveComponent(component.id)}
+                                                    className="p-1.5 text-text-secondary hover:text-accent-red hover:bg-accent-red/10 rounded-md transition-colors"
+                                                    title="Remove component"
                                                 >
-                                                    <optgroup label="Weight">
-                                                        <option value="kg">kg</option>
-                                                        <option value="g">g</option>
-                                                        <option value="mg">mg</option>
-                                                        <option value="lb">lb</option>
-                                                        <option value="oz">oz</option>
-                                                    </optgroup>
-                                                    <optgroup label="Volume">
-                                                        <option value="L">L</option>
-                                                        <option value="mL">mL</option>
-                                                        <option value="gal">gal</option>
-                                                        <option value="qt">qt</option>
-                                                        <option value="cup">cup</option>
-                                                        <option value="tbsp">tbsp</option>
-                                                        <option value="tsp">tsp</option>
-                                                    </optgroup>
-                                                    <optgroup label="Count">
-                                                        <option value="pcs">pcs</option>
-                                                        <option value="pack">pack</option>
-                                                        <option value="box">box</option>
-                                                    </optgroup>
-                                                </select>
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Column Headers */}
+                                        <div className="grid grid-cols-10 gap-2 mb-2">
+                                            <div className="col-span-1"></div>
+                                            <div className="col-span-5">
+                                                <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Ingredient Name</span>
+                                            </div>
+                                            <div className="col-span-1">
+                                                <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Qty</span>
+                                            </div>
+                                            <div className="col-span-1">
+                                                <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Unit</span>
                                             </div>
                                             <div className="col-span-2">
-                                                <div className="w-full bg-bg-primary border border-border-color rounded-lg p-2 text-sm text-right text-text-primary h-full flex items-center justify-end font-semibold">
-                                                    {formatPeso(ing.cost)}
-                                                </div>
+                                                <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Cost</span>
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
-                                <button type="button" onClick={handleAddIngredient} className="mt-3 flex items-center gap-2 text-sm text-accent-blue font-medium hover:bg-accent-blue/10 px-2 py-1 rounded-lg transition-colors"><PlusIcon className="w-4 h-4"/> Add Ingredient</button>
+
+                                        {/* Ingredients List */}
+                                        <div className="space-y-2 mb-2">
+                                            {component.ingredients.map((ing, ingIndex) => {
+                                                const activeKey = `${component.id}-${ingIndex}`;
+                                                return (
+                                                    <div key={ingIndex} className="grid grid-cols-10 gap-2 items-center">
+                                                        <div className="col-span-1 flex justify-center">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveIngredient(component.id, ingIndex)}
+                                                                className="p-1 text-text-secondary hover:text-accent-red hover:bg-accent-red/10 rounded-full transition-colors"
+                                                            >
+                                                                <TrashIcon className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                        <div className="col-span-5 relative">
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Search ingredient..."
+                                                                value={ing.name}
+                                                                onChange={e => handleIngredientChange(component.id, ingIndex, 'name', e.target.value)}
+                                                                onFocus={() => setActiveIngredientIndex(activeKey)}
+                                                                onBlur={() => setTimeout(() => setActiveIngredientIndex(null), 150)}
+                                                                onKeyDown={e => handleKeyDown(e, component.id, ingIndex)}
+                                                                className="w-full bg-bg-primary border border-border-color rounded-md px-2 py-1.5 text-sm focus:ring-accent-blue focus:border-accent-blue"
+                                                            />
+                                                            {activeIngredientIndex === activeKey && suggestions.length > 0 && (
+                                                                <div className="absolute top-full left-0 right-0 bg-bg-tertiary border-x border-b border-border-color rounded-b-lg z-20 max-h-40 overflow-y-auto mt-1">
+                                                                    {suggestions.map((s, sIndex) => {
+                                                                        const isRecipe = 'totalCostWithAllocation' in s;
+                                                                        return (
+                                                                            <div
+                                                                                key={s.id}
+                                                                                onMouseDown={() => handleSuggestionClick(component.id, ingIndex, s)}
+                                                                                onMouseEnter={() => setHighlightedIndex(sIndex)}
+                                                                                className={`p-2 text-sm cursor-pointer ${sIndex === highlightedIndex ? 'bg-hover-bg' : 'hover:bg-hover-bg'}`}
+                                                                            >
+                                                                                {s.name}{' '}
+                                                                                <span className="text-text-secondary/70">
+                                                                                    {isRecipe ? (
+                                                                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-accent-blue/20 text-accent-blue">Template Recipe</span>
+                                                                                    ) : (
+                                                                                        `(${'brand' in s ? s.brand : ''})`
+                                                                                    )}
+                                                                                </span>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="col-span-1">
+                                                            <input
+                                                                type="number"
+                                                                placeholder="Qty"
+                                                                value={ing.quantity}
+                                                                onChange={e => handleIngredientChange(component.id, ingIndex, 'quantity', e.target.value)}
+                                                                className="w-full bg-bg-primary border border-border-color rounded-md px-2 py-1.5 text-sm focus:ring-accent-blue focus:border-accent-blue"
+                                                            />
+                                                        </div>
+                                                        <div className="col-span-1">
+                                                            <select
+                                                                value={ing.unit}
+                                                                onChange={e => handleIngredientChange(component.id, ingIndex, 'unit', e.target.value)}
+                                                                className="w-full bg-bg-primary border border-border-color rounded-md px-2 py-1.5 text-sm focus:ring-accent-blue focus:border-accent-blue appearance-none bg-[length:16px] bg-[center_right_0.5rem] bg-no-repeat"
+                                                                style={{ backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")" }}
+                                                            >
+                                                                <optgroup label="Weight">
+                                                                    <option value="kg">kg</option>
+                                                                    <option value="g">g</option>
+                                                                    <option value="mg">mg</option>
+                                                                    <option value="lb">lb</option>
+                                                                    <option value="oz">oz</option>
+                                                                </optgroup>
+                                                                <optgroup label="Volume">
+                                                                    <option value="L">L</option>
+                                                                    <option value="mL">mL</option>
+                                                                    <option value="gal">gal</option>
+                                                                    <option value="qt">qt</option>
+                                                                    <option value="cup">cup</option>
+                                                                    <option value="tbsp">tbsp</option>
+                                                                    <option value="tsp">tsp</option>
+                                                                </optgroup>
+                                                                <optgroup label="Count">
+                                                                    <option value="pcs">pcs</option>
+                                                                    <option value="pack">pack</option>
+                                                                    <option value="box">box</option>
+                                                                </optgroup>
+                                                            </select>
+                                                        </div>
+                                                        <div className="col-span-2 flex items-center">
+                                                            <span className="text-sm text-text-primary font-semibold">
+                                                                {formatPeso(ing.cost)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* Add Ingredient Button */}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleAddIngredient(component.id)}
+                                            className="flex items-center gap-2 text-sm text-accent-blue font-medium hover:bg-accent-blue/10 px-2 py-1 rounded-lg transition-colors"
+                                        >
+                                            <PlusIcon className="w-4 h-4" /> Add Ingredient
+                                        </button>
+                                    </div>
+                                ))}
+
+                                {/* Add Component Button */}
+                                <button
+                                    type="button"
+                                    onClick={handleAddComponent}
+                                    className="mt-2 flex items-center gap-2 text-sm text-text-secondary font-medium hover:bg-hover-bg px-2 py-1 rounded-lg transition-colors border border-border-color"
+                                >
+                                    <PlusIcon className="w-4 h-4" /> Add Component
+                                </button>
                                 {errors.ingredients && <p className="text-xs text-accent-red mt-1">{errors.ingredients}</p>}
                             </div>
                              <div className="lg:col-span-1">
                                 <h3 className="text-md font-semibold text-text-primary mb-2">Mark Up Summary</h3>
                                 <div className="space-y-1.5 text-sm">
-                                    {ALLOCATIONS.map(alloc => {
+                                    {allocations.map((alloc, index) => {
                                         const amount = totalCost * (alloc.percentage / 100);
+                                        const isEditing = editingAllocationIndex === index;
                                         return (
                                             <div key={alloc.name} className="flex justify-between items-center">
                                                 <span className="text-text-secondary">{alloc.name}</span>
                                                 <div className="flex items-baseline gap-2">
                                                     <span className="font-semibold">{formatPeso(amount)}</span>
-                                                    <span className="text-xs text-text-secondary/70 w-12 text-right">({alloc.percentage}%)</span>
+                                                    {isEditing ? (
+                                                        <input
+                                                            type="number"
+                                                            value={alloc.percentage}
+                                                            onChange={e => handleAllocationPercentageChange(index, e.target.value)}
+                                                            onBlur={() => setEditingAllocationIndex(null)}
+                                                            onKeyDown={e => {
+                                                                if (e.key === 'Enter') setEditingAllocationIndex(null);
+                                                            }}
+                                                            autoFocus
+                                                            className="w-12 text-xs text-right bg-bg-primary border border-accent-blue rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-accent-blue"
+                                                        />
+                                                    ) : (
+                                                        <span
+                                                            className="text-xs text-text-secondary/70 w-12 text-right cursor-pointer hover:text-accent-blue transition-colors"
+                                                            onClick={() => setEditingAllocationIndex(index)}
+                                                        >
+                                                            ({alloc.percentage}%)
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         );
@@ -363,7 +637,7 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
                                         <span>Total Markup</span>
                                         <div className="flex items-baseline gap-2">
                                             <span>{formatPeso(totalCostWithAllocation - totalCost)}</span>
-                                            <span className="text-xs text-text-secondary/70 w-12 text-right">({TOTAL_ALLOCATION_PERCENTAGE}%)</span>
+                                            <span className="text-xs text-text-secondary/70 w-12 text-right">({totalAllocationPercentage}%)</span>
                                         </div>
                                     </div>
                                 </div>

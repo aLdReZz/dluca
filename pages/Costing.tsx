@@ -225,13 +225,14 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
                 <StatCard title="Pastry Cost %" value="0.00%" />
                 <StatCard title="Total Recipes" value={String(recipeCostings.length)} />
             </div>
-            
-            {recipeCostings.length > 0 ? (
+
+            {/* Regular Recipes (not templates) */}
+            {recipeCostings.filter(r => !r.isTemplate).length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
-                    {recipeCostings.map(recipe => (
-                        <RecipeCard 
-                            key={recipe.id} 
-                            recipe={recipe} 
+                    {recipeCostings.filter(r => !r.isTemplate).map(recipe => (
+                        <RecipeCard
+                            key={recipe.id}
+                            recipe={recipe}
                             onEdit={() => handleOpenEditModal(recipe)}
                             onDelete={() => handleDeleteClick(recipe)}
                         />
@@ -243,6 +244,26 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
                 </div>
             )}
 
+            {/* Template Recipes Section */}
+            {recipeCostings.filter(r => r.isTemplate).length > 0 && (
+                <>
+                    <div className="mt-8 mb-4 border-t border-border-color pt-6">
+                        <h3 className="text-lg font-semibold text-text-primary">Template Recipes</h3>
+                        <p className="text-sm text-text-secondary mt-1">Reusable recipe components for other recipes</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
+                        {recipeCostings.filter(r => r.isTemplate).map(recipe => (
+                            <RecipeCard
+                                key={recipe.id}
+                                recipe={recipe}
+                                onEdit={() => handleOpenEditModal(recipe)}
+                                onDelete={() => handleDeleteClick(recipe)}
+                            />
+                        ))}
+                    </div>
+                </>
+            )}
+
             {isModalOpen && (
                 <RecipeCostingModal
                     isOpen={isModalOpen}
@@ -250,6 +271,7 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
                     onSave={handleSaveRecipe}
                     recipeToEdit={recipeToEdit}
                     products={productInventoryItems}
+                    recipes={recipeCostings}
                 />
             )}
             

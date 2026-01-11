@@ -166,7 +166,7 @@ const ProductInventoryView: React.FC<{
                 <table className="w-full min-w-[1000px]">
                     <thead className="bg-bg-tertiary/50 border-b border-border-color">
                         <tr>
-                            {['Category', 'Item Name', 'Brand', 'Unit', 'Qty', 'Price', 'Supplier', 'Action'].map(header => (
+                            {['Category', 'Item Name', 'Brand', 'Unit', 'Qty', 'Price', 'Price per Unit', 'Supplier', 'Action'].map(header => (
                                 <th key={header} className="px-3 py-2.5 text-left text-xs font-bold text-text-secondary uppercase tracking-wider">{header}</th>
                             ))}
                         </tr>
@@ -193,6 +193,11 @@ const ProductInventoryView: React.FC<{
                                             </td>
                                             <td className="px-3 py-2 text-sm"><input type="number" name="quantity" value={editingProductData.quantity} onChange={handleFieldChange} className="bg-bg-primary border border-border-color rounded-md px-2 py-1 w-full text-xs focus:ring-2 focus:ring-accent-blue/50"/></td>
                                             <td className="px-3 py-2 text-sm"><input type="number" name="price" value={editingProductData.price} onChange={handleFieldChange} className="bg-bg-primary border border-border-color rounded-md px-2 py-1 w-full text-xs focus:ring-2 focus:ring-accent-blue/50"/></td>
+                                            <td className="px-3 py-2 text-xs text-text-secondary">
+                                                {editingProductData.quantity > 0 && editingProductData.price > 0
+                                                    ? formatPeso(editingProductData.price / editingProductData.quantity) + '/' + editingProductData.unit
+                                                    : '-'}
+                                            </td>
                                             <td className="px-3 py-2 text-sm"><input type="text" name="supplier" value={editingProductData.supplier} onChange={handleFieldChange} className="bg-bg-primary border border-border-color rounded-md px-2 py-1 w-full text-xs focus:ring-2 focus:ring-accent-blue/50"/></td>
                                             <td className="px-3 py-2">
                                                 <div className="flex items-center gap-1">
@@ -211,6 +216,11 @@ const ProductInventoryView: React.FC<{
                                             <td className="px-3 py-3 text-xs text-text-secondary">{product.unit}</td>
                                             <td className="px-3 py-3 text-sm font-bold text-accent-blue">{product.quantity}</td>
                                             <td className="px-3 py-3 text-sm font-bold text-text-primary">{formatPeso(product.price)}</td>
+                                            <td className="px-3 py-3 text-xs text-text-secondary">
+                                                {product.quantity > 0 && product.price > 0
+                                                    ? formatPeso(product.price / product.quantity) + '/' + product.unit
+                                                    : '-'}
+                                            </td>
                                             <td className="px-3 py-3 text-xs text-text-secondary truncate max-w-[150px]" title={product.supplier}>{product.supplier}</td>
                                             <td className="px-3 py-3">
                                                 <div className="flex items-center gap-1">
@@ -228,7 +238,7 @@ const ProductInventoryView: React.FC<{
                             )
                         }) : (
                             <tr>
-                                <td colSpan={8} className="text-center py-12 text-text-secondary text-sm">
+                                <td colSpan={9} className="text-center py-12 text-text-secondary text-sm">
                                     <div className="flex flex-col items-center gap-2">
                                         <svg className="w-12 h-12 text-text-secondary/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
