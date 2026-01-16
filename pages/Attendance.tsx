@@ -155,8 +155,8 @@ const Attendance: React.FC<AttendanceProps> = ({
         }
     };
 
-    // Fetch attendance records from Firebase
-    const { data: firebaseAttendanceRecords = [], loading: attendanceLoading, error: attendanceError } = useFirebaseData(
+    // Fetch attendance records from Firebase with refetch capability
+    const { data: firebaseAttendanceRecords = [], loading: attendanceLoading, error: attendanceError, refetch: refetchAttendance } = useFirebaseData(
         () => attendanceService.getAll(),
         [attendanceDataVersion]
     );
@@ -1043,6 +1043,10 @@ const Attendance: React.FC<AttendanceProps> = ({
             console.log('🔥 Starting Firebase save...');
             await updateSingleAttendance(recordToSave);
             console.log('✅ Firebase save complete');
+
+            // Refetch attendance records from Firebase to ensure we have the latest data
+            await refetchAttendance();
+            console.log('🔄 Attendance records refetched');
 
             // Don't remove from pending immediately - let the cleanup effect handle it
             // This prevents the UI from reverting while Firebase refetches
