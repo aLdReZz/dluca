@@ -674,10 +674,15 @@ const Attendance: React.FC<AttendanceProps> = ({
     };
     
     const handleSaveSchedules = async () => {
-        // Save all employees to Firebase
-        await syncEmployees(employees);
-        setIsScheduleLocked(true);
-        alert('All schedule changes have been saved!');
+        try {
+            // Save all employees to Firebase
+            await syncEmployees(employees);
+            setOperationStatus({ type: 'success', message: 'All schedule changes have been saved!' });
+            console.log('✅ Schedule changes saved successfully');
+        } catch (error) {
+            console.error('Error saving schedule changes:', error);
+            setOperationStatus({ type: 'error', message: 'Failed to save schedule changes. Please try again.' });
+        }
     };
 
     const handleEditSchedules = () => {
@@ -1474,6 +1479,15 @@ const Attendance: React.FC<AttendanceProps> = ({
                             </svg>
                             <span className="hidden sm:inline">{isEditMode ? 'Exit Edit' : 'Edit Mode'}</span>
                         </button>
+                        {isEditMode && (
+                            <button
+                                onClick={handleSaveSchedules}
+                                className="bg-accent-green text-white px-3 py-1.5 rounded-md font-medium text-xs hover:bg-accent-green/90 transition flex items-center gap-1.5"
+                            >
+                                <CheckIcon className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Save Changes</span>
+                            </button>
+                        )}
                         <button
                             onClick={handleExportSchedule}
                             className="bg-bg-tertiary border border-border-color text-text-primary px-3 py-1.5 rounded-md font-medium text-xs hover:bg-hover-bg transition flex items-center gap-1.5"
