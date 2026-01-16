@@ -275,6 +275,7 @@ const Attendance: React.FC<AttendanceProps> = ({
     const [editingAttendanceContext, setEditingAttendanceContext] = useState<{ emp: Employee, dateKey: string, date: Date } | null>(null);
     const [isWeekScheduleCreatorOpen, setIsWeekScheduleCreatorOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
+    const prevEditModeRef = useRef(false);
 
     const getEmployeeListKey = (employee: Employee, index: number) => {
         const baseIdentifier = employee?.id ?? employee?.name ?? index;
@@ -317,6 +318,32 @@ const Attendance: React.FC<AttendanceProps> = ({
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    // Auto-save when exiting edit mode
+    useEffect(() => {
+        const wasInEditMode = prevEditModeRef.current;
+        const isNowInEditMode = isEditMode;
+
+        // If we were in edit mode and now we're not, save the changes
+        if (wasInEditMode && !isNowInEditMode) {
+            const saveChanges = async () => {
+                try {
+                    await syncEmployees(employees);
+                    console.log('✅ Schedule changes auto-saved when exiting edit mode');
+                } catch (error) {
+                    console.error('Error auto-saving schedule changes:', error);
+                    setOperationStatus({
+                        type: 'error',
+                        message: 'Failed to save schedule changes. Please try again.'
+                    });
+                }
+            };
+            saveChanges();
+        }
+
+        // Update the ref for next render
+        prevEditModeRef.current = isEditMode;
+    }, [isEditMode, employees, syncEmployees]);
 
     const weekDates = useMemo(() => {
         const [year, month, day] = scheduleWeekStart.split('-').map(Number);
@@ -1396,14 +1423,14 @@ const Attendance: React.FC<AttendanceProps> = ({
                         <h2 className="text-2xl font-bold text-text-primary">Schedule & Attendance</h2>
                         <p className="text-sm text-text-secondary mt-0.5">View schedules and actual attendance together</p>
                     </div>
-                     <div className="flex items-center gap-1.5 flex-wrap justify-start w-full sm:w-auto">
+                     <div className="flex items-center gap-1 flex-wrap justify-start w-full sm:w-auto">
                         {/* Previous Week Button */}
                         <button
                             onClick={handlePreviousWeek}
-                            className="w-9 h-9 rounded-lg bg-bg-tertiary border border-border-color hover:bg-hover-bg hover:border-accent-blue/30 transition flex items-center justify-center text-text-secondary hover:text-text-primary group"
+                            className="w-8 h-8 rounded-md bg-bg-tertiary border border-border-color hover:bg-hover-bg hover:border-accent-blue/30 transition flex items-center justify-center text-text-secondary hover:text-text-primary group"
                             title="Previous week"
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
                             </svg>
                         </button>
@@ -1411,9 +1438,9 @@ const Attendance: React.FC<AttendanceProps> = ({
                         <div className="relative" ref={datePickerRef}>
                              <button
                                 onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                                className="flex items-center gap-1.5 bg-bg-tertiary border border-border-color rounded-md py-2 px-3 text-xs font-medium hover:bg-hover-bg transition h-[38px]"
+                                className="flex items-center gap-1.5 bg-bg-tertiary border border-border-color rounded-md py-1.5 px-3 text-xs font-medium hover:bg-hover-bg transition"
                             >
-                                <CalendarDaysIcon className="w-4 h-4 text-text-secondary" />
+                                <CalendarDaysIcon className="w-3.5 h-3.5 text-text-secondary" />
                                 <span className={slideDirection === 'left' ? 'date-slide-left' : slideDirection === 'right' ? 'date-slide-right' : ''}>{new Date(scheduleWeekStart + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</span>
                             </button>
                             {isDatePickerOpen && (
@@ -1427,43 +1454,43 @@ const Attendance: React.FC<AttendanceProps> = ({
                         {/* Next Week Button */}
                         <button
                             onClick={handleNextWeek}
-                            className="w-9 h-9 rounded-lg bg-bg-tertiary border border-border-color hover:bg-hover-bg hover:border-accent-blue/30 transition flex items-center justify-center text-text-secondary hover:text-text-primary group"
+                            className="w-8 h-8 rounded-md bg-bg-tertiary border border-border-color hover:bg-hover-bg hover:border-accent-blue/30 transition flex items-center justify-center text-text-secondary hover:text-text-primary group"
                             title="Next week"
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                             </svg>
                         </button>
                         <button
                             onClick={() => setIsEditMode(!isEditMode)}
-                            className={`px-4 py-2 rounded-lg font-semibold text-xs transition flex items-center gap-1.5 ${
+                            className={`px-3 py-1.5 rounded-md font-medium text-xs transition flex items-center gap-1.5 ${
                                 isEditMode
-                                    ? 'bg-accent-blue text-white hover:bg-opacity-90 shadow-md shadow-accent-blue/30'
+                                    ? 'bg-accent-blue text-white hover:bg-opacity-90'
                                     : 'bg-bg-tertiary border border-border-color text-text-primary hover:bg-hover-bg'
                             }`}
                         >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                             <span className="hidden sm:inline">{isEditMode ? 'Exit Edit' : 'Edit Mode'}</span>
                         </button>
                         <button
                             onClick={handleExportSchedule}
-                            className="bg-bg-tertiary border border-border-color text-text-primary px-4 py-2 rounded-lg font-semibold text-xs hover:bg-hover-bg transition flex items-center gap-1.5"
+                            className="bg-bg-tertiary border border-border-color text-text-primary px-3 py-1.5 rounded-md font-medium text-xs hover:bg-hover-bg transition flex items-center gap-1.5"
                         >
-                            <DownloadIcon className="w-4 h-4"/>
+                            <DownloadIcon className="w-3.5 h-3.5"/>
                             <span className="hidden sm:inline">Export Schedule</span>
                         </button>
-                        <label htmlFor="attendance-csv-input" className="cursor-pointer bg-accent-blue text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-blue/30">
-                            <UploadIcon className="w-4 h-4"/>
+                        <label htmlFor="attendance-csv-input" className="cursor-pointer bg-accent-blue text-white px-3 py-1.5 rounded-md font-medium text-xs hover:bg-opacity-90 transition flex items-center gap-1.5">
+                            <UploadIcon className="w-3.5 h-3.5"/>
                             <span className="hidden sm:inline">Attendance CSV</span>
                         </label>
                         <input type="file" id="attendance-csv-input" accept=".csv" className="hidden" onChange={handleAttendanceUpload} />
                         <button
                             onClick={() => setIsWeekScheduleCreatorOpen(true)}
-                            className="bg-accent-blue text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-opacity-90 transition flex items-center gap-1.5 shadow-md shadow-accent-blue/30"
+                            className="bg-accent-blue text-white px-3 py-1.5 rounded-md font-medium text-xs hover:bg-opacity-90 transition flex items-center gap-1.5"
                         >
-                            <PlusIcon className="w-4 h-4"/>
+                            <PlusIcon className="w-3.5 h-3.5"/>
                             <span className="hidden sm:inline">Create Schedule</span>
                         </button>
                     </div>
