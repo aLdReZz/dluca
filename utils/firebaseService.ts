@@ -253,25 +253,39 @@ export const attendanceService = {
                 const existingSnapshot = await getDocs(collection(db, 'attendanceRecords'));
                 const existingIds = new Set(existingSnapshot.docs.map(doc => doc.id));
 
-                // Separate new records from existing ones
-                const newRecords = records.filter(record => {
+                // Separate new records from existing ones for tracking
+                const newRecords: AttendanceRecord[] = [];
+                const updatedRecords: AttendanceRecord[] = [];
+
+                records.forEach(record => {
                     const docId = `${record.employee}-${record.date}`;
-                    return !existingIds.has(docId);
+                    if (existingIds.has(docId)) {
+                        updatedRecords.push(record);
+                    } else {
+                        newRecords.push(record);
+                    }
                 });
 
-                if (newRecords.length === 0) {
-                    console.log('ℹ️ No new attendance records to add (all already exist)');
+                if (records.length === 0) {
+                    console.log('ℹ️ No attendance records to process');
                     return;
                 }
 
-                // Add only new records
+                // Process all records (both new and updates)
                 let batch = writeBatch(db);
                 let operationCount = 0;
 
-                for (const record of newRecords) {
+                for (const record of records) {
                     const docId = `${record.employee}-${record.date}`;
                     const docRef = doc(db, 'attendanceRecords', docId);
-                    batch.set(docRef, { ...record, createdAt: new Date() });
+                    const isExisting = existingIds.has(docId);
+
+                    // Use set with merge to create or update
+                    batch.set(docRef, {
+                        ...record,
+                        ...(isExisting ? { updatedAt: new Date() } : { createdAt: new Date() })
+                    }, { merge: false }); // merge: false means complete replacement
+
                     operationCount++;
 
                     if (operationCount >= FIRESTORE_BATCH_LIMIT) {
@@ -285,7 +299,7 @@ export const attendanceService = {
                     await batch.commit();
                 }
 
-                console.log(`✅ Added ${newRecords.length} new attendance records (skipped ${records.length - newRecords.length} duplicates)`);
+                console.log(`✅ Processed ${records.length} attendance records: ${newRecords.length} new, ${updatedRecords.length} updated`);
             }
         );
     },
