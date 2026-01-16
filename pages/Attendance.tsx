@@ -1044,12 +1044,20 @@ const Attendance: React.FC<AttendanceProps> = ({
             await updateSingleAttendance(recordToSave);
             console.log('✅ Firebase save complete');
 
+            // Small delay to ensure Firebase has processed the write
+            await new Promise(resolve => setTimeout(resolve, 500));
+
             // Refetch attendance records from Firebase to ensure we have the latest data
             await refetchAttendance();
             console.log('🔄 Attendance records refetched');
 
-            // Don't remove from pending immediately - let the cleanup effect handle it
-            // This prevents the UI from reverting while Firebase refetches
+            // Clear pending update after successful save and refetch
+            setPendingUpdates(prev => {
+                const newMap = new Map(prev);
+                newMap.delete(updateKey);
+                console.log('🧹 Cleared pending update for:', updateKey);
+                return newMap;
+            });
         } catch (error) {
             console.error('❌ Error saving attendance:', error);
             // Keep in pending updates on error so user can retry
