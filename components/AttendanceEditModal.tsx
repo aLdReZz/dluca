@@ -86,8 +86,29 @@ const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
         setTimeout(onClose, 300);
     };
 
+    // Convert 24-hour format back to 12-hour format for storage
+    const convertTo12Hour = (time24h: string): string => {
+        if (!time24h) return '';
+
+        const [hoursStr, minutes] = time24h.split(':');
+        let hours = parseInt(hoursStr);
+        const period = hours >= 12 ? 'PM' : 'AM';
+
+        if (hours === 0) {
+            hours = 12;
+        } else if (hours > 12) {
+            hours -= 12;
+        }
+
+        return `${hours}:${minutes} ${period}`;
+    };
+
     const handleSave = () => {
-        onSave({ timeIn, timeOut });
+        // Convert times back to 12-hour format before saving
+        onSave({
+            timeIn: convertTo12Hour(timeIn),
+            timeOut: convertTo12Hour(timeOut)
+        });
         handleClose();
     };
 
