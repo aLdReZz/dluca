@@ -127,8 +127,8 @@ const getMondayDateString = (date: Date) => {
 };
 
 const Attendance: React.FC<AttendanceProps> = ({
-    employees = [],
-    setEmployees,
+    employees: propEmployees = [],
+    setEmployees: setPropEmployees,
     attendanceRecords: propAttendanceRecords,
     setAttendanceRecords: setPropAttendanceRecords,
     payrollRecords: propPayrollRecords,
@@ -138,6 +138,22 @@ const Attendance: React.FC<AttendanceProps> = ({
     setManualGhostMinutes,
 }) => {
     const [attendanceDataVersion, setAttendanceDataVersion] = useState(0);
+
+    // Fetch employees from Firebase with refetch capability
+    const { data: firebaseEmployees = [], loading: employeesLoading, error: employeesError, refetch: refetchEmployees } = useFirebaseData(
+        () => employeesService.getAll(),
+        []
+    );
+
+    // Use Firebase employees if available, otherwise use prop employees
+    const employees = (Array.isArray(firebaseEmployees) && firebaseEmployees.length > 0) ? firebaseEmployees : propEmployees;
+
+    // Wrapper function to update both local Firebase state and parent prop state
+    const setEmployees = (newEmployees: Employee[] | ((prev: Employee[]) => Employee[])) => {
+        if (setPropEmployees) {
+            setPropEmployees(newEmployees);
+        }
+    };
 
     // Fetch attendance records from Firebase
     const { data: firebaseAttendanceRecords = [], loading: attendanceLoading, error: attendanceError } = useFirebaseData(
@@ -340,6 +356,8 @@ const Attendance: React.FC<AttendanceProps> = ({
 
                     if (hasChanges) {
                         await syncEmployees(employees);
+                        // Refetch employees from Firebase to ensure we have the latest data
+                        await refetchEmployees();
                         console.log('✅ Schedule changes auto-saved when exiting edit mode');
                         setOperationStatus({
                             type: 'success',
@@ -361,7 +379,7 @@ const Attendance: React.FC<AttendanceProps> = ({
 
         // Update the ref for next render
         prevEditModeRef.current = isEditMode;
-    }, [isEditMode, employees, syncEmployees, setOperationStatus]);
+    }, [isEditMode, employees, syncEmployees, refetchEmployees, setOperationStatus]);
 
     const weekDates = useMemo(() => {
         const [year, month, day] = scheduleWeekStart.split('-').map(Number);
@@ -695,6 +713,8 @@ const Attendance: React.FC<AttendanceProps> = ({
         try {
             // Save all employees to Firebase
             await syncEmployees(employees);
+            // Refetch employees from Firebase to ensure we have the latest data
+            await refetchEmployees();
             setOperationStatus({ type: 'success', message: 'All schedule changes have been saved!' });
             console.log('✅ Schedule changes saved successfully');
         } catch (error) {
