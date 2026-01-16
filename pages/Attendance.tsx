@@ -262,6 +262,14 @@ const Attendance: React.FC<AttendanceProps> = ({
         console.log('✅ Merged records:', merged.length);
         return merged;
     }, [firebaseAttendanceRecords, propAttendanceRecords, pendingUpdates]);
+
+    // Wrapper function to update attendance records (updates parent state if available)
+    const setAttendanceRecords = (newRecords: AttendanceRecord[] | ((prev: AttendanceRecord[]) => AttendanceRecord[])) => {
+        if (setPropAttendanceRecords) {
+            setPropAttendanceRecords(newRecords);
+        }
+    };
+
     const salesData = (Array.isArray(firebaseSalesData) && firebaseSalesData.length > 0) ? firebaseSalesData : (propSalesData || []);
     const payrollRecords = propPayrollRecords || [];
     const [operationStatus, setOperationStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
