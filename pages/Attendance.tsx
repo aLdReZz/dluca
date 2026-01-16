@@ -276,6 +276,7 @@ const Attendance: React.FC<AttendanceProps> = ({
     const [isWeekScheduleCreatorOpen, setIsWeekScheduleCreatorOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     const prevEditModeRef = useRef(false);
+    const employeesOnEditStartRef = useRef<Employee[]>([]);
 
     const getEmployeeListKey = (employee: Employee, index: number) => {
         const baseIdentifier = employee?.id ?? employee?.name ?? index;
@@ -324,12 +325,29 @@ const Attendance: React.FC<AttendanceProps> = ({
         const wasInEditMode = prevEditModeRef.current;
         const isNowInEditMode = isEditMode;
 
+        // When entering edit mode, save the current state
+        if (!wasInEditMode && isNowInEditMode) {
+            employeesOnEditStartRef.current = JSON.parse(JSON.stringify(employees));
+            console.log('📝 Entering edit mode, tracking changes...');
+        }
+
         // If we were in edit mode and now we're not, save the changes
         if (wasInEditMode && !isNowInEditMode) {
             const saveChanges = async () => {
                 try {
-                    await syncEmployees(employees);
-                    console.log('✅ Schedule changes auto-saved when exiting edit mode');
+                    // Check if there were any changes
+                    const hasChanges = JSON.stringify(employeesOnEditStartRef.current) !== JSON.stringify(employees);
+
+                    if (hasChanges) {
+                        await syncEmployees(employees);
+                        console.log('✅ Schedule changes auto-saved when exiting edit mode');
+                        setOperationStatus({
+                            type: 'success',
+                            message: 'Schedule changes saved successfully!'
+                        });
+                    } else {
+                        console.log('ℹ️ No changes detected, skipping auto-save');
+                    }
                 } catch (error) {
                     console.error('Error auto-saving schedule changes:', error);
                     setOperationStatus({
@@ -343,7 +361,7 @@ const Attendance: React.FC<AttendanceProps> = ({
 
         // Update the ref for next render
         prevEditModeRef.current = isEditMode;
-    }, [isEditMode, employees, syncEmployees]);
+    }, [isEditMode, employees, syncEmployees, setOperationStatus]);
 
     const weekDates = useMemo(() => {
         const [year, month, day] = scheduleWeekStart.split('-').map(Number);
