@@ -450,6 +450,19 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
                 return deduction.date >= payPeriod.start && deduction.date <= payPeriod.end;
             }) || [];
 
+            // Build salary deduction items including late deduction
+            const salaryDeductionItems = [];
+            if (record.lateMinutes && record.lateMinutes > 0) {
+                salaryDeductionItems.push({
+                    description: `Late Deduction (${record.lateMinutes} min)`,
+                    amount: record.lateDeduction || 0
+                });
+            }
+            salaryDeductionItems.push(...filteredSalaryDeductions.map(deduction => ({
+                description: deduction.date ? `${deduction.description} (${formatDateForDisplay(deduction.date)})` : deduction.description,
+                amount: deduction.amount,
+            })));
+
             console.log('Export All PDFs - Employee:', {
                 name: record.employee,
                 recordId: record.id,
@@ -479,7 +492,7 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
                 earnings,
                 deductions,
                 totalEarnings: record.grossPay,
-                totalDeductions: record.deductions.total + (record.customDeduction || 0),
+                totalDeductions: record.deductions.total + (record.customDeduction || 0) + (record.lateDeduction || 0),
                 netSalary: record.netPay,
                 daysPresent: record.daysPresent,
                 daysPresentAmount: record.regularPay + record.overtimePay,
@@ -490,10 +503,7 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
                     description: income.date ? `${income.description} (${formatDateForDisplay(income.date)})` : income.description,
                     amount: income.amount,
                 })),
-                salaryDeductionItems: filteredSalaryDeductions.map(deduction => ({
-                    description: deduction.date ? `${deduction.description} (${formatDateForDisplay(deduction.date)})` : deduction.description,
-                    amount: deduction.amount,
-                })),
+                salaryDeductionItems: salaryDeductionItems,
                 lateMinutes: record.lateMinutes,
                 lateDeduction: record.lateDeduction,
                 regularHours: record.regularHours,
