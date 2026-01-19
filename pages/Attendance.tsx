@@ -708,8 +708,10 @@ const Attendance: React.FC<AttendanceProps> = ({
         try {
             // Delete from Firebase
             await employeesService.delete(String(employeeId));
-            // Update local state
+            // Update local state for immediate feedback
             setEmployees(employees.filter(emp => emp.id !== employeeId));
+            // Refetch employees from Firebase to ensure UI is in sync
+            await refetchEmployees();
             setOperationStatus({ type: 'success', message: 'Employee deleted successfully!' });
         } catch (error) {
             console.error('Error deleting employee:', error);
