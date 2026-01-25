@@ -971,9 +971,13 @@ const Attendance: React.FC<AttendanceProps> = ({
         // Close modal immediately
         setEditingScheduleContext(null);
 
-        // Save to Firebase in the background (don't await)
+        // Save to Firebase and refetch to ensure persistence
         try {
             await syncEmployees(updatedEmployees);
+            // Add a small delay to ensure Firebase has completed the write
+            await new Promise(resolve => setTimeout(resolve, 500));
+            // Refetch employees to confirm data persisted
+            await refetchEmployees();
         } catch (error) {
             console.error('Error saving schedule:', error);
         }

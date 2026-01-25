@@ -361,6 +361,12 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
             chartTitle = 'Sales';
         }
 
+        // Calculate average for the average line
+        const averageValue = chartData.length > 0
+            ? chartData.reduce((sum, val) => sum + val, 0) / chartData.length
+            : 0;
+        const averageLineData = chartData.map(() => averageValue);
+
         chartInstanceRef.current = new Chart(chartCtx, {
             type: 'line',
             data: {
@@ -397,13 +403,43 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
                     pointHoverBackgroundColor: '#bfdbfe',
                     pointHoverBorderColor: '#1d4ed8',
                     pointHitRadius: 14,
+                },
+                {
+                    label: `Average: ${formatPeso(averageValue)}`,
+                    data: averageLineData,
+                    borderColor: '#f59e0b',
+                    borderWidth: 2,
+                    borderDash: [8, 4],
+                    backgroundColor: 'transparent',
+                    fill: false,
+                    tension: 0,
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                    pointHitRadius: 0,
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { display: false },
+                    legend: {
+                        display: true,
+                        position: 'top' as const,
+                        align: 'end' as const,
+                        labels: {
+                            usePointStyle: true,
+                            pointStyle: 'line',
+                            boxWidth: 30,
+                            boxHeight: 2,
+                            padding: 15,
+                            font: {
+                                size: 11,
+                                family: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                            },
+                            color: '#94a3b8',
+                            filter: (item) => item.text.startsWith('Average'),
+                        },
+                    },
                     tooltip: {
                         backgroundColor: 'rgba(12, 15, 22, 0.94)',
                         borderColor: 'rgba(96, 165, 250, 0.35)',
@@ -422,6 +458,10 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
                         cornerRadius: 10,
                         caretSize: 6,
                         boxPadding: 6,
+                        filter: (tooltipItem) => {
+                            // Don't show tooltip for the average line
+                            return !tooltipItem.dataset.label?.startsWith('Average');
+                        },
                         callbacks: {
                             title: () => [],
                             label: (context) => {
