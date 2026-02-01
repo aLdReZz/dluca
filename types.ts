@@ -69,11 +69,19 @@ export interface AdditionalIncome {
     date: string;
 }
 
+export interface RateHistoryEntry {
+    id: string;
+    rate: number;
+    effectiveDate: string;
+    notes?: string;
+}
+
 export interface Employee {
     id: number;
     name: string;
     position: string;
     rate: number;
+    rateHistory?: RateHistoryEntry[];
     schedule: { [dateKey: string]: Schedule };
     phone?: string;
     email?: string;

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import type { Employee, AttendanceRecord, PayrollRecord, Schedule, SalesData } from '../types';
-import { UploadIcon, DownloadIcon, CalendarDaysIcon, PencilSquareIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon, PlusIcon, CheckIcon } from '../components/Icons';
+import type { Employee, AttendanceRecord, PayrollRecord, Schedule, SalesData, RateHistoryEntry } from '../types';
+import { UploadIcon, DownloadIcon, CalendarDaysIcon, PencilSquareIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon, PlusIcon, CheckIcon, XMarkIcon } from '../components/Icons';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmployeeProfile from '../components/EmployeeProfile';
 import ScheduleEditModal from '../components/ScheduleEditModal';
@@ -11,6 +11,7 @@ import WeekScheduleCreator from '../components/WeekScheduleCreator';
 import { useFirebaseData, useFirebaseMutation } from '../hooks/useFirebase';
 import { attendanceService, salesService, employeesService } from '../utils/firebaseService';
 import { parsePaidHoursCsv, mapPaidHoursToEmployees, parseCsvText } from '../utils/paidHours';
+import { addRateChange, removeRateChange } from '../utils/rateHistory';
 
 interface AttendanceProps {
     employees?: Employee[];
@@ -288,6 +289,9 @@ const Attendance: React.FC<AttendanceProps> = ({
         bankAccount: '',
         paymentMode: '',
     });
+    const [rateHistoryForm, setRateHistoryForm] = useState<RateHistoryEntry[]>([]);
+    const [isAddingRateChange, setIsAddingRateChange] = useState(false);
+    const [newRateChange, setNewRateChange] = useState({ rate: '', effectiveDate: '', notes: '' });
     const [isScheduleLocked, setIsScheduleLocked] = useState(true);
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
     const [isScheduleTotalHrsVisible, setScheduleTotalHrsVisible] = useState(false);
@@ -489,6 +493,9 @@ const Attendance: React.FC<AttendanceProps> = ({
             bankAccount: '',
             paymentMode: '',
         });
+        setRateHistoryForm([]);
+        setIsAddingRateChange(false);
+        setNewRateChange({ rate: '', effectiveDate: '', notes: '' });
         setIsModalOpen(true);
     };
 
@@ -506,6 +513,9 @@ const Attendance: React.FC<AttendanceProps> = ({
             bankAccount: employee.bankAccount || '',
             paymentMode: employee.paymentMode || '',
         });
+        setRateHistoryForm(employee.rateHistory || []);
+        setIsAddingRateChange(false);
+        setNewRateChange({ rate: '', effectiveDate: '', notes: '' });
         setIsModalOpen(true);
     };
 
@@ -590,6 +600,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                 position: formData.position,
                 department: formData.department,
                 rate: parseFloat(formData.rate) || 0,
+                rateHistory: rateHistoryForm.length > 0 ? rateHistoryForm : undefined,
                 schedule: {},
                 phone: formData.phone,
                 email: formData.email,
@@ -611,6 +622,7 @@ const Attendance: React.FC<AttendanceProps> = ({
                           position: formData.position,
                           department: formData.department,
                           rate: newRate,
+                          rateHistory: rateHistoryForm.length > 0 ? rateHistoryForm : undefined,
                           phone: formData.phone,
                           email: formData.email,
                           bankAccount: formData.bankAccount,
@@ -1917,6 +1929,129 @@ const Attendance: React.FC<AttendanceProps> = ({
                                     <input type="number" name="rate" value={formData.rate} onChange={handleFormChange} className="w-full bg-bg-primary border border-border-color rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue" />
                                 </div>
                             </div>
+
+                            {/* Rate History Section */}
+                            <div className="border border-border-color rounded-lg p-4 bg-bg-primary/50">
+                                <div className="flex items-center justify-between mb-3">
+                                    <label className="text-sm font-medium text-text-secondary">Rate History</label>
+                                    {!isAddingRateChange && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsAddingRateChange(true)}
+                                            className="text-xs px-2 py-1 rounded bg-accent-blue/20 text-accent-blue hover:bg-accent-blue/30 transition-colors flex items-center gap-1"
+                                        >
+                                            <PlusIcon className="w-3 h-3" /> Add Rate Change
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Add Rate Change Form */}
+                                {isAddingRateChange && (
+                                    <div className="mb-3 p-3 bg-bg-secondary rounded-lg border border-border-color space-y-2">
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="block text-xs text-text-secondary mb-1">New Rate (₱)</label>
+                                                <input
+                                                    type="number"
+                                                    value={newRateChange.rate}
+                                                    onChange={(e) => setNewRateChange({ ...newRateChange, rate: e.target.value })}
+                                                    className="w-full bg-bg-primary border border-border-color rounded px-2 py-1 text-sm"
+                                                    placeholder="0.00"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs text-text-secondary mb-1">Effective Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={newRateChange.effectiveDate}
+                                                    onChange={(e) => setNewRateChange({ ...newRateChange, effectiveDate: e.target.value })}
+                                                    className="w-full bg-bg-primary border border-border-color rounded px-2 py-1 text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-text-secondary mb-1">Notes (optional)</label>
+                                            <input
+                                                type="text"
+                                                value={newRateChange.notes}
+                                                onChange={(e) => setNewRateChange({ ...newRateChange, notes: e.target.value })}
+                                                className="w-full bg-bg-primary border border-border-color rounded px-2 py-1 text-sm"
+                                                placeholder="e.g., Promotion, Annual raise"
+                                            />
+                                        </div>
+                                        <div className="flex gap-2 justify-end">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setIsAddingRateChange(false);
+                                                    setNewRateChange({ rate: '', effectiveDate: '', notes: '' });
+                                                }}
+                                                className="px-3 py-1 text-xs rounded bg-bg-tertiary hover:bg-hover-bg transition"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const rate = parseFloat(newRateChange.rate);
+                                                    if (!rate || !newRateChange.effectiveDate) {
+                                                        alert('Please enter rate and effective date');
+                                                        return;
+                                                    }
+                                                    const newEntry: RateHistoryEntry = {
+                                                        id: Date.now().toString(),
+                                                        rate,
+                                                        effectiveDate: newRateChange.effectiveDate,
+                                                        notes: newRateChange.notes || undefined,
+                                                    };
+                                                    setRateHistoryForm([...rateHistoryForm, newEntry].sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate)));
+                                                    setNewRateChange({ rate: '', effectiveDate: '', notes: '' });
+                                                    setIsAddingRateChange(false);
+                                                }}
+                                                className="px-3 py-1 text-xs rounded bg-accent-blue text-white hover:bg-opacity-80 transition"
+                                            >
+                                                Add
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Rate History List */}
+                                {rateHistoryForm.length > 0 ? (
+                                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                                        {[...rateHistoryForm]
+                                            .sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate))
+                                            .map((entry) => (
+                                                <div
+                                                    key={entry.id}
+                                                    className="flex items-center justify-between p-2 bg-bg-secondary rounded border border-border-color group"
+                                                >
+                                                    <div className="flex-1">
+                                                        <span className="text-sm font-medium">₱{entry.rate.toFixed(2)}/hr</span>
+                                                        <span className="text-xs text-text-secondary ml-2">
+                                                            from {new Date(entry.effectiveDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                        </span>
+                                                        {entry.notes && (
+                                                            <span className="text-xs text-text-secondary/60 ml-2">({entry.notes})</span>
+                                                        )}
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setRateHistoryForm(rateHistoryForm.filter(r => r.id !== entry.id))}
+                                                        className="p-1 rounded text-text-secondary/40 hover:text-accent-red hover:bg-accent-red/10 opacity-0 group-hover:opacity-100 transition-all"
+                                                    >
+                                                        <XMarkIcon className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-text-secondary/60 text-center py-2">
+                                        No rate changes recorded. Current rate will apply to all dates.
+                                    </p>
+                                )}
+                            </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-text-secondary mb-1">Phone</label>

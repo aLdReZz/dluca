@@ -14,6 +14,7 @@ import {
 } from '../utils/salesData';
 import { calculateServiceChargeDistribution } from '../utils/serviceChargeAllocation';
 import { generateConsolidatedPayslipsPdf, PayslipPdfData } from '../utils/payslipPdf';
+import { getRateForDate } from '../utils/rateHistory';
 
 
 interface PayrollProps {
@@ -209,11 +210,14 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
             let daysAbsent = 0;
             let daysLate = 0;
             let totalLateMinutes = 0;
+            let regularPay = 0;
+            let overtimePay = 0;
 
             for (let d = new Date(startDate); d <= endDate; d.setUTCDate(d.getUTCDate() + 1)) {
                 const dateKey = d.toISOString().split('T')[0];
                 const schedule = employee.schedule[dateKey];
                 const record = attendanceRecords.find(r => r.employee.toLowerCase() === employee.name.toLowerCase() && r.date === dateKey);
+                const dailyRate = getRateForDate(employee, dateKey);
 
                 const scheduledInMinutes = schedule?.timeIn ? timeStringToMinutes(schedule.timeIn) : null;
                 let workedMinutesForDay = 0;
@@ -251,19 +255,20 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
                             dailyPaidRegularMinutes = Math.max(0, baseWorkedMinutes - 60); // Deduct 1 hour break
                         }
 
-                        totalRegularHours += dailyPaidRegularMinutes / 60;
+                        const dailyRegularHours = dailyPaidRegularMinutes / 60;
+                        totalRegularHours += dailyRegularHours;
+                        regularPay += dailyRegularHours * dailyRate;
                         workedMinutesForDay += dailyPaidRegularMinutes;
 
                         const approvedOTMinutes = employee.approvedOvertime?.[dateKey] || 0;
-                        totalOvertimeHours += approvedOTMinutes / 60;
+                        const dailyOTHours = approvedOTMinutes / 60;
+                        totalOvertimeHours += dailyOTHours;
+                        overtimePay += dailyOTHours * dailyRate * OVERTIME_RATE_MULTIPLIER;
                         workedMinutesForDay += approvedOTMinutes;
                     }
                 }
 
             }
-
-            const regularPay = totalRegularHours * employee.rate;
-            const overtimePay = totalOvertimeHours * employee.rate * OVERTIME_RATE_MULTIPLIER;
 
             // Calculate total additional income - filter by pay period
             const totalAdditionalIncome = (employee.additionalIncome || [])
