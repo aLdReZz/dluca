@@ -300,6 +300,11 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
 
             const netPay = grossPay - deductions.total - totalSalaryDeductions - lateDeduction;
 
+            // Calculate effective rate for display (based on actual pay / hours)
+            const effectiveRate = totalRegularHours > 0
+                ? regularPay / totalRegularHours
+                : employee.rate;
+
             return {
                 id: employee.id,
                 employee: employee.name,
@@ -307,7 +312,7 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
                 department: employee.department,
                 bankAccount: employee.bankAccount,
                 paymentMode: employee.paymentMode,
-                rate: employee.rate,
+                rate: effectiveRate,
                 regularHours: totalRegularHours,
                 overtimeHours: totalOvertimeHours,
                 totalHours: totalRegularHours + totalOvertimeHours,

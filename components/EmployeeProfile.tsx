@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { Employee, AttendanceRecord, PayrollRecord, SalesData, SalaryDeduction, AdditionalIncome } from '../types';
+import type { Employee, AttendanceRecord, PayrollRecord, SalesData, SalaryDeduction, AdditionalIncome, RateHistoryEntry } from '../types';
 import {
     XMarkIcon, CreditCardIcon, PencilIcon, TrashIcon,
     CalendarDaysIcon, CheckIcon, PlusIcon, ChevronDownIcon
@@ -12,6 +12,7 @@ import {
     extractServiceCharge,
 } from '../utils/salesData';
 import { calculateServiceChargeDistribution } from '../utils/serviceChargeAllocation';
+import { getRateForDate } from '../utils/rateHistory';
 
 interface EmployeeProfileProps {
     employee: Employee;
@@ -145,6 +146,8 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
     const [tempScheduleOut, setTempScheduleOut] = useState('');
     const [tempTimeIn, setTempTimeIn] = useState('');
     const [tempTimeOut, setTempTimeOut] = useState('');
+    const [editingRateDateKey, setEditingRateDateKey] = useState<string | null>(null);
+    const [tempRate, setTempRate] = useState('');
 
     const [committedRange, setCommittedRange] = useState(() => {
         const date = new Date();
@@ -386,6 +389,61 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         setEditingSchedule(null);
         setTempScheduleIn('');
         setTempScheduleOut('');
+    };
+
+    const handleRateEdit = (dateKey: string) => {
+        const currentRate = getRateForDate(employee, dateKey);
+        setTempRate(String(currentRate));
+        setEditingRateDateKey(dateKey);
+    };
+
+    const handleRateSave = (dateKey: string) => {
+        const newRate = parseFloat(tempRate);
+        if (isNaN(newRate) || newRate <= 0) {
+            setEditingRateDateKey(null);
+            setTempRate('');
+            return;
+        }
+
+        // Add this rate as a new rate history entry
+        const newEntry: RateHistoryEntry = {
+            id: Date.now().toString(),
+            rate: newRate,
+            effectiveDate: dateKey,
+            notes: 'Updated from Daily Activity Log',
+        };
+
+        const currentHistory = employee.rateHistory || [];
+        // Check if there's already an entry for this exact date
+        const existingIndex = currentHistory.findIndex(e => e.effectiveDate === dateKey);
+
+        let updatedHistory: RateHistoryEntry[];
+        if (existingIndex >= 0) {
+            // Update existing entry
+            updatedHistory = currentHistory.map((e, i) =>
+                i === existingIndex ? { ...e, rate: newRate } : e
+            );
+        } else {
+            // Add new entry
+            updatedHistory = [...currentHistory, newEntry].sort(
+                (a, b) => a.effectiveDate.localeCompare(b.effectiveDate)
+            );
+        }
+
+        // Update the current rate if this is the latest applicable rate
+        const today = new Date().toISOString().split('T')[0];
+        const latestEffectiveRate = [...updatedHistory]
+            .filter(entry => entry.effectiveDate <= today)
+            .sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate))[0];
+
+        onUpdateEmployee({
+            ...employee,
+            rateHistory: updatedHistory,
+            rate: latestEffectiveRate?.rate ?? employee.rate,
+        });
+
+        setEditingRateDateKey(null);
+        setTempRate('');
     };
 
     const handleAttendanceEdit = (dateKey: string, type: 'in' | 'out' | 'both') => {
@@ -832,8 +890,8 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         </div>
     );
     
-    const tableHeaders = ['Date', 'Status', 'Scheduled', 'Schedule Duration', 'Time In/Out', 'Login Hours', 'Overtime', 'Paid Hours'];
-    const rightAlignedHeaders = ['Schedule Duration', 'Login Hours', 'Overtime'];
+    const tableHeaders = ['Date', 'Status', 'Scheduled', 'Schedule Duration', 'Time In/Out', 'Login Hours', 'Overtime', 'Paid Hours', 'Rate'];
+    const rightAlignedHeaders = ['Schedule Duration', 'Login Hours', 'Overtime', 'Rate'];
     const centerAlignedHeaders = ['Status'];
 
     return (
@@ -1496,6 +1554,46 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                                             ) : '--'}
                                                         </td>
                                                         <td className="px-2 py-1.5 font-semibold whitespace-nowrap text-center">{log.paidHours > 0 ? formatDuration(log.paidHours) : '--'}</td>
+                                                        <td className="px-2 py-1.5 font-semibold whitespace-nowrap text-center">
+                                                            {editingRateDateKey === dateKey ? (
+                                                                <div className="flex items-center gap-1 justify-center">
+                                                                    <span className="text-xs">₱</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={tempRate}
+                                                                        onChange={(e) => setTempRate(e.target.value)}
+                                                                        className="w-16 px-1 py-0.5 bg-bg-primary border border-border-color rounded text-[10px] text-center"
+                                                                        autoFocus
+                                                                        step="0.01"
+                                                                    />
+                                                                    <button
+                                                                        onClick={() => handleRateSave(dateKey)}
+                                                                        className="text-accent-green hover:text-accent-green/80"
+                                                                        title="Save"
+                                                                    >
+                                                                        <CheckIcon className="w-3 h-3" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setEditingRateDateKey(null);
+                                                                            setTempRate('');
+                                                                        }}
+                                                                        className="text-accent-red hover:text-accent-red/80"
+                                                                        title="Cancel"
+                                                                    >
+                                                                        <XMarkIcon className="w-3 h-3" />
+                                                                    </button>
+                                                                </div>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => handleRateEdit(dateKey)}
+                                                                    className="hover:text-accent-blue transition-colors"
+                                                                    title="Click to edit rate for this date"
+                                                                >
+                                                                    ₱{getRateForDate(employee, dateKey).toFixed(2)}
+                                                                </button>
+                                                            )}
+                                                        </td>
                                                     </tr>
                                                 )
                                             })}
@@ -1545,6 +1643,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                                         </div>
                                                     </div>
                                                     <div className="flex justify-between"><span className="text-text-secondary">Paid Hours:</span><span className="font-semibold">{log.paidHours > 0 ? formatDuration(log.paidHours) : '--'}</span></div>
+                                                    <div className="flex justify-between"><span className="text-text-secondary">Rate:</span><span className="font-semibold">₱{getRateForDate(employee, dateKey).toFixed(2)}</span></div>
                                                 </div>
                                             </div>
                                         )
