@@ -600,13 +600,16 @@ const Attendance: React.FC<AttendanceProps> = ({
                 position: formData.position,
                 department: formData.department,
                 rate: parseFloat(formData.rate) || 0,
-                rateHistory: rateHistoryForm.length > 0 ? rateHistoryForm : undefined,
                 schedule: {},
                 phone: formData.phone,
                 email: formData.email,
                 bankAccount: formData.bankAccount,
                 paymentMode: formData.paymentMode,
             };
+            // Only add rateHistory if there are entries
+            if (rateHistoryForm.length > 0) {
+                newEmployee.rateHistory = rateHistoryForm;
+            }
             updatedEmployees = [...employees, newEmployee];
             setEmployees(updatedEmployees);
         } else if (selectedEmployee) {
@@ -614,23 +617,29 @@ const Attendance: React.FC<AttendanceProps> = ({
             const oldRate = selectedEmployee.rate;
             const rateChanged = newRate !== oldRate;
 
-            updatedEmployees = employees.map(emp =>
-                emp.id === selectedEmployee.id
-                    ? {
-                          ...emp,
-                          name: formData.name,
-                          position: formData.position,
-                          department: formData.department,
-                          rate: newRate,
-                          rateHistory: rateHistoryForm.length > 0 ? rateHistoryForm : undefined,
-                          phone: formData.phone,
-                          email: formData.email,
-                          bankAccount: formData.bankAccount,
-                          paymentMode: formData.paymentMode,
-                          // Preserve existing fields like schedule, approvedOvertime, salaryDeductions
-                      }
-                    : emp
-            );
+            updatedEmployees = employees.map(emp => {
+                if (emp.id === selectedEmployee.id) {
+                    const updatedEmp: Employee = {
+                        ...emp,
+                        name: formData.name,
+                        position: formData.position,
+                        department: formData.department,
+                        rate: newRate,
+                        phone: formData.phone,
+                        email: formData.email,
+                        bankAccount: formData.bankAccount,
+                        paymentMode: formData.paymentMode,
+                    };
+                    // Only set rateHistory if there are entries, otherwise remove it
+                    if (rateHistoryForm.length > 0) {
+                        updatedEmp.rateHistory = rateHistoryForm;
+                    } else {
+                        delete updatedEmp.rateHistory;
+                    }
+                    return updatedEmp;
+                }
+                return emp;
+            });
             setEmployees(updatedEmployees);
 
             // Update payroll records if rate or other employee details changed
