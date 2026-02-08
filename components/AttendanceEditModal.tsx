@@ -19,11 +19,6 @@ const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
     date,
     initialRecord,
 }) => {
-    const [timeIn, setTimeIn] = useState('');
-    const [timeOut, setTimeOut] = useState('');
-    const [isClosing, setIsClosing] = useState(false);
-    const timeInRef = useRef<HTMLInputElement>(null);
-
     // Convert 12-hour format to 24-hour format for the time input
     const convertTo24Hour = (time12h: string): string => {
         if (!time12h) return '';
@@ -50,6 +45,11 @@ const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
 
         return `${hours.toString().padStart(2, '0')}:${minutes}`;
     };
+
+    const [timeIn, setTimeIn] = useState(() => convertTo24Hour(initialRecord?.timeIn || ''));
+    const [timeOut, setTimeOut] = useState(() => convertTo24Hour(initialRecord?.timeOut || ''));
+    const [isClosing, setIsClosing] = useState(false);
+    const timeInRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (isOpen) {

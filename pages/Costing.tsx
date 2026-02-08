@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { RecipeCosting, ProductInventoryItem } from '../types';
-import { PlusIcon, PencilIcon, TrashIcon } from '../components/Icons';
+import { PlusIcon, EyeIcon, TrashIcon, Squares2X2Icon, TableCellsIcon } from '../components/Icons';
 import LoadingSpinner from '../components/LoadingSpinner';
 import RecipeCostingModal from '../components/RecipeCostingModal';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -22,12 +22,18 @@ const StatCard: React.FC<{title: string, value: string}> = ({title, value}) => (
 
 const RecipeCard: React.FC<{ recipe: RecipeCosting; onEdit: () => void; onDelete: () => void; }> = ({ recipe, onEdit, onDelete }) => {
     const formatPeso = (amount: number) => `₱${amount.toFixed(2)}`;
-    
+
     return (
         <div className="bg-bg-secondary rounded-lg sm:rounded-xl border border-border-color p-3 sm:p-4 lg:p-5 flex flex-col justify-between transition-shadow hover:shadow-lg hover:border-border-color/80">
             <div>
-                <h3 className="text-base sm:text-lg font-semibold text-text-primary truncate">{recipe.name}</h3>
-                <div className="mt-3 sm:mt-4 space-y-1.5 sm:space-y-2 text-xs sm:text-sm">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                    <h3 className="text-base sm:text-lg font-semibold text-text-primary truncate flex-1">{recipe.name}</h3>
+                    <div className="flex items-center gap-1 ml-2">
+                        <button onClick={onEdit} className="p-2 rounded-full text-text-secondary hover:text-text-primary hover:bg-hover-bg transition-colors" title="View Recipe"><EyeIcon className="w-5 h-5" /></button>
+                        <button onClick={onDelete} className="p-2 rounded-full text-text-secondary hover:text-accent-red hover:bg-hover-bg transition-colors" title="Delete Recipe"><TrashIcon className="w-5 h-5" /></button>
+                    </div>
+                </div>
+                <div className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm">
                     <div className="flex justify-between">
                         <span className="text-text-secondary">Ingredient Cost:</span>
                         <span className="font-medium">{formatPeso(recipe.totalCost)}</span>
@@ -48,11 +54,74 @@ const RecipeCard: React.FC<{ recipe: RecipeCosting; onEdit: () => void; onDelete
                         <span className="text-text-secondary font-semibold">Profit:</span>
                         <span className={`font-bold text-lg ${(recipe.sellingPrice - recipe.totalCost) > 0 ? 'text-accent-green' : 'text-accent-red'}`}>{formatPeso(recipe.sellingPrice - recipe.totalCost)}</span>
                     </div>
+                    {recipe.isTemplate && recipe.yieldAmount && recipe.costPerUnit !== undefined && (
+                        <div className="flex justify-between items-center mt-2 pt-2 border-t border-border-color/50">
+                            <span className="text-text-secondary text-xs">Cost per {recipe.yieldUnit || 'unit'}:</span>
+                            <span className="font-semibold text-sm text-accent-blue">{formatPeso(recipe.costPerUnit)}</span>
+                        </div>
+                    )}
                 </div>
             </div>
-            <div className="mt-6 flex items-center justify-end gap-2">
-                <button onClick={onEdit} className="p-2 rounded-full text-text-secondary hover:text-text-primary hover:bg-hover-bg transition-colors" title="Edit Recipe"><PencilIcon className="w-5 h-5" /></button>
-                <button onClick={onDelete} className="p-2 rounded-full text-text-secondary hover:text-accent-red hover:bg-hover-bg transition-colors" title="Delete Recipe"><TrashIcon className="w-5 h-5" /></button>
+        </div>
+    );
+};
+
+const RecipeListItem: React.FC<{ recipe: RecipeCosting; onEdit: () => void; onDelete: () => void; }> = ({ recipe, onEdit, onDelete }) => {
+    const formatPeso = (amount: number) => `₱${amount.toFixed(2)}`;
+    const profit = recipe.sellingPrice - recipe.totalCost;
+
+    return (
+        <div className="bg-bg-secondary border border-border-color rounded-lg p-3 hover:shadow-md hover:border-border-color/80 transition-all">
+            <div className="flex items-center gap-3">
+                {/* Recipe Name */}
+                <div className="w-48 min-w-0 flex-shrink-0">
+                    <h3 className="font-semibold text-text-primary text-sm truncate">{recipe.name}</h3>
+                    {recipe.isTemplate && recipe.yieldAmount && recipe.costPerUnit !== undefined && (
+                        <p className="text-xs text-accent-blue mt-0.5">
+                            {formatPeso(recipe.costPerUnit)}/{recipe.yieldUnit || 'unit'}
+                        </p>
+                    )}
+                </div>
+
+                {/* Cost Details */}
+                <div className="flex-1 grid grid-cols-4 gap-4 text-xs">
+                    <div>
+                        <div className="text-text-secondary mb-0.5">Ingredient Cost</div>
+                        <div className="font-semibold text-text-primary">{formatPeso(recipe.totalCost)}</div>
+                    </div>
+                    <div>
+                        <div className="text-text-secondary mb-0.5">Total Cost</div>
+                        <div className="font-semibold text-text-primary">{formatPeso(recipe.totalCostWithAllocation)}</div>
+                    </div>
+                    <div>
+                        <div className="text-text-secondary mb-0.5">Selling Price</div>
+                        <div className="font-semibold text-text-primary">{formatPeso(recipe.sellingPrice)}</div>
+                    </div>
+                    <div>
+                        <div className="text-text-secondary mb-0.5">Profit</div>
+                        <div className={`font-bold ${profit > 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                            {formatPeso(profit)}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                        onClick={onEdit}
+                        className="p-1.5 rounded text-text-secondary hover:text-accent-blue hover:bg-accent-blue/10 transition-colors"
+                        title="View Recipe"
+                    >
+                        <EyeIcon className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={onDelete}
+                        className="p-1.5 rounded text-text-secondary hover:text-accent-red hover:bg-accent-red/10 transition-colors"
+                        title="Delete Recipe"
+                    >
+                        <TrashIcon className="w-4 h-4" />
+                    </button>
+                </div>
             </div>
         </div>
     );
@@ -98,6 +167,7 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
     const [recipeToEdit, setRecipeToEdit] = useState<RecipeCosting | null>(null);
     const [recipeToDelete, setRecipeToDelete] = useState<RecipeCosting | null>(null);
     const [operationStatus, setOperationStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+    const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
 
     const handleOpenAddModal = () => {
         setRecipeToEdit(null);
@@ -214,10 +284,28 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
                     <h2 className="text-xl sm:text-2xl lg:text-3xl font-semibold">Costing Analysis</h2>
                     <p className="text-text-secondary mt-0.5 sm:mt-1 text-xs sm:text-sm">Analyze the cost and profitability of your recipes.</p>
                 </div>
-                <button onClick={handleOpenAddModal} className="flex items-center gap-1.5 sm:gap-2 bg-accent-blue text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm shadow-md hover:bg-opacity-80 transition w-full sm:w-auto">
-                    <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5"/>
-                    Add Recipe Costing
-                </button>
+                <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                    <div className="flex items-center bg-bg-secondary border border-border-color rounded-lg p-1">
+                        <button
+                            onClick={() => setViewMode('card')}
+                            className={`p-2 rounded transition-colors ${viewMode === 'card' ? 'bg-accent-blue text-white' : 'text-text-secondary hover:text-text-primary hover:bg-hover-bg'}`}
+                            title="Card View"
+                        >
+                            <Squares2X2Icon className="w-5 h-5" />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('list')}
+                            className={`p-2 rounded transition-colors ${viewMode === 'list' ? 'bg-accent-blue text-white' : 'text-text-secondary hover:text-text-primary hover:bg-hover-bg'}`}
+                            title="List View"
+                        >
+                            <TableCellsIcon className="w-5 h-5" />
+                        </button>
+                    </div>
+                    <button onClick={handleOpenAddModal} className="flex items-center gap-1.5 sm:gap-2 bg-accent-blue text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm shadow-md hover:bg-opacity-80 transition flex-1 sm:flex-initial justify-center">
+                        <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5"/>
+                        Add Recipe Costing
+                    </button>
+                </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4 xl:gap-6 mb-4 sm:mb-6 lg:mb-8">
                 <StatCard title="Avg. Final Cost %" value={`${averageFinalCost.toFixed(2)}%`} />
@@ -228,16 +316,29 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
 
             {/* Regular Recipes (not templates) */}
             {recipeCostings.filter(r => !r.isTemplate).length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
-                    {recipeCostings.filter(r => !r.isTemplate).map(recipe => (
-                        <RecipeCard
-                            key={recipe.id}
-                            recipe={recipe}
-                            onEdit={() => handleOpenEditModal(recipe)}
-                            onDelete={() => handleDeleteClick(recipe)}
-                        />
-                    ))}
-                </div>
+                viewMode === 'card' ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
+                        {recipeCostings.filter(r => !r.isTemplate).map(recipe => (
+                            <RecipeCard
+                                key={recipe.id}
+                                recipe={recipe}
+                                onEdit={() => handleOpenEditModal(recipe)}
+                                onDelete={() => handleDeleteClick(recipe)}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="space-y-2">
+                        {recipeCostings.filter(r => !r.isTemplate).map(recipe => (
+                            <RecipeListItem
+                                key={recipe.id}
+                                recipe={recipe}
+                                onEdit={() => handleOpenEditModal(recipe)}
+                                onDelete={() => handleDeleteClick(recipe)}
+                            />
+                        ))}
+                    </div>
+                )
             ) : (
                 <div className="bg-bg-secondary rounded-xl border border-border-color">
                     <p className="p-16 text-center text-text-secondary">No recipe costings found. Click "Add Recipe Costing" to begin.</p>
@@ -251,16 +352,29 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
                         <h3 className="text-lg font-semibold text-text-primary">Template Recipes</h3>
                         <p className="text-sm text-text-secondary mt-1">Reusable recipe components for other recipes</p>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
-                        {recipeCostings.filter(r => r.isTemplate).map(recipe => (
-                            <RecipeCard
-                                key={recipe.id}
-                                recipe={recipe}
-                                onEdit={() => handleOpenEditModal(recipe)}
-                                onDelete={() => handleDeleteClick(recipe)}
-                            />
-                        ))}
-                    </div>
+                    {viewMode === 'card' ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
+                            {recipeCostings.filter(r => r.isTemplate).map(recipe => (
+                                <RecipeCard
+                                    key={recipe.id}
+                                    recipe={recipe}
+                                    onEdit={() => handleOpenEditModal(recipe)}
+                                    onDelete={() => handleDeleteClick(recipe)}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {recipeCostings.filter(r => r.isTemplate).map(recipe => (
+                                <RecipeListItem
+                                    key={recipe.id}
+                                    recipe={recipe}
+                                    onEdit={() => handleOpenEditModal(recipe)}
+                                    onDelete={() => handleDeleteClick(recipe)}
+                                />
+                            ))}
+                        </div>
+                    )}
                 </>
             )}
 

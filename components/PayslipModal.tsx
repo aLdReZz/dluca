@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { PayrollRecord, Employee } from '../types';
-import { XMarkIcon, PrinterIcon, InformationCircleIcon } from './Icons';
-import { generatePayslipPdf, type PayslipPdfData } from '../utils/payslipPdf';
+import { XMarkIcon, PrinterIcon, InformationCircleIcon, EnvelopeIcon } from './Icons';
+import { generatePayslipPdf, generatePayslipPdfBase64, type PayslipPdfData } from '../utils/payslipPdf';
+import { sendPayslipEmail } from '../utils/emailService';
 
 interface PayslipModalProps {
     record: PayrollRecord;
@@ -119,6 +120,8 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
     );
     const [isPrinting, setIsPrinting] = useState(false);
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+    const [isSendingEmail, setIsSendingEmail] = useState(false);
+    const [emailStatus, setEmailStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const afterPrintHandlerRef = useRef<(() => void) | null>(null);
     const trimmedDeductionNotes = deductionNotes.trim();
 
@@ -260,6 +263,33 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
             alert('Unable to export the official PDF template. Please try again.');
         } finally {
             setIsGeneratingPdf(false);
+        }
+    };
+
+    const handleSendEmail = async () => {
+        if (!employee?.email) return;
+
+        setIsSendingEmail(true);
+        setEmailStatus('idle');
+
+        try {
+            const pdfPayload = buildPayslipPdfData();
+            const base64 = await generatePayslipPdfBase64(pdfPayload);
+
+            await sendPayslipEmail({
+                recipientEmail: employee.email,
+                employeeName: record.employee,
+                payCoverage: payPeriodRangeShortLabel,
+                netSalary: netPay.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                pdfBase64: base64,
+            });
+
+            setEmailStatus('success');
+        } catch (error) {
+            console.error('Failed to send payslip email', error);
+            setEmailStatus('error');
+        } finally {
+            setIsSendingEmail(false);
         }
     };
 
@@ -868,6 +898,16 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                     </button>
                     <button
                         type="button"
+                        onClick={handleSendEmail}
+                        disabled={!employee?.email || isSendingEmail || isGeneratingPdf}
+                        className="px-4 py-2 rounded-lg font-semibold text-sm bg-accent-green text-white hover:bg-opacity-80 transition flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                        aria-busy={isSendingEmail}
+                        title={!employee?.email ? 'Employee has no email address on file' : undefined}
+                    >
+                        <EnvelopeIcon className="w-5 h-5" /> {isSendingEmail ? 'Sending...' : 'Send via Email'}
+                    </button>
+                    <button
+                        type="button"
                         onClick={handlePrint}
                         disabled={isPrinting}
                         className="px-4 py-2 rounded-lg font-medium text-sm bg-bg-tertiary hover:bg-hover-bg transition flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
@@ -883,6 +923,13 @@ const PayslipModal: React.FC<PayslipModalProps> = ({
                         Save & Close
                     </button>
                 </div>
+                {emailStatus !== 'idle' && (
+                    <div className={`px-4 py-2 text-sm text-center rounded-b-2xl ${emailStatus === 'success' ? 'text-accent-green' : 'text-accent-red'}`}>
+                        {emailStatus === 'success'
+                            ? `Payslip sent successfully to ${employee?.email}`
+                            : 'Failed to send email. Please check your EmailJS configuration and try again.'}
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -180,6 +180,9 @@ export interface RecipeCosting {
     foodCostPercentage: number;
     finalCostPercentage: number;
     isTemplate?: boolean; // True if this is a template recipe (not sold individually)
+    yieldAmount?: number; // Total grams/units this recipe produces
+    yieldUnit?: string; // Unit of yield (g, kg, pcs, etc.)
+    costPerUnit?: number; // Cost per unit (calculated based on yieldUnit)
 }
 
 export type ContentType = 'Post' | 'Story' | 'Reel' | 'Ad';

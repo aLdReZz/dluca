@@ -526,6 +526,16 @@ export const generatePayslipPdf = async (data: PayslipPdfData) => {
     doc.save(filename);
 };
 
+export const generatePayslipPdfBase64 = async (data: PayslipPdfData): Promise<string> => {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+    const logoDataUrl = await loadLogoDataUrl();
+
+    await renderPayslipPage(doc, data, logoDataUrl);
+
+    const arrayBuffer = doc.output('arraybuffer') as ArrayBuffer;
+    return arrayBufferToBase64(arrayBuffer);
+};
+
 export const generateConsolidatedPayslipsPdf = async (payslipsData: PayslipPdfData[]) => {
     if (payslipsData.length === 0) {
         console.warn('No payslip data provided for consolidated PDF');

@@ -683,6 +683,7 @@ const Attendance: React.FC<AttendanceProps> = ({
             if (updatedEmployees.length > 0) {
                 await syncEmployees(updatedEmployees);
                 console.log('✅ Employee changes saved to Firebase');
+                await refetchEmployees();
             }
         } catch (error) {
             console.warn('Could not save employee changes to Firebase:', error);
@@ -2143,6 +2144,7 @@ const Attendance: React.FC<AttendanceProps> = ({
 
             {editingAttendanceContext && (
                 <AttendanceEditModal
+                    key={`${editingAttendanceContext.emp.name}_${editingAttendanceContext.dateKey}`}
                     isOpen={!!editingAttendanceContext}
                     onClose={() => setEditingAttendanceContext(null)}
                     onSave={handleSaveAttendanceFromModal}
