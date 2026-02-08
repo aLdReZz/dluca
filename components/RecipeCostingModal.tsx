@@ -9,6 +9,7 @@ interface RecipeCostingModalProps {
     recipeToEdit: RecipeCosting | null;
     products: ProductInventoryItem[];
     recipes?: RecipeCosting[]; // For using template recipes as ingredients
+    onAddProduct?: (product: Omit<ProductInventoryItem, 'id'>) => Promise<ProductInventoryItem | null>;
 }
 
 const DEFAULT_ALLOCATIONS = [
@@ -20,7 +21,7 @@ const DEFAULT_ALLOCATIONS = [
     { name: 'S.C. Disc', percentage: 20 },
 ];
 
-const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose, onSave, recipeToEdit, products, recipes = [] }) => {
+const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose, onSave, recipeToEdit, products, recipes = [], onAddProduct }) => {
     const [name, setName] = useState('');
     const [sellingPrice, setSellingPrice] = useState('');
     const [isTemplate, setIsTemplate] = useState(false);
@@ -38,6 +39,19 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
     const [editingIngredientKey, setEditingIngredientKey] = useState<string | null>(null);
     const [isEditMode, setIsEditMode] = useState(false);
     const [isClosing, setIsClosing] = useState(false);
+
+    // Add to Pricelist state
+    const [showAddProductForm, setShowAddProductForm] = useState(false);
+    const [addProductContext, setAddProductContext] = useState<{ componentId: string; ingredientIndex: number; ingredientName: string } | null>(null);
+    const [newProduct, setNewProduct] = useState({
+        name: '',
+        category: '',
+        brand: '',
+        unit: 'g',
+        quantity: 1,
+        price: 0,
+        supplier: '',
+    });
 
     const nameInputRef = useRef<HTMLInputElement>(null);
     
@@ -340,7 +354,75 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
         newAllocations[index] = { ...newAllocations[index], percentage };
         setAllocations(newAllocations);
     };
-    
+
+    const handleShowAddProductForm = (componentId: string, ingredientIndex: number, ingredientName: string) => {
+        setAddProductContext({ componentId, ingredientIndex, ingredientName });
+        setNewProduct({
+            name: ingredientName,
+            category: '',
+            brand: '',
+            unit: 'g',
+            quantity: 1,
+            price: 0,
+            supplier: '',
+        });
+        setShowAddProductForm(true);
+        setActiveIngredientIndex(null);
+        setSuggestions([]);
+    };
+
+    const handleSaveNewProduct = async () => {
+        if (!onAddProduct || !addProductContext) return;
+
+        if (!newProduct.name.trim() || newProduct.price <= 0) {
+            alert('Please fill in product name and price');
+            return;
+        }
+
+        const productToAdd: Omit<ProductInventoryItem, 'id'> = {
+            name: newProduct.name,
+            category: newProduct.category || 'Uncategorized',
+            brand: newProduct.brand || '',
+            unit: newProduct.unit,
+            quantity: newProduct.quantity,
+            price: newProduct.price,
+            supplier: newProduct.supplier || '',
+        };
+
+        const addedProduct = await onAddProduct(productToAdd);
+
+        if (addedProduct) {
+            // Select the newly added product as the ingredient
+            const { componentId, ingredientIndex } = addProductContext;
+            setComponents(components.map(c => {
+                if (c.id !== componentId) return c;
+
+                const newIngredients = [...c.ingredients];
+                const quantity = newIngredients[ingredientIndex].quantity || 1;
+                const unit = newProduct.unit;
+
+                newIngredients[ingredientIndex] = {
+                    itemId: addedProduct.id,
+                    name: addedProduct.name,
+                    quantity: quantity,
+                    unit: unit,
+                    cost: calculateCost(addedProduct, quantity, unit),
+                };
+
+                const newCost = newIngredients.reduce((sum, ing) => sum + ing.cost, 0);
+                return { ...c, ingredients: newIngredients, cost: newCost };
+            }));
+        }
+
+        setShowAddProductForm(false);
+        setAddProductContext(null);
+    };
+
+    const handleCancelAddProduct = () => {
+        setShowAddProductForm(false);
+        setAddProductContext(null);
+    };
+
     const validate = () => {
         const newErrors: { [key: string]: string } = {};
         if (!name.trim()) newErrors.name = "Recipe name is required";
@@ -462,27 +544,28 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
                                     </div>
                                 )}
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-text-secondary mb-1">
-                                    Selling Price (₱){!isTemplate && '*'}
-                                </label>
-                                {isEditMode || !recipeToEdit ? (
-                                    <>
-                                        <input
-                                            type="number"
-                                            value={sellingPrice}
-                                            onChange={e => setSellingPrice(e.target.value)}
-                                            disabled={isTemplate}
-                                            className={`w-full bg-bg-primary border rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue ${errors.sellingPrice ? 'border-accent-red' : 'border-border-color'} ${isTemplate ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                        />
-                                        {errors.sellingPrice && <p className="text-xs text-accent-red mt-1">{errors.sellingPrice}</p>}
-                                    </>
-                                ) : (
-                                    <div className="w-full p-2 text-text-primary font-medium">
-                                        ₱{sellingPrice}
-                                    </div>
-                                )}
-                            </div>
+                            {!isTemplate && (
+                                <div>
+                                    <label className="block text-sm font-medium text-text-secondary mb-1">
+                                        Selling Price (₱)*
+                                    </label>
+                                    {isEditMode || !recipeToEdit ? (
+                                        <>
+                                            <input
+                                                type="number"
+                                                value={sellingPrice}
+                                                onChange={e => setSellingPrice(e.target.value)}
+                                                className={`w-full bg-bg-primary border rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue ${errors.sellingPrice ? 'border-accent-red' : 'border-border-color'}`}
+                                            />
+                                            {errors.sellingPrice && <p className="text-xs text-accent-red mt-1">{errors.sellingPrice}</p>}
+                                        </>
+                                    ) : (
+                                        <div className="w-full p-2 text-text-primary font-medium">
+                                            ₱{sellingPrice}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {isTemplate && (
@@ -610,8 +693,8 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
                                                                         onKeyDown={e => handleKeyDown(e, component.id, ingIndex)}
                                                                         className="w-full bg-bg-primary border border-border-color rounded-md px-2 py-1.5 text-sm focus:ring-accent-blue focus:border-accent-blue"
                                                                     />
-                                                                    {activeIngredientIndex === activeKey && suggestions.length > 0 && (
-                                                                        <div className="absolute top-full left-0 right-0 bg-bg-tertiary border-x border-b border-border-color rounded-b-lg z-20 max-h-40 overflow-y-auto mt-1">
+                                                                    {activeIngredientIndex === activeKey && (suggestions.length > 0 || (ing.name.trim() && onAddProduct)) && (
+                                                                        <div className="absolute top-full left-0 right-0 bg-bg-tertiary border-x border-b border-border-color rounded-b-lg z-20 max-h-48 overflow-y-auto mt-1">
                                                                             {suggestions.map((s, sIndex) => {
                                                                                 const isRecipe = 'totalCostWithAllocation' in s;
                                                                                 return (
@@ -632,6 +715,16 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
                                                                                     </div>
                                                                                 );
                                                                             })}
+                                                                            {/* Add to Pricelist option */}
+                                                                            {onAddProduct && ing.name.trim() && !suggestions.some(s => s.name.toLowerCase() === ing.name.toLowerCase()) && (
+                                                                                <div
+                                                                                    onMouseDown={() => handleShowAddProductForm(component.id, ingIndex, ing.name)}
+                                                                                    className="p-2 text-sm cursor-pointer hover:bg-hover-bg border-t border-border-color/50 flex items-center gap-2"
+                                                                                >
+                                                                                    <PlusIcon className="w-4 h-4 text-accent-green" />
+                                                                                    <span className="text-accent-green font-medium">Add "{ing.name}" to Pricelist</span>
+                                                                                </div>
+                                                                            )}
                                                                         </div>
                                                                     )}
                                                                 </>
@@ -728,48 +821,52 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
                                 {errors.ingredients && <p className="text-xs text-accent-red mt-1">{errors.ingredients}</p>}
                             </div>
                              <div className="lg:col-span-1">
-                                <h3 className="text-md font-semibold text-text-primary mb-2">Mark Up Summary</h3>
-                                <div className="space-y-1.5 text-sm">
-                                    {allocations.map((alloc, index) => {
-                                        const amount = totalCost * (alloc.percentage / 100);
-                                        const isEditing = editingAllocationIndex === index;
-                                        return (
-                                            <div key={alloc.name} className="flex justify-between items-center">
-                                                <span className="text-text-secondary">{alloc.name}</span>
+                                {!isTemplate && (
+                                    <>
+                                        <h3 className="text-md font-semibold text-text-primary mb-2">Mark Up Summary</h3>
+                                        <div className="space-y-1.5 text-sm">
+                                            {allocations.map((alloc, index) => {
+                                                const amount = totalCost * (alloc.percentage / 100);
+                                                const isEditing = editingAllocationIndex === index;
+                                                return (
+                                                    <div key={alloc.name} className="flex justify-between items-center">
+                                                        <span className="text-text-secondary">{alloc.name}</span>
+                                                        <div className="flex items-baseline gap-2">
+                                                            <span className="font-semibold">{formatPeso(amount)}</span>
+                                                            {isEditing ? (
+                                                                <input
+                                                                    type="number"
+                                                                    value={alloc.percentage}
+                                                                    onChange={e => handleAllocationPercentageChange(index, e.target.value)}
+                                                                    onBlur={() => setEditingAllocationIndex(null)}
+                                                                    onKeyDown={e => {
+                                                                        if (e.key === 'Enter') setEditingAllocationIndex(null);
+                                                                    }}
+                                                                    autoFocus
+                                                                    className="w-12 text-xs text-right bg-bg-primary border border-accent-blue rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-accent-blue"
+                                                                />
+                                                            ) : (
+                                                                <span
+                                                                    className="text-xs text-text-secondary/70 w-12 text-right cursor-pointer hover:text-accent-blue transition-colors"
+                                                                    onClick={() => setEditingAllocationIndex(index)}
+                                                                >
+                                                                    ({alloc.percentage}%)
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                            <div className="flex justify-between items-center pt-2 border-t border-border-color/50 font-semibold">
+                                                <span>Total Markup</span>
                                                 <div className="flex items-baseline gap-2">
-                                                    <span className="font-semibold">{formatPeso(amount)}</span>
-                                                    {isEditing ? (
-                                                        <input
-                                                            type="number"
-                                                            value={alloc.percentage}
-                                                            onChange={e => handleAllocationPercentageChange(index, e.target.value)}
-                                                            onBlur={() => setEditingAllocationIndex(null)}
-                                                            onKeyDown={e => {
-                                                                if (e.key === 'Enter') setEditingAllocationIndex(null);
-                                                            }}
-                                                            autoFocus
-                                                            className="w-12 text-xs text-right bg-bg-primary border border-accent-blue rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-accent-blue"
-                                                        />
-                                                    ) : (
-                                                        <span
-                                                            className="text-xs text-text-secondary/70 w-12 text-right cursor-pointer hover:text-accent-blue transition-colors"
-                                                            onClick={() => setEditingAllocationIndex(index)}
-                                                        >
-                                                            ({alloc.percentage}%)
-                                                        </span>
-                                                    )}
+                                                    <span>{formatPeso(totalCostWithAllocation - totalCost)}</span>
+                                                    <span className="text-xs text-text-secondary/70 w-12 text-right">({totalAllocationPercentage}%)</span>
                                                 </div>
                                             </div>
-                                        );
-                                    })}
-                                    <div className="flex justify-between items-center pt-2 border-t border-border-color/50 font-semibold">
-                                        <span>Total Markup</span>
-                                        <div className="flex items-baseline gap-2">
-                                            <span>{formatPeso(totalCostWithAllocation - totalCost)}</span>
-                                            <span className="text-xs text-text-secondary/70 w-12 text-right">({totalAllocationPercentage}%)</span>
                                         </div>
-                                    </div>
-                                </div>
+                                    </>
+                                )}
 
                                 {/* Template Recipe Checkbox */}
                                 <div className="mt-4 flex items-start gap-2 p-3 bg-bg-tertiary/30 rounded-lg border border-border-color/50">
@@ -791,25 +888,36 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
                     </div>
                     
                     <div className="p-4 bg-bg-tertiary/50 border-t border-border-color flex flex-col md:flex-row justify-between items-center gap-4 rounded-b-2xl flex-shrink-0">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 text-center md:text-left">
+                        <div className={`grid grid-cols-2 ${isTemplate ? 'md:grid-cols-2' : 'md:grid-cols-4'} gap-x-6 gap-y-2 text-center md:text-left`}>
                             <div>
-                                <span className="text-xs text-text-secondary block">Ingredient Cost</span>
+                                <span className="text-xs text-text-secondary block">{isTemplate ? 'Total Cost' : 'Ingredient Cost'}</span>
                                 <span className="font-semibold text-md">{formatPeso(totalCost)}</span>
                             </div>
-                            <div>
-                                <span className="text-xs text-text-secondary block">Total w/ Mark Up</span>
-                                <span className="font-semibold text-md">{formatPeso(totalCostWithAllocation)}</span>
-                            </div>
-                            <div>
-                                <span className="text-xs text-text-secondary block">Food Cost %</span>
-                                <span className="font-semibold text-md">{foodCostPercentage.toFixed(2)}%</span>
-                            </div>
-                            <div>
-                                <span className="text-xs text-text-secondary block">Final Cost %</span>
-                                <span className={`font-semibold text-md ${finalCostPercentage > 100 ? 'text-accent-red' : 'text-accent-green'}`}>
-                                    {finalCostPercentage.toFixed(2)}%
-                                </span>
-                            </div>
+                            {isTemplate ? (
+                                <div>
+                                    <span className="text-xs text-text-secondary block">Cost per {yieldUnit || 'unit'}</span>
+                                    <span className="font-semibold text-md text-accent-blue">
+                                        {parseFloat(yieldAmount) > 0 ? formatPeso(totalCost / parseFloat(yieldAmount)) : '—'}
+                                    </span>
+                                </div>
+                            ) : (
+                                <>
+                                    <div>
+                                        <span className="text-xs text-text-secondary block">Total w/ Mark Up</span>
+                                        <span className="font-semibold text-md">{formatPeso(totalCostWithAllocation)}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-text-secondary block">Food Cost %</span>
+                                        <span className="font-semibold text-md">{foodCostPercentage.toFixed(2)}%</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-text-secondary block">Final Cost %</span>
+                                        <span className={`font-semibold text-md ${finalCostPercentage > 100 ? 'text-accent-red' : 'text-accent-green'}`}>
+                                            {finalCostPercentage.toFixed(2)}%
+                                        </span>
+                                    </div>
+                                </>
+                            )}
                         </div>
                         <div className="flex gap-2 w-full md:w-auto">
                             <button
@@ -830,6 +938,117 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
                     </div>
                 </form>
             </div>
+
+            {/* Add to Pricelist Modal */}
+            {showAddProductForm && (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[70]">
+                    <div className="bg-bg-secondary rounded-xl border border-border-color p-6 w-full max-w-md mx-4">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold">Add to Pricelist</h3>
+                            <button onClick={handleCancelAddProduct} className="p-1 rounded-full hover:bg-hover-bg">
+                                <XMarkIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="block text-sm font-medium text-text-secondary mb-1">Product Name*</label>
+                                <input
+                                    type="text"
+                                    value={newProduct.name}
+                                    onChange={e => setNewProduct({ ...newProduct, name: e.target.value })}
+                                    className="w-full bg-bg-primary border border-border-color rounded-md px-3 py-2 text-sm"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-text-secondary mb-1">Category</label>
+                                    <input
+                                        type="text"
+                                        value={newProduct.category}
+                                        onChange={e => setNewProduct({ ...newProduct, category: e.target.value })}
+                                        className="w-full bg-bg-primary border border-border-color rounded-md px-3 py-2 text-sm"
+                                        placeholder="e.g., Produce"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-text-secondary mb-1">Brand</label>
+                                    <input
+                                        type="text"
+                                        value={newProduct.brand}
+                                        onChange={e => setNewProduct({ ...newProduct, brand: e.target.value })}
+                                        className="w-full bg-bg-primary border border-border-color rounded-md px-3 py-2 text-sm"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-text-secondary mb-1">Qty</label>
+                                    <input
+                                        type="number"
+                                        value={newProduct.quantity}
+                                        onChange={e => setNewProduct({ ...newProduct, quantity: parseFloat(e.target.value) || 1 })}
+                                        className="w-full bg-bg-primary border border-border-color rounded-md px-3 py-2 text-sm"
+                                        min="0.01"
+                                        step="0.01"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-text-secondary mb-1">Unit</label>
+                                    <select
+                                        value={newProduct.unit}
+                                        onChange={e => setNewProduct({ ...newProduct, unit: e.target.value })}
+                                        className="w-full bg-bg-primary border border-border-color rounded-md px-3 py-2 text-sm"
+                                    >
+                                        <option value="g">g</option>
+                                        <option value="kg">kg</option>
+                                        <option value="mL">mL</option>
+                                        <option value="L">L</option>
+                                        <option value="pcs">pcs</option>
+                                        <option value="pack">pack</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-text-secondary mb-1">Price (₱)*</label>
+                                    <input
+                                        type="number"
+                                        value={newProduct.price || ''}
+                                        onChange={e => setNewProduct({ ...newProduct, price: parseFloat(e.target.value) || 0 })}
+                                        className="w-full bg-bg-primary border border-border-color rounded-md px-3 py-2 text-sm"
+                                        min="0.01"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-text-secondary mb-1">Supplier</label>
+                                <input
+                                    type="text"
+                                    value={newProduct.supplier}
+                                    onChange={e => setNewProduct({ ...newProduct, supplier: e.target.value })}
+                                    className="w-full bg-bg-primary border border-border-color rounded-md px-3 py-2 text-sm"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex gap-2 mt-5">
+                            <button
+                                type="button"
+                                onClick={handleCancelAddProduct}
+                                className="flex-1 px-4 py-2 rounded-md font-semibold bg-bg-tertiary hover:bg-hover-bg transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSaveNewProduct}
+                                className="flex-1 px-4 py-2 rounded-md font-semibold bg-accent-green text-white hover:bg-opacity-80 transition"
+                            >
+                                Add to Pricelist
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

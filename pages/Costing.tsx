@@ -136,9 +136,14 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
     );
 
     // Fetch products from Firebase
-    const { data: firebaseProducts = [], loading: productsLoading, error: productsError } = useFirebaseData(
+    const { data: firebaseProducts = [], loading: productsLoading, error: productsError, refetch: refetchProducts } = useFirebaseData(
         () => productInventoryService.getAll(),
         []
+    );
+
+    // Add product mutation (for adding new products from RecipeCostingModal)
+    const { mutate: addProduct } = useFirebaseMutation(
+        (product: Omit<ProductInventoryItem, 'id'>) => productInventoryService.add(product)
     );
 
     // Add recipe mutation
@@ -242,6 +247,25 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
         const totalPercentage = recipeCostings.reduce((sum, recipe) => sum + recipe.finalCostPercentage, 0);
         return totalPercentage / recipeCostings.length;
     }, [recipeCostings]);
+
+    // Handler for adding new products from RecipeCostingModal
+    const handleAddProduct = async (product: Omit<ProductInventoryItem, 'id'>): Promise<ProductInventoryItem | null> => {
+        try {
+            const newProduct = await addProduct(product);
+            if (newProduct) {
+                // Refetch products to update the list
+                refetchProducts();
+                setOperationStatus({ type: 'success', message: `"${product.name}" added to pricelist` });
+                setTimeout(() => setOperationStatus(null), 3000);
+                return newProduct as ProductInventoryItem;
+            }
+            return null;
+        } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : 'Failed to add product';
+            setOperationStatus({ type: 'error', message: errorMsg });
+            return null;
+        }
+    };
 
     // Show loading state
     if (recipesLoading || productsLoading) {
@@ -386,6 +410,7 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
                     recipeToEdit={recipeToEdit}
                     products={productInventoryItems}
                     recipes={recipeCostings}
+                    onAddProduct={handleAddProduct}
                 />
             )}
             
