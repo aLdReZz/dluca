@@ -24,6 +24,7 @@ const DEFAULT_ALLOCATIONS = [
 const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose, onSave, recipeToEdit, products, recipes = [], onAddProduct }) => {
     const [name, setName] = useState('');
     const [sellingPrice, setSellingPrice] = useState('');
+    const [department, setDepartment] = useState<'Kitchen' | 'Bakery' | 'Coffee & Bar' | ''>('');
     const [isTemplate, setIsTemplate] = useState(false);
     const [yieldAmount, setYieldAmount] = useState('');
     const [yieldUnit, setYieldUnit] = useState('g');
@@ -57,22 +58,45 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
     
     const formatPeso = (amount: number) => `₱${amount.toFixed(2)}`;
 
+    // Track if modal was just opened to prevent re-initialization when products update
+    const modalOpenedRef = useRef(false);
+
     useEffect(() => {
         if (isOpen) {
             document.body.style.overflow = 'hidden';
-            setAllocations(DEFAULT_ALLOCATIONS); // Reset allocations when opening modal
-            if (recipeToEdit) {
-                setName(recipeToEdit.name);
-                setSellingPrice(String(recipeToEdit.sellingPrice));
-                setIsTemplate(recipeToEdit.isTemplate || false);
-                setYieldAmount(recipeToEdit.yieldAmount ? String(recipeToEdit.yieldAmount) : '');
-                setYieldUnit(recipeToEdit.yieldUnit || 'g');
 
-                // Check if recipe has components or legacy ingredients
-                if (recipeToEdit.components && recipeToEdit.components.length > 0) {
-                    // Recalculate costs for components
-                    const updatedComponents = recipeToEdit.components.map(comp => {
-                        const updatedIngredients = comp.ingredients.map(ing => {
+            // Only initialize form when modal is first opened, not when products change
+            if (!modalOpenedRef.current) {
+                modalOpenedRef.current = true;
+                setAllocations(DEFAULT_ALLOCATIONS); // Reset allocations when opening modal
+
+                if (recipeToEdit) {
+                    setName(recipeToEdit.name);
+                    setSellingPrice(String(recipeToEdit.sellingPrice));
+                    setDepartment(recipeToEdit.department || '');
+                    setIsTemplate(recipeToEdit.isTemplate || false);
+                    setYieldAmount(recipeToEdit.yieldAmount ? String(recipeToEdit.yieldAmount) : '');
+                    setYieldUnit(recipeToEdit.yieldUnit || 'g');
+
+                    // Check if recipe has components or legacy ingredients
+                    if (recipeToEdit.components && recipeToEdit.components.length > 0) {
+                        // Recalculate costs for components
+                        const updatedComponents = recipeToEdit.components.map(comp => {
+                            const updatedIngredients = comp.ingredients.map(ing => {
+                                const product = products.find(p => p.id === ing.itemId);
+                                if (product) {
+                                    const recalculatedCost = calculateCost(product, ing.quantity, ing.unit);
+                                    return { ...ing, cost: recalculatedCost };
+                                }
+                                return ing;
+                            });
+                            const componentCost = updatedIngredients.reduce((sum, ing) => sum + ing.cost, 0);
+                            return { ...comp, ingredients: updatedIngredients, cost: componentCost };
+                        });
+                        setComponents(updatedComponents);
+                    } else {
+                        // Legacy: single component with all ingredients
+                        const updatedIngredients = recipeToEdit.ingredients.map(ing => {
                             const product = products.find(p => p.id === ing.itemId);
                             if (product) {
                                 const recalculatedCost = calculateCost(product, ing.quantity, ing.unit);
@@ -81,34 +105,23 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
                             return ing;
                         });
                         const componentCost = updatedIngredients.reduce((sum, ing) => sum + ing.cost, 0);
-                        return { ...comp, ingredients: updatedIngredients, cost: componentCost };
-                    });
-                    setComponents(updatedComponents);
+                        setComponents([{ id: '1', name: '', ingredients: updatedIngredients, cost: componentCost }]);
+                    }
                 } else {
-                    // Legacy: single component with all ingredients
-                    const updatedIngredients = recipeToEdit.ingredients.map(ing => {
-                        const product = products.find(p => p.id === ing.itemId);
-                        if (product) {
-                            const recalculatedCost = calculateCost(product, ing.quantity, ing.unit);
-                            return { ...ing, cost: recalculatedCost };
-                        }
-                        return ing;
-                    });
-                    const componentCost = updatedIngredients.reduce((sum, ing) => sum + ing.cost, 0);
-                    setComponents([{ id: '1', name: '', ingredients: updatedIngredients, cost: componentCost }]);
+                    setName('');
+                    setSellingPrice('');
+                    setDepartment('');
+                    setIsTemplate(false);
+                    setYieldAmount('');
+                    setYieldUnit('g');
+                    setComponents([{ id: '1', name: '', ingredients: [], cost: 0 }]);
                 }
-            } else {
-                setName('');
-                setSellingPrice('');
-                setIsTemplate(false);
-                setYieldAmount('');
-                setYieldUnit('g');
-                setComponents([{ id: '1', name: '', ingredients: [], cost: 0 }]);
+                setErrors({});
+                setTimeout(() => nameInputRef.current?.focus(), 100);
             }
-            setErrors({});
-            setTimeout(() => nameInputRef.current?.focus(), 100);
         } else {
             document.body.style.overflow = 'unset';
+            modalOpenedRef.current = false; // Reset flag when modal closes
         }
         return () => {
             document.body.style.overflow = 'unset';
@@ -270,16 +283,30 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
                     setSuggestions([]);
                 }
             } else if (field === 'quantity') {
-                const product = products.find(p => p.id === currentIngredient.itemId);
                 currentIngredient.quantity = parseFloat(value) || 0;
+
+                // Check if it's a product or a template recipe
+                const product = products.find(p => p.id === currentIngredient.itemId);
+                const templateRecipe = recipes.find(r => r.id === currentIngredient.itemId && r.isTemplate);
+
                 if (product) {
                     currentIngredient.cost = calculateCost(product, currentIngredient.quantity, currentIngredient.unit);
+                } else if (templateRecipe && templateRecipe.costPerUnit) {
+                    // For template recipes, use costPerUnit directly
+                    currentIngredient.cost = templateRecipe.costPerUnit * currentIngredient.quantity;
                 }
             } else if (field === 'unit') {
                 currentIngredient.unit = value;
+
+                // Check if it's a product or a template recipe
                 const product = products.find(p => p.id === currentIngredient.itemId);
+                const templateRecipe = recipes.find(r => r.id === currentIngredient.itemId && r.isTemplate);
+
                 if (product && currentIngredient.quantity > 0) {
                     currentIngredient.cost = calculateCost(product, currentIngredient.quantity, currentIngredient.unit);
+                } else if (templateRecipe && templateRecipe.costPerUnit && currentIngredient.quantity > 0) {
+                    // For template recipes, use costPerUnit directly
+                    currentIngredient.cost = templateRecipe.costPerUnit * currentIngredient.quantity;
                 }
             }
 
@@ -374,8 +401,18 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
     const handleSaveNewProduct = async () => {
         if (!onAddProduct || !addProductContext) return;
 
-        if (!newProduct.name.trim() || newProduct.price <= 0) {
-            alert('Please fill in product name and price');
+        if (!newProduct.name.trim()) {
+            alert('Product name is required');
+            return;
+        }
+
+        if (!newProduct.price || newProduct.price <= 0) {
+            alert('Price must be greater than 0');
+            return;
+        }
+
+        if (!newProduct.quantity || newProduct.quantity <= 0) {
+            alert('Quantity must be greater than 0');
             return;
         }
 
@@ -412,10 +449,11 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
                 const newCost = newIngredients.reduce((sum, ing) => sum + ing.cost, 0);
                 return { ...c, ingredients: newIngredients, cost: newCost };
             }));
-        }
 
-        setShowAddProductForm(false);
-        setAddProductContext(null);
+            // Close the modal after successful add
+            setShowAddProductForm(false);
+            setAddProductContext(null);
+        }
     };
 
     const handleCancelAddProduct = () => {
@@ -473,6 +511,7 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
         const recipeData: any = {
             name: name.trim(),
             sellingPrice: parseFloat(sellingPrice) || 0,
+            department: department || undefined,
             ingredients: allIngredients, // Legacy support
             components: sanitizedComponents, // New structure
             totalCost: totalCost || 0,
@@ -530,7 +569,7 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
                     </div>
 
                     <div className="p-6 space-y-4 flex-1 overflow-y-auto">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-text-secondary mb-1">Recipe Name*</label>
                                 {isEditMode || !recipeToEdit ? (
@@ -541,6 +580,26 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
                                 ) : (
                                     <div className="w-full p-2 text-text-primary font-medium">
                                         {name}
+                                    </div>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-text-secondary mb-1">Department</label>
+                                {isEditMode || !recipeToEdit ? (
+                                    <select
+                                        value={department}
+                                        onChange={e => setDepartment(e.target.value as 'Kitchen' | 'Bakery' | 'Coffee & Bar' | '')}
+                                        className="w-full bg-bg-primary border border-border-color rounded-lg p-2 focus:ring-accent-blue focus:border-accent-blue appearance-none"
+                                        style={{ backgroundImage: 'none' }}
+                                    >
+                                        <option value="">Select Department</option>
+                                        <option value="Kitchen">Kitchen</option>
+                                        <option value="Bakery">Bakery</option>
+                                        <option value="Coffee & Bar">Coffee & Bar</option>
+                                    </select>
+                                ) : (
+                                    <div className="w-full p-2 text-text-primary font-medium">
+                                        {department || 'Not set'}
                                     </div>
                                 )}
                             </div>
@@ -888,7 +947,7 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
                     </div>
                     
                     <div className="p-4 bg-bg-tertiary/50 border-t border-border-color flex flex-col md:flex-row justify-between items-center gap-4 rounded-b-2xl flex-shrink-0">
-                        <div className={`grid grid-cols-2 ${isTemplate ? 'md:grid-cols-2' : 'md:grid-cols-4'} gap-x-6 gap-y-2 text-center md:text-left`}>
+                        <div className={`grid grid-cols-2 ${isTemplate ? 'md:grid-cols-2' : 'md:grid-cols-5'} gap-x-6 gap-y-2 text-center md:text-left`}>
                             <div>
                                 <span className="text-xs text-text-secondary block">{isTemplate ? 'Total Cost' : 'Ingredient Cost'}</span>
                                 <span className="font-semibold text-md">{formatPeso(totalCost)}</span>
@@ -907,13 +966,21 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
                                         <span className="font-semibold text-md">{formatPeso(totalCostWithAllocation)}</span>
                                     </div>
                                     <div>
-                                        <span className="text-xs text-text-secondary block">Food Cost %</span>
-                                        <span className="font-semibold text-md">{foodCostPercentage.toFixed(2)}%</span>
+                                        <span className="text-xs text-text-secondary block">Selling Price</span>
+                                        <span className="font-semibold text-md">{formatPeso(parseFloat(sellingPrice) || 0)}</span>
                                     </div>
                                     <div>
-                                        <span className="text-xs text-text-secondary block">Final Cost %</span>
-                                        <span className={`font-semibold text-md ${finalCostPercentage > 100 ? 'text-accent-red' : 'text-accent-green'}`}>
-                                            {finalCostPercentage.toFixed(2)}%
+                                        <span className="text-xs text-text-secondary block">Profit</span>
+                                        <span className={`font-semibold text-md ${(parseFloat(sellingPrice) - totalCostWithAllocation) > 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                                            {formatPeso((parseFloat(sellingPrice) || 0) - totalCostWithAllocation)}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-text-secondary block">Profit %</span>
+                                        <span className="font-semibold text-md text-accent-blue">
+                                            {totalCost > 0 && parseFloat(sellingPrice) > 0
+                                                ? `${((parseFloat(sellingPrice) / totalCost) * 100).toFixed(2)}%`
+                                                : '—'}
                                         </span>
                                     </div>
                                 </>
@@ -941,8 +1008,8 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
 
             {/* Add to Pricelist Modal */}
             {showAddProductForm && (
-                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[70]">
-                    <div className="bg-bg-secondary rounded-xl border border-border-color p-6 w-full max-w-md mx-4">
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[70]" onClick={handleCancelAddProduct}>
+                    <div className="bg-bg-secondary rounded-xl border border-border-color p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-semibold">Add to Pricelist</h3>
                             <button onClick={handleCancelAddProduct} className="p-1 rounded-full hover:bg-hover-bg">
@@ -985,11 +1052,12 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
                                     <label className="block text-sm font-medium text-text-secondary mb-1">Qty</label>
                                     <input
                                         type="number"
-                                        value={newProduct.quantity}
-                                        onChange={e => setNewProduct({ ...newProduct, quantity: parseFloat(e.target.value) || 1 })}
+                                        value={newProduct.quantity || ''}
+                                        onChange={e => setNewProduct({ ...newProduct, quantity: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
                                         className="w-full bg-bg-primary border border-border-color rounded-md px-3 py-2 text-sm"
                                         min="0.01"
                                         step="0.01"
+                                        placeholder="1"
                                     />
                                 </div>
                                 <div>
@@ -1012,7 +1080,7 @@ const RecipeCostingModal: React.FC<RecipeCostingModalProps> = ({ isOpen, onClose
                                     <input
                                         type="number"
                                         value={newProduct.price || ''}
-                                        onChange={e => setNewProduct({ ...newProduct, price: parseFloat(e.target.value) || 0 })}
+                                        onChange={e => setNewProduct({ ...newProduct, price: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
                                         className="w-full bg-bg-primary border border-border-color rounded-md px-3 py-2 text-sm"
                                         min="0.01"
                                         step="0.01"

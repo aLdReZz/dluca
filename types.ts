@@ -179,6 +179,7 @@ export interface RecipeCosting {
     sellingPrice: number;
     foodCostPercentage: number;
     finalCostPercentage: number;
+    department?: 'Kitchen' | 'Bakery' | 'Coffee & Bar'; // Department categorization
     isTemplate?: boolean; // True if this is a template recipe (not sold individually)
     yieldAmount?: number; // Total grams/units this recipe produces
     yieldUnit?: string; // Unit of yield (g, kg, pcs, etc.)

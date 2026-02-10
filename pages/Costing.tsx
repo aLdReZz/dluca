@@ -69,57 +69,60 @@ const RecipeCard: React.FC<{ recipe: RecipeCosting; onEdit: () => void; onDelete
 const RecipeListItem: React.FC<{ recipe: RecipeCosting; onEdit: () => void; onDelete: () => void; }> = ({ recipe, onEdit, onDelete }) => {
     const formatPeso = (amount: number) => `₱${amount.toFixed(2)}`;
     const profit = recipe.sellingPrice - recipe.totalCost;
+    const profitPercentage = recipe.totalCost > 0 && recipe.sellingPrice > 0
+        ? ((recipe.sellingPrice / recipe.totalCost) * 100).toFixed(2)
+        : '0.00';
 
     return (
-        <div className="bg-bg-secondary border border-border-color rounded-lg p-3 hover:shadow-md hover:border-border-color/80 transition-all">
-            <div className="flex items-center gap-3">
+        <div className="bg-bg-secondary border-b border-border-color hover:bg-hover-bg/30 transition-colors">
+            <div className={`grid ${recipe.isTemplate ? 'grid-cols-[2fr_150px_150px_100px]' : 'grid-cols-[1fr_auto_auto_auto_auto_auto_auto]'} gap-4 items-center px-3 py-2 text-xs`}>
                 {/* Recipe Name */}
-                <div className="w-48 min-w-0 flex-shrink-0">
-                    <h3 className="font-semibold text-text-primary text-sm truncate">{recipe.name}</h3>
+                <div className="truncate">
+                    <span className="font-medium text-text-primary">{recipe.name}</span>
                     {recipe.isTemplate && recipe.yieldAmount && recipe.costPerUnit !== undefined && (
-                        <p className="text-xs text-accent-blue mt-0.5">
-                            {formatPeso(recipe.costPerUnit)}/{recipe.yieldUnit || 'unit'}
-                        </p>
+                        <span className="text-accent-blue ml-2">({formatPeso(recipe.costPerUnit)}/{recipe.yieldUnit})</span>
                     )}
                 </div>
 
-                {/* Cost Details */}
-                <div className="flex-1 grid grid-cols-4 gap-4 text-xs">
-                    <div>
-                        <div className="text-text-secondary mb-0.5">Ingredient Cost</div>
-                        <div className="font-semibold text-text-primary">{formatPeso(recipe.totalCost)}</div>
-                    </div>
-                    <div>
-                        <div className="text-text-secondary mb-0.5">Total Cost</div>
-                        <div className="font-semibold text-text-primary">{formatPeso(recipe.totalCostWithAllocation)}</div>
-                    </div>
-                    <div>
-                        <div className="text-text-secondary mb-0.5">Selling Price</div>
-                        <div className="font-semibold text-text-primary">{formatPeso(recipe.sellingPrice)}</div>
-                    </div>
-                    <div>
-                        <div className="text-text-secondary mb-0.5">Profit</div>
-                        <div className={`font-bold ${profit > 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                {/* Ingredient Cost */}
+                <div className={`text-right text-text-primary ${recipe.isTemplate ? '' : 'w-28'}`}>{formatPeso(recipe.totalCost)}</div>
+
+                {/* Total Cost */}
+                <div className={`text-right text-text-primary ${recipe.isTemplate ? '' : 'w-28'}`}>{formatPeso(recipe.totalCostWithAllocation)}</div>
+
+                {/* Selling Price, Profit, and Profit % - Only for non-template recipes */}
+                {!recipe.isTemplate && (
+                    <>
+                        {/* Selling Price */}
+                        <div className="text-right text-text-primary w-28">{formatPeso(recipe.sellingPrice)}</div>
+
+                        {/* Profit */}
+                        <div className={`text-right font-semibold w-28 ${profit > 0 ? 'text-accent-green' : 'text-accent-red'}`}>
                             {formatPeso(profit)}
                         </div>
-                    </div>
-                </div>
+
+                        {/* Profit % */}
+                        <div className={`text-right font-semibold w-24 ${profit > 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                            {profitPercentage}%
+                        </div>
+                    </>
+                )}
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-1 flex-shrink-0">
+                <div className={`flex items-center justify-end gap-0.5 ${recipe.isTemplate ? '' : 'w-20'}`}>
                     <button
                         onClick={onEdit}
-                        className="p-1.5 rounded text-text-secondary hover:text-accent-blue hover:bg-accent-blue/10 transition-colors"
+                        className="p-1 rounded text-text-secondary hover:text-accent-blue hover:bg-accent-blue/10 transition-colors"
                         title="View Recipe"
                     >
-                        <EyeIcon className="w-4 h-4" />
+                        <EyeIcon className="w-3.5 h-3.5" />
                     </button>
                     <button
                         onClick={onDelete}
-                        className="p-1.5 rounded text-text-secondary hover:text-accent-red hover:bg-accent-red/10 transition-colors"
+                        className="p-1 rounded text-text-secondary hover:text-accent-red hover:bg-accent-red/10 transition-colors"
                         title="Delete Recipe"
                     >
-                        <TrashIcon className="w-4 h-4" />
+                        <TrashIcon className="w-3.5 h-3.5" />
                     </button>
                 </div>
             </div>
@@ -173,6 +176,7 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
     const [recipeToDelete, setRecipeToDelete] = useState<RecipeCosting | null>(null);
     const [operationStatus, setOperationStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
     const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
+    const [selectedDepartment, setSelectedDepartment] = useState<'All' | 'Kitchen' | 'Bakery' | 'Coffee & Bar'>('All');
 
     const handleOpenAddModal = () => {
         setRecipeToEdit(null);
@@ -248,16 +252,23 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
         return totalPercentage / recipeCostings.length;
     }, [recipeCostings]);
 
+    // Filter recipes by department
+    const filteredRecipes = useMemo(() => {
+        if (selectedDepartment === 'All') return recipeCostings;
+        return recipeCostings.filter(recipe => recipe.department === selectedDepartment);
+    }, [recipeCostings, selectedDepartment]);
+
     // Handler for adding new products from RecipeCostingModal
     const handleAddProduct = async (product: Omit<ProductInventoryItem, 'id'>): Promise<ProductInventoryItem | null> => {
         try {
-            const newProduct = await addProduct(product);
-            if (newProduct) {
+            const newProductId = await addProduct(product);
+            if (newProductId) {
                 // Refetch products to update the list
                 refetchProducts();
                 setOperationStatus({ type: 'success', message: `"${product.name}" added to pricelist` });
                 setTimeout(() => setOperationStatus(null), 3000);
-                return newProduct as ProductInventoryItem;
+                // Return the full product object with the new ID
+                return { ...product, id: newProductId as string };
             }
             return null;
         } catch (err) {
@@ -338,11 +349,30 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
                 <StatCard title="Total Recipes" value={String(recipeCostings.length)} />
             </div>
 
+            {/* Department Filter */}
+            <div className="mb-6">
+                <div className="inline-flex items-center gap-1 bg-bg-secondary border border-border-color rounded-lg p-1">
+                    {(['All', 'Kitchen', 'Bakery', 'Coffee & Bar'] as const).map((dept) => (
+                        <button
+                            key={dept}
+                            onClick={() => setSelectedDepartment(dept)}
+                            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                                selectedDepartment === dept
+                                    ? 'bg-accent-blue text-white shadow-sm'
+                                    : 'text-text-secondary hover:text-text-primary hover:bg-hover-bg'
+                            }`}
+                        >
+                            {dept}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             {/* Regular Recipes (not templates) */}
-            {recipeCostings.filter(r => !r.isTemplate).length > 0 ? (
+            {filteredRecipes.filter(r => !r.isTemplate).length > 0 ? (
                 viewMode === 'card' ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
-                        {recipeCostings.filter(r => !r.isTemplate).map(recipe => (
+                        {filteredRecipes.filter(r => !r.isTemplate).map(recipe => (
                             <RecipeCard
                                 key={recipe.id}
                                 recipe={recipe}
@@ -352,8 +382,19 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
                         ))}
                     </div>
                 ) : (
-                    <div className="space-y-2">
-                        {recipeCostings.filter(r => !r.isTemplate).map(recipe => (
+                    <div className="bg-bg-secondary border border-border-color rounded-lg overflow-hidden">
+                        {/* Header Row */}
+                        <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto] gap-4 items-center px-3 py-2 text-xs font-semibold text-text-secondary bg-bg-tertiary/50 border-b border-border-color">
+                            <div>Recipe Name</div>
+                            <div className="text-right w-28">Ingredient Cost</div>
+                            <div className="text-right w-28">Total Cost</div>
+                            <div className="text-right w-28">Selling Price</div>
+                            <div className="text-right w-28">Profit</div>
+                            <div className="text-right w-24">Profit %</div>
+                            <div className="text-right w-20">Actions</div>
+                        </div>
+                        {/* Data Rows */}
+                        {filteredRecipes.filter(r => !r.isTemplate).map(recipe => (
                             <RecipeListItem
                                 key={recipe.id}
                                 recipe={recipe}
@@ -370,7 +411,7 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
             )}
 
             {/* Template Recipes Section */}
-            {recipeCostings.filter(r => r.isTemplate).length > 0 && (
+            {filteredRecipes.filter(r => r.isTemplate).length > 0 && (
                 <>
                     <div className="mt-8 mb-4 border-t border-border-color pt-6">
                         <h3 className="text-lg font-semibold text-text-primary">Template Recipes</h3>
@@ -378,7 +419,7 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
                     </div>
                     {viewMode === 'card' ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
-                            {recipeCostings.filter(r => r.isTemplate).map(recipe => (
+                            {filteredRecipes.filter(r => r.isTemplate).map(recipe => (
                                 <RecipeCard
                                     key={recipe.id}
                                     recipe={recipe}
@@ -388,8 +429,16 @@ const Costing: React.FC<CostingProps> = ({ recipeCostings: propRecipeCostings, s
                             ))}
                         </div>
                     ) : (
-                        <div className="space-y-2">
-                            {recipeCostings.filter(r => r.isTemplate).map(recipe => (
+                        <div className="bg-bg-secondary border border-border-color rounded-lg overflow-hidden">
+                            {/* Header Row */}
+                            <div className="grid grid-cols-[2fr_150px_150px_100px] gap-4 items-center px-3 py-2 text-xs font-semibold text-text-secondary bg-bg-tertiary/50 border-b border-border-color">
+                                <div>Recipe Name</div>
+                                <div className="text-right">Ingredient Cost</div>
+                                <div className="text-right">Total Cost</div>
+                                <div className="text-right">Actions</div>
+                            </div>
+                            {/* Data Rows */}
+                            {filteredRecipes.filter(r => r.isTemplate).map(recipe => (
                                 <RecipeListItem
                                     key={recipe.id}
                                     recipe={recipe}
