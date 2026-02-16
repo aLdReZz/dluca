@@ -18,6 +18,7 @@ import {
     ClipboardDocumentListIcon,
     ChevronLeftIcon,
     ChevronRightIcon,
+    CalendarDaysIcon,
 } from './Icons';
 
 const InventoryBoxIcon: React.FC<{ className?: string }> = ({ className = '' }) => (
@@ -81,6 +82,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, currentPage, onNavigate, isOpen
     const staffManagementItems = [
         { id: 'attendance', label: 'Attendance', icon: ClockIcon, roles: ['admin', 'staff'] },
         { id: 'payroll', label: 'Payroll', icon: CreditCardIcon, roles: ['admin'] },
+        { id: 'schedule-simulator', label: 'Schedule Simulator', icon: CalendarDaysIcon, roles: ['admin'] },
     ];
     const contentItems = [
         { id: 'calendar', label: 'Content Calendar', icon: CalendarIcon, roles: ['admin', 'staff'] },

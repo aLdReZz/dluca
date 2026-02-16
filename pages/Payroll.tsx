@@ -527,12 +527,12 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
     const summaryStats = useMemo(() => {
         return payrollRecords.reduce(
             (acc, record) => {
-                acc.totalGross += record.grossPay;
+                acc.totalPeriodEarning += record.regularPay + record.overtimePay;
+                acc.totalServiceCharge += record.serviceCharge || 0;
                 acc.totalNet += record.netPay;
-                acc.totalHours += record.totalHours;
                 return acc;
             },
-            { totalGross: 0, totalNet: 0, totalHours: 0 },
+            { totalPeriodEarning: 0, totalServiceCharge: 0, totalNet: 0 },
         );
     }, [payrollRecords]);
 
@@ -626,9 +626,9 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <SummaryCard title="Total Gross Pay" value={formatPeso(summaryStats.totalGross)} icon={BanknotesIcon} />
-                <SummaryCard title="Total Hours" value={`${summaryStats.totalHours.toFixed(2)} hrs`} icon={ClockIcon} />
-                <SummaryCard title="Total Net Pay" value={formatPeso(summaryStats.totalNet)} icon={CurrencyPesoIcon} />
+                <SummaryCard title="Total Period Earning" value={formatPeso(summaryStats.totalPeriodEarning)} icon={BanknotesIcon} />
+                <SummaryCard title="Total Service Charge" value={formatPeso(summaryStats.totalServiceCharge)} icon={ClockIcon} />
+                <SummaryCard title="Total Net Pay" value={formatPeso(summaryStats.totalPeriodEarning + summaryStats.totalServiceCharge)} icon={CurrencyPesoIcon} />
                 <SummaryCard
                     title="Service Charge Pool"
                     value={formatPeso(serviceChargePoolTotal)}

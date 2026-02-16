@@ -14,6 +14,7 @@ import Attendance from './pages/Attendance';
 import Payroll from './pages/Payroll';
 import Calendar from './pages/Calendar';
 import PurchaseRequest from './pages/PurchaseRequest';
+import ScheduleSimulator from './pages/ScheduleSimulator';
 import type { Role, Page, SalesData, InventoryItem, PurchaseOrder, Employee, CalendarEvent, RecipeCosting, PayrollRecord, AttendanceRecord, ProductInventoryItem } from './types';
 import { MenuIcon, ShieldCheckIcon, UserIcon, PlusIcon, ChartBarIcon, FunnelIcon, DocumentTextIcon, CubeIcon, ReceiptPercentIcon } from './components/Icons';
 import { useFirebaseData } from './hooks/useFirebase';
@@ -601,6 +602,8 @@ const App: React.FC = () => {
                         manualGhostMinutes={manualGhostMinutes}
                     />
                 );
+            case 'schedule-simulator':
+                return <ScheduleSimulator employees={employees} />;
             case 'calendar':
                 return <Calendar events={calendarEvents} setEvents={setCalendarEvents} />;
             default:

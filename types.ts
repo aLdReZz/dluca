@@ -2,7 +2,7 @@ import React from 'react';
 
 export type Role = 'admin' | 'staff';
 
-export type Page = 'dashboard' | 'sales' | 'pricelist' | 'inventory-supplies' | 'purchase-request' | 'costing' | 'accounting' | 'accounting-transactions' | 'accounting-profitloss' | 'accounting-chartofaccounts' | 'attendance' | 'payroll' | 'calendar';
+export type Page = 'dashboard' | 'sales' | 'pricelist' | 'inventory-supplies' | 'purchase-request' | 'costing' | 'accounting' | 'accounting-transactions' | 'accounting-profitloss' | 'accounting-chartofaccounts' | 'attendance' | 'payroll' | 'schedule-simulator' | 'calendar';
 
 export interface SalesData {
     [key: string]: string;
