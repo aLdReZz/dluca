@@ -29,7 +29,9 @@
       "Bash(netlify link:*)",
       "Bash(npm run)",
       "Bash(timeout /t 2)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(npx netlify:*)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []

@@ -871,8 +871,16 @@ const Dashboard: React.FC<DashboardProps> = ({ salesData: propSalesData }) => {
                                 <span className="font-semibold text-text-primary">{formatPeso(stats.serviceChargeEmployee)}</span>
                             </div>
                             <div>
-                                <span className="text-text-secondary">Ghost:</span>{' '}
-                                <span className="font-semibold text-text-primary">{formatPeso(stats.serviceChargeGhost)}</span>
+                                <span className="text-text-secondary">Ghost 1:</span>{' '}
+                                <span className="font-semibold text-text-primary">{formatPeso((stats.serviceChargeGhost / 2) * 0.90)}</span>
+                            </div>
+                            <div>
+                                <span className="text-text-secondary">Ghost 2:</span>{' '}
+                                <span className="font-semibold text-text-primary">{formatPeso((stats.serviceChargeGhost / 2) * 0.90)}</span>
+                            </div>
+                            <div>
+                                <span className="text-text-secondary">Dylan:</span>{' '}
+                                <span className="font-semibold text-text-primary">{formatPeso(stats.serviceChargeGhost * 0.10)}</span>
                             </div>
                         </div>
                     }
