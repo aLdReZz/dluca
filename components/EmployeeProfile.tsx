@@ -615,10 +615,10 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                     dailyRecord.worked = baseWorkedMinutes;
                     dailyRecord.overtime = potentialOt;
 
-                    // Calculate paid hours: worked minutes minus lunch break if login > 4 hours
+                    // Calculate paid hours: worked minutes minus lunch break if login > 6 hours
                     const totalLoginMinutes = actualOutMinutes - actualInMinutes;
                     let paidMinutes = baseWorkedMinutes;
-                    if (totalLoginMinutes > 4 * 60) {
+                    if (totalLoginMinutes > 6 * 60) {
                         paidMinutes = Math.max(0, paidMinutes - 60);
                     }
                     const approvedOtForDay = employee.approvedOvertime?.[dateKey] || 0;
@@ -772,9 +772,9 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             worked += log.worked;
             approvedOT += approvedOtForDay;
             
-            // Calculate paid hours: only time within scheduled hours, minus lunch break if > 4 hours
+            // Calculate paid hours: only time within scheduled hours, minus lunch break if > 6 hours
             let dailyPaidMinutes = log.worked;
-            if (totalDailyLoginDuration > 4 * 60) {
+            if (totalDailyLoginDuration > 6 * 60) {
                 dailyPaidMinutes = Math.max(0, dailyPaidMinutes - 60);
             }
             paidMinutes += dailyPaidMinutes;
@@ -831,7 +831,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             }
 
             let dailyPaidRegularMinutes = log.worked;
-            if (totalDailyLoginDuration > 4 * 60) {
+            if (totalDailyLoginDuration > 6 * 60) {
                 dailyPaidRegularMinutes = Math.max(0, log.worked - 60);
             }
 

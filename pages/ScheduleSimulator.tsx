@@ -117,8 +117,8 @@ const ScheduleSimulator: React.FC<ScheduleSimulatorProps> = ({ employees }) => {
                     const outMin = timeStringToMinutes(existing.timeOut);
                     if (inMin !== null && outMin !== null && outMin > inMin) {
                         const totalDuration = outMin - inMin;
-                        // Deduct 1hr break if shift > 4hrs
-                        const paidMinutes = totalDuration > 4 * 60 ? totalDuration - 60 : totalDuration;
+                        // Deduct 1hr break if shift > 6hrs
+                        const paidMinutes = totalDuration > 6 * 60 ? totalDuration - 60 : totalDuration;
                         newHours[emp.id][dateKey] = Math.round(paidMinutes / 60);
                     } else {
                         newHours[emp.id][dateKey] = 0;
@@ -182,7 +182,7 @@ const ScheduleSimulator: React.FC<ScheduleSimulatorProps> = ({ employees }) => {
                     const outMin = timeStringToMinutes(prevSchedule.timeOut);
                     if (inMin !== null && outMin !== null && outMin > inMin) {
                         const totalDuration = outMin - inMin;
-                        const paidMinutes = totalDuration > 4 * 60 ? totalDuration - 60 : totalDuration;
+                        const paidMinutes = totalDuration > 6 * 60 ? totalDuration - 60 : totalDuration;
                         updated[employeeId][periodDates[i]] = Math.round(paidMinutes / 60);
                     } else {
                         updated[employeeId][periodDates[i]] = 0;

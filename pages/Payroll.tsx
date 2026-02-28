@@ -251,7 +251,7 @@ const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceR
                         const totalDailyLoginDuration = actualOutMinutes - actualInMinutes;
 
                         let dailyPaidRegularMinutes = baseWorkedMinutes;
-                        if (totalDailyLoginDuration > 4 * 60) { // More than 4 hours
+                        if (totalDailyLoginDuration > 6 * 60) { // More than 6 hours
                             dailyPaidRegularMinutes = Math.max(0, baseWorkedMinutes - 60); // Deduct 1 hour break
                         }
 
