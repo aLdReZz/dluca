@@ -244,7 +244,9 @@ const SummaryCard: React.FC<{
     color?: string;
     onClick?: () => void;
     isSelected?: boolean;
-}> = ({ title, value, icon: Icon, color = 'text-accent-blue', onClick, isSelected = false }) => (
+    logoSrc?: string;
+    logoFull?: boolean;
+}> = ({ title, value, icon: Icon, color = 'text-accent-blue', onClick, isSelected = false, logoSrc, logoFull }) => (
     <div
         className={`bg-bg-secondary p-4 rounded-xl border transition-all duration-200 cursor-pointer ${
             isSelected
@@ -254,8 +256,11 @@ const SummaryCard: React.FC<{
         onClick={onClick}
     >
         <div className="flex items-center justify-between mb-2">
-            <div className="p-2 rounded-lg bg-bg-tertiary flex-shrink-0">
-                <Icon className="w-5 h-5 text-text-secondary" />
+            <div className={`rounded-lg bg-bg-tertiary flex-shrink-0 ${logoFull ? 'p-0 overflow-hidden w-9 h-9' : 'p-2'}`}>
+                {logoSrc
+                    ? <img src={logoSrc} alt={title} className={`grayscale opacity-70 ${logoFull ? 'w-full h-full object-cover' : 'w-5 h-5 object-contain'}`} />
+                    : <Icon className="w-5 h-5 text-text-secondary" />
+                }
             </div>
             {isSelected && (
                 <div className="px-2 py-0.5 rounded bg-accent-blue/20 border border-accent-blue/30 flex-shrink-0">
@@ -275,6 +280,10 @@ type SortDirection = 'asc' | 'desc' | null;
 
 const Transactions: React.FC = () => {
     const [isAddingNew, setIsAddingNew] = useState(false);
+    const [showCsvModal, setShowCsvModal] = useState(false);
+    const [csvRows, setCsvRows] = useState<Array<{ date: string; description: string; amount: string; type: string; reference: string; category: string; bank: string; valid: boolean; error?: string }>>([]);
+    const [csvImporting, setCsvImporting] = useState(false);
+    const csvFileInputRef = useRef<HTMLInputElement>(null);
     const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
     const [deletingTransaction, setDeletingTransaction] = useState<AccountingTransaction | null>(null);
     const [operationStatus, setOperationStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
@@ -290,6 +299,12 @@ const Transactions: React.FC = () => {
         category: '',
         bank: ''
     });
+
+    // Tab state
+    const [activeTab, setActiveTab] = useState<'review' | 'categorized'>('review');
+    const [reviewCategories, setReviewCategories] = useState<Record<string, string>>({});
+    const [selectedReviewIds, setSelectedReviewIds] = useState<Set<string>>(new Set());
+    const [confirmingIds, setConfirmingIds] = useState<Set<string>>(new Set());
 
     // Sorting state
     const [sortField, setSortField] = useState<SortField>('date');
@@ -343,10 +358,10 @@ const Transactions: React.FC = () => {
         []
     );
 
-    // Filter to get only bank type accounts
+    // Filter to get only leaf bank accounts (exclude parent categories that have no parentId)
     const bankAccounts = useMemo(() => {
         if (!allAccounts || !Array.isArray(allAccounts)) return [];
-        return allAccounts.filter(account => account.type === 'bank' && account.isActive);
+        return allAccounts.filter(account => account.type === 'bank' && account.isActive && account.parentId);
     }, [allAccounts]);
 
     // Filter to get all non-bank accounts for category dropdown
@@ -407,6 +422,15 @@ const Transactions: React.FC = () => {
         return sortedTransactions.filter(t => (t as any).bank === selectedBank);
     }, [sortedTransactions, selectedBank]);
 
+    // Split into review vs categorized
+    const reviewTransactions = useMemo(() => {
+        return filteredTransactions.filter(t => t.status === 'review');
+    }, [filteredTransactions]);
+
+    const categorizedTransactions = useMemo(() => {
+        return filteredTransactions.filter(t => !t.status || t.status === 'categorized');
+    }, [filteredTransactions]);
+
     // Sorting handler
     const handleSort = (field: SortField) => {
         if (sortField === field) {
@@ -453,9 +477,9 @@ const Transactions: React.FC = () => {
         };
     }, [resizingColumn, startX, startWidth]);
 
-    // Calculate running balance with sorting
+    // Calculate running balance with sorting (categorized only)
     const transactionsWithBalance = useMemo(() => {
-        const sorted = [...filteredTransactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const sorted = [...categorizedTransactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         let balance = openingBalance || 0;
 
         const withBalance = sorted.map(transaction => {
@@ -574,7 +598,8 @@ const Transactions: React.FC = () => {
                 account: 'general',
                 category: newCategory,
                 bank: newPaymentMethod,
-                accountId: selectedAccount?.id
+                accountId: selectedAccount?.id,
+                status: 'categorized' as const
             };
 
             await addTransaction(transaction);
@@ -611,6 +636,131 @@ const Transactions: React.FC = () => {
         setNewPaymentMethod('');
         setNewAmount('');
         setIsAddingNew(false);
+    };
+
+    const parseCsvLine = (line: string): string[] => {
+        const result: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (ch === '"') { inQuotes = !inQuotes; }
+            else if (ch === ',' && !inQuotes) { result.push(current.trim()); current = ''; }
+            else { current += ch; }
+        }
+        result.push(current.trim());
+        return result;
+    };
+
+    const parseCsvDate = (raw: string): string => {
+        const cleaned = raw.trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return cleaned;
+        const withYear = /\d{4}/.test(cleaned) ? cleaned : `${cleaned} ${new Date().getFullYear()}`;
+        const d = new Date(withYear);
+        if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+        return cleaned;
+    };
+
+    const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const text = event.target?.result as string;
+            const lines = text.split(/\r?\n/).filter(l => l.trim());
+            if (lines.length < 2) return;
+            const rawHeaders = parseCsvLine(lines[0]);
+            const headers = rawHeaders.map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
+
+            const getCol = (cols: string[], names: string[]) => {
+                for (const name of names) {
+                    const idx = headers.indexOf(name);
+                    if (idx !== -1) return (cols[idx] || '').trim();
+                }
+                return '';
+            };
+
+            const parsed = lines.slice(1).map(line => {
+                const cols = parseCsvLine(line);
+                const rawDate = getCol(cols, ['date']);
+                const date = parseCsvDate(rawDate);
+                const description = getCol(cols, ['description', 'desc', 'details', 'narration']);
+                const rawAmount = getCol(cols, ['amount', 'debitamount', 'creditamount', 'value']);
+                const amount = rawAmount.replace(/[₱,\s]/g, '');
+                const rawType = getCol(cols, ['type', 'transactiontype', 'drcr']).toLowerCase();
+                // "income" → credit, "expense" → debit
+                const type = rawType === 'income' ? 'credit' : rawType === 'expense' ? 'debit' : rawType;
+                const category = getCol(cols, ['category']);
+                const subCategory = getCol(cols, ['subcategory', 'subcat']);
+                const subSubCategory = getCol(cols, ['subsubcategory', 'subsubcat']);
+                const fullCategory = [category, subCategory, subSubCategory].filter(Boolean).join(' > ');
+                const bank = getCol(cols, ['bank', 'paymentmethod', 'method', 'bankaccount']);
+
+                let valid = true;
+                let error = '';
+                if (!rawDate) { valid = false; error = 'Missing date'; }
+                else if (!description) { valid = false; error = 'Missing description'; }
+                else if (!amount || isNaN(parseFloat(amount))) { valid = false; error = 'Invalid amount'; }
+
+                return { date, description, amount, type, reference: '', category: fullCategory, bank, valid, error };
+            }).filter(r => r.date || r.description || r.amount);
+
+            setCsvRows(parsed);
+            setShowCsvModal(true);
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+    };
+
+    const handleCsvImport = async () => {
+        const validRows = csvRows.filter(r => r.valid);
+        if (!validRows.length) return;
+        setCsvImporting(true);
+
+        const transactionsToImport = validRows.map(row => {
+            const selectedAccount = categoryAccounts.find(acc => acc.name === row.category);
+            let transactionType: 'credit' | 'debit' = 'debit';
+            if (row.type === 'credit' || row.type === 'cr') {
+                transactionType = 'credit';
+            } else if (row.type === 'debit' || row.type === 'dr') {
+                transactionType = 'debit';
+            } else if (selectedAccount) {
+                transactionType = selectedAccount.type === 'revenue' || selectedAccount.type === 'liability' || selectedAccount.type === 'equity' ? 'credit' : 'debit';
+            }
+            return {
+                date: row.date,
+                type: transactionType,
+                description: row.description,
+                reference: row.reference,
+                amount: parseFloat(row.amount),
+                account: 'general' as const,
+                category: row.category,
+                bank: row.bank,
+                accountId: selectedAccount?.id,
+                status: 'review' as const
+            };
+        });
+
+        let successCount = 0;
+        let batchError = '';
+        try {
+            successCount = await accountingService.addBatch(transactionsToImport);
+        } catch (err: any) {
+            console.error('Batch import failed:', err);
+            batchError = err?.message || 'Unknown error';
+        }
+
+        await refetch();
+        setCsvImporting(false);
+        setShowCsvModal(false);
+        setCsvRows([]);
+        const failCount = validRows.length - successCount;
+        const msg = batchError
+            ? `Import failed: ${batchError}`
+            : failCount > 0
+            ? `${successCount} imported, ${failCount} failed — check your Firestore quota or connection`
+            : `${successCount} transaction${successCount !== 1 ? 's' : ''} imported successfully`;
+        setOperationStatus({ type: failCount > 0 || batchError ? 'error' : 'success', message: msg });
     };
 
     const handleEditTransaction = (transaction: AccountingTransaction) => {
@@ -788,6 +938,65 @@ const Transactions: React.FC = () => {
         setBatchEditData({ type: '', category: '', bank: '' });
     };
 
+    // Confirm a single "For Review" transaction → move to Categorized
+    const handleConfirmTransaction = async (id: string, category: string) => {
+        setConfirmingIds(prev => new Set(prev).add(id));
+        try {
+            const selectedAccount = categoryAccounts.find(acc => acc.name === category);
+            await updateTransaction({
+                id,
+                updates: {
+                    status: 'categorized',
+                    ...(category ? { category, accountId: selectedAccount?.id } : {})
+                }
+            });
+            setReviewCategories(prev => { const n = { ...prev }; delete n[id]; return n; });
+            setSelectedReviewIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+            await refetch();
+        } catch {
+            setOperationStatus({ type: 'error', message: 'Failed to confirm transaction' });
+        } finally {
+            setConfirmingIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+        }
+    };
+
+    // Exclude (delete) a "For Review" transaction
+    const handleExcludeTransaction = async (id: string) => {
+        setConfirmingIds(prev => new Set(prev).add(id));
+        try {
+            await deleteTransaction(id);
+            setSelectedReviewIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+            await refetch();
+            setOperationStatus({ type: 'success', message: 'Transaction excluded' });
+        } catch {
+            setOperationStatus({ type: 'error', message: 'Failed to exclude transaction' });
+        } finally {
+            setConfirmingIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+        }
+    };
+
+    // Batch confirm all selected review transactions
+    const handleBatchConfirm = async () => {
+        const ids = Array.from(selectedReviewIds);
+        if (!ids.length) return;
+        setConfirmingIds(new Set(ids));
+        try {
+            await Promise.all(ids.map(id => {
+                const category = reviewCategories[id] ?? ((reviewTransactions.find(t => t.id === id) as any)?.category ?? '');
+                const selectedAccount = categoryAccounts.find(acc => acc.name === category);
+                return updateTransaction({ id, updates: { status: 'categorized', ...(category ? { category, accountId: selectedAccount?.id } : {}) } });
+            }));
+            setSelectedReviewIds(new Set());
+            setReviewCategories(prev => { const n = { ...prev }; ids.forEach(id => delete n[id]); return n; });
+            setOperationStatus({ type: 'success', message: `${ids.length} transaction${ids.length !== 1 ? 's' : ''} confirmed` });
+            await refetch();
+        } catch {
+            setOperationStatus({ type: 'error', message: 'Failed to confirm some transactions' });
+        } finally {
+            setConfirmingIds(new Set());
+        }
+    };
+
     // Clear status messages after 3 seconds
     useEffect(() => {
         if (operationStatus) {
@@ -863,6 +1072,12 @@ const Transactions: React.FC = () => {
                                 }
                                 onClick={() => setSelectedBank(bank.name)}
                                 isSelected={selectedBank === bank.name}
+                                logoSrc={
+                                    bank.name.toLowerCase().includes('rcbc') ? '/rcbc-logo.png' :
+                                    bank.name.toLowerCase().includes('gcash') ? '/gcash-logo.png' :
+                                    undefined
+                                }
+                                logoFull={bank.name.toLowerCase().includes('gcash') || bank.name.toLowerCase().includes('rcbc')}
                             />
                         ))
                     ) : (
@@ -906,20 +1121,170 @@ const Transactions: React.FC = () => {
                     </div>
                 )}
 
-                <button
-                    onClick={handleOpenAddTransaction}
-                    className="flex items-center justify-center gap-2 px-4 py-3 bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 transition-colors tap-target w-full sm:w-auto"
-                >
-                    <PlusIcon className="w-5 h-5" />
-                    <span className="font-medium">Add Transaction</span>
-                </button>
+                <div className="flex gap-2 w-full sm:w-auto">
+                    <input
+                        ref={csvFileInputRef}
+                        type="file"
+                        accept=".csv"
+                        className="hidden"
+                        onChange={handleCsvFileChange}
+                    />
+                    <button
+                        onClick={() => csvFileInputRef.current?.click()}
+                        className="flex items-center justify-center gap-2 px-4 py-3 bg-bg-secondary border border-border-color text-text-primary rounded-lg hover:bg-hover-bg transition-colors tap-target flex-1 sm:flex-none"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                        <span className="font-medium">Import CSV</span>
+                    </button>
+                    <button
+                        onClick={handleOpenAddTransaction}
+                        className="flex items-center justify-center gap-2 px-4 py-3 bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 transition-colors tap-target flex-1 sm:flex-none"
+                    >
+                        <PlusIcon className="w-5 h-5" />
+                        <span className="font-medium">Add Transaction</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* Tab Bar */}
+            <div className="px-4 lg:px-6 pb-0">
+                <div className="flex items-center justify-between border-b border-border-color">
+                    <div className="flex">
+                        <button
+                            onClick={() => { setActiveTab('review'); setSelectedTransactions(new Set()); }}
+                            className={`px-5 py-2.5 text-sm font-medium transition-colors relative ${activeTab === 'review' ? 'text-accent-blue border-b-2 border-accent-blue -mb-px' : 'text-text-secondary hover:text-text-primary'}`}
+                        >
+                            For Review
+                            {reviewTransactions.length > 0 && (
+                                <span className={`ml-2 px-1.5 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'review' ? 'bg-accent-blue text-white' : 'bg-bg-tertiary text-text-secondary'}`}>
+                                    {reviewTransactions.length}
+                                </span>
+                            )}
+                        </button>
+                        <button
+                            onClick={() => { setActiveTab('categorized'); setSelectedReviewIds(new Set()); }}
+                            className={`px-5 py-2.5 text-sm font-medium transition-colors relative ${activeTab === 'categorized' ? 'text-accent-blue border-b-2 border-accent-blue -mb-px' : 'text-text-secondary hover:text-text-primary'}`}
+                        >
+                            Categorized
+                            <span className={`ml-2 px-1.5 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'categorized' ? 'bg-accent-blue text-white' : 'bg-bg-tertiary text-text-secondary'}`}>
+                                {transactionsWithBalance.length}
+                            </span>
+                        </button>
+                    </div>
+                    {transactionsWithBalance.length > 0 && (
+                        <button
+                            onClick={async () => {
+                                if (!confirm(`Move all ${transactionsWithBalance.length} categorized transactions back to For Review?`)) return;
+                                await accountingService.resetAllToReview();
+                                await refetch();
+                                setActiveTab('review');
+                            }}
+                            className="text-xs text-text-secondary hover:text-accent-blue transition-colors pb-0.5"
+                        >
+                            Move all to For Review
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Transactions List */}
-            <div className="px-4 lg:px-6 pb-4">
-                {transactionsWithBalance.length === 0 && !isAddingNew ? (
+            <div className="px-4 lg:px-6 pb-4 pt-3">
+                {activeTab === 'review' ? (
+                    reviewTransactions.length === 0 ? (
+                        <div className="bg-bg-secondary rounded-xl border border-border-color p-8 lg:p-12 text-center">
+                            <CheckIcon className="w-10 h-10 text-accent-green mx-auto mb-3 opacity-60" />
+                            <p className="text-text-primary font-medium mb-1">All caught up!</p>
+                            <p className="text-text-secondary text-sm">No transactions to review. Import a CSV to get started.</p>
+                        </div>
+                    ) : (
+                        <div className="bg-bg-secondary rounded-xl border border-border-color overflow-hidden">
+                            {selectedReviewIds.size > 0 && (
+                                <div className="flex items-center gap-3 px-4 py-2.5 bg-accent-green/10 border-b border-accent-green/20">
+                                    <span className="text-sm font-medium text-accent-green">{selectedReviewIds.size} selected</span>
+                                    <button onClick={handleBatchConfirm} className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 text-sm font-medium transition-colors">
+                                        <CheckIcon className="w-4 h-4" /> Confirm All
+                                    </button>
+                                    <button onClick={() => setSelectedReviewIds(new Set())} className="px-3 py-1.5 bg-bg-tertiary text-text-secondary rounded-lg hover:bg-hover-bg text-sm transition-colors">Clear</button>
+                                </div>
+                            )}
+                            <div className="overflow-auto">
+                                <table className="w-full" style={{ tableLayout: 'fixed' }}>
+                                    <thead className="bg-bg-tertiary sticky top-0 z-10">
+                                        <tr>
+                                            <th className="w-10 px-3 py-3 text-center">
+                                                <input type="checkbox"
+                                                    checked={selectedReviewIds.size === reviewTransactions.length && reviewTransactions.length > 0}
+                                                    onChange={() => setSelectedReviewIds(selectedReviewIds.size === reviewTransactions.length ? new Set() : new Set(reviewTransactions.map(t => t.id)))}
+                                                    className="w-4 h-4 rounded border-border-color bg-bg-secondary text-accent-blue cursor-pointer" />
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary" style={{width:'120px'}}>Date</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Description</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary" style={{width:'120px'}}>Bank</th>
+                                            <th className="px-4 py-3 text-right text-sm font-semibold text-text-primary" style={{width:'130px'}}>Amount</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary" style={{width:'220px'}}>Category</th>
+                                            <th className="px-4 py-3 text-center text-sm font-semibold text-text-primary" style={{width:'90px'}}>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border-color">
+                                        {reviewTransactions.map((transaction) => {
+                                            const localCategory = reviewCategories[transaction.id] ?? ((transaction as any).category || '');
+                                            const isConfirming = confirmingIds.has(transaction.id);
+                                            return (
+                                                <tr key={transaction.id} className={`hover:bg-hover-bg/30 transition-colors ${isConfirming ? 'opacity-40 pointer-events-none' : ''}`}>
+                                                    <td className="px-3 py-3 text-center">
+                                                        <input type="checkbox"
+                                                            checked={selectedReviewIds.has(transaction.id)}
+                                                            onChange={() => {
+                                                                const n = new Set(selectedReviewIds);
+                                                                n.has(transaction.id) ? n.delete(transaction.id) : n.add(transaction.id);
+                                                                setSelectedReviewIds(n);
+                                                            }}
+                                                            className="w-4 h-4 rounded border-border-color bg-bg-secondary text-accent-blue cursor-pointer" />
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm text-text-secondary whitespace-nowrap">{formatDate(transaction.date)}</td>
+                                                    <td className="px-4 py-3 text-sm text-text-primary">
+                                                        <div className="truncate" title={transaction.description}>{transaction.description}</div>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm text-text-secondary">{(transaction as any).bank || '-'}</td>
+                                                    <td className="px-4 py-3 text-sm text-right font-medium whitespace-nowrap">
+                                                        <span className={transaction.type === 'credit' ? 'text-accent-green' : 'text-accent-red'}>
+                                                            {transaction.type === 'credit' ? '+' : '-'}{formatPeso(transaction.amount)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        <CategoryAutocomplete
+                                                            value={localCategory}
+                                                            onChange={(val) => setReviewCategories(prev => ({ ...prev, [transaction.id]: val }))}
+                                                            options={categoryAccounts}
+                                                            placeholder="Select category"
+                                                            className="w-full bg-bg-primary border border-border-color rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center justify-center gap-1.5">
+                                                            <button onClick={() => handleConfirmTransaction(transaction.id, localCategory)} disabled={isConfirming} title="Confirm & categorize"
+                                                                className="p-1.5 rounded-lg bg-accent-green/10 text-accent-green hover:bg-accent-green/20 transition-colors disabled:opacity-50">
+                                                                <CheckIcon className="w-4 h-4" />
+                                                            </button>
+                                                            <button onClick={() => handleExcludeTransaction(transaction.id)} disabled={isConfirming} title="Exclude"
+                                                                className="p-1.5 rounded-lg bg-accent-red/10 text-accent-red hover:bg-accent-red/20 transition-colors disabled:opacity-50">
+                                                                <XMarkIcon className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )
+                ) : (
+                /* Categorized Tab */
+                transactionsWithBalance.length === 0 && !isAddingNew ? (
                     <div className="bg-bg-secondary rounded-xl border border-border-color p-8 lg:p-12 text-center">
-                        <p className="text-text-secondary">No transactions yet. Click "Add Transaction" to get started.</p>
+                        <p className="text-text-secondary">No categorized transactions yet.</p>
                     </div>
                 ) : (
                     <>
@@ -1331,7 +1696,7 @@ const Transactions: React.FC = () => {
                             ))}
                         </div>
                     </>
-                )}
+                ))}
             </div>
 
             {/* Modals */}
@@ -1446,6 +1811,83 @@ const Transactions: React.FC = () => {
                                 className="flex-1 px-4 py-2 bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 transition-colors"
                             >
                                 Update All
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* CSV Import Modal */}
+            {showCsvModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-bg-primary border border-border-color rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                        <div className="flex items-center justify-between p-5 border-b border-border-color">
+                            <div>
+                                <h2 className="text-lg font-semibold text-text-primary">Import CSV</h2>
+                                <p className="text-sm text-text-secondary mt-0.5">
+                                    {csvRows.filter(r => r.valid).length} valid · {csvRows.filter(r => !r.valid).length} invalid
+                                </p>
+                            </div>
+                            <button onClick={() => { setShowCsvModal(false); setCsvRows([]); }} className="p-2 rounded-lg hover:bg-hover-bg transition-colors">
+                                <XMarkIcon className="w-5 h-5 text-text-secondary" />
+                            </button>
+                        </div>
+
+                        <div className="p-4 bg-bg-secondary/50 border-b border-border-color">
+                            <p className="text-xs text-text-secondary">
+                                Expected columns: <span className="text-text-primary font-medium">date, description, amount</span> (required) · type, reference, category, bank (optional)
+                            </p>
+                        </div>
+
+                        <div className="overflow-auto flex-1">
+                            <table className="w-full text-sm">
+                                <thead className="sticky top-0 bg-bg-tertiary">
+                                    <tr>
+                                        <th className="px-3 py-2 text-left font-medium text-text-secondary w-8">#</th>
+                                        <th className="px-3 py-2 text-left font-medium text-text-secondary">Date</th>
+                                        <th className="px-3 py-2 text-left font-medium text-text-secondary">Description</th>
+                                        <th className="px-3 py-2 text-left font-medium text-text-secondary">Amount</th>
+                                        <th className="px-3 py-2 text-left font-medium text-text-secondary">Type</th>
+                                        <th className="px-3 py-2 text-left font-medium text-text-secondary">Category</th>
+                                        <th className="px-3 py-2 text-left font-medium text-text-secondary">Bank</th>
+                                        <th className="px-3 py-2 text-left font-medium text-text-secondary">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {csvRows.map((row, i) => (
+                                        <tr key={i} className={`border-t border-border-color ${row.valid ? 'hover:bg-hover-bg' : 'bg-accent-red/5'}`}>
+                                            <td className="px-3 py-2 text-text-secondary">{i + 1}</td>
+                                            <td className="px-3 py-2 text-text-primary">{row.date}</td>
+                                            <td className="px-3 py-2 text-text-primary max-w-[200px] truncate">{row.description}</td>
+                                            <td className="px-3 py-2 text-text-primary">{row.amount}</td>
+                                            <td className="px-3 py-2 text-text-secondary capitalize">{row.type || '—'}</td>
+                                            <td className="px-3 py-2 text-text-secondary">{row.category || '—'}</td>
+                                            <td className="px-3 py-2 text-text-secondary">{row.bank || '—'}</td>
+                                            <td className="px-3 py-2">
+                                                {row.valid
+                                                    ? <span className="text-xs text-accent-green font-medium">Ready</span>
+                                                    : <span className="text-xs text-accent-red font-medium">{row.error}</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="flex gap-3 p-5 border-t border-border-color">
+                            <button
+                                onClick={() => { setShowCsvModal(false); setCsvRows([]); }}
+                                className="flex-1 px-4 py-2.5 bg-bg-tertiary text-text-primary rounded-lg hover:bg-hover-bg transition-colors font-medium"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleCsvImport}
+                                disabled={csvImporting || csvRows.filter(r => r.valid).length === 0}
+                                className="flex-1 px-4 py-2.5 bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {csvImporting ? `Importing ${csvRows.filter(r => r.valid).length} transactions, please wait...` : `Import ${csvRows.filter(r => r.valid).length} Transactions`}
                             </button>
                         </div>
                     </div>

@@ -988,14 +988,48 @@ export const accountingService = {
         );
     },
 
+    // Batch import transactions
+    async addBatch(transactions: Omit<AccountingTransaction, 'id'>[]): Promise<number> {
+        return withFirebaseCheck(
+            async () => {
+                const createdAt = new Date().toISOString();
+                let batch = writeBatch(db);
+                let operationCount = 0;
+                let successCount = 0;
+
+                for (const transaction of transactions) {
+                    const docRef = doc(collection(db, 'accountingTransactions'));
+                    // Strip undefined values — Firestore batch.set rejects them
+                    const data: Record<string, any> = { ...transaction, createdAt };
+                    Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
+                    batch.set(docRef, data);
+                    operationCount++;
+                    successCount++;
+
+                    if (operationCount >= FIRESTORE_BATCH_LIMIT) {
+                        await batch.commit();
+                        batch = writeBatch(db);
+                        operationCount = 0;
+                    }
+                }
+
+                if (operationCount > 0) {
+                    await batch.commit();
+                }
+
+                return successCount;
+            },
+            () => 0
+        );
+    },
+
     // Update transaction
     async update(id: string, data: Partial<AccountingTransaction>): Promise<void> {
         return withFirebaseCheck(
             async () => {
-                await updateDoc(doc(db, 'accountingTransactions', id), {
-                    ...data,
-                    updatedAt: new Date().toISOString(),
-                });
+                const payload: Record<string, any> = { ...data, updatedAt: new Date().toISOString() };
+                Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
+                await updateDoc(doc(db, 'accountingTransactions', id), payload);
             }
         );
     },
@@ -1006,6 +1040,31 @@ export const accountingService = {
             async () => {
                 await deleteDoc(doc(db, 'accountingTransactions', id));
             }
+        );
+    },
+
+    // Reset all transactions to 'review' status
+    async resetAllToReview(): Promise<number> {
+        return withFirebaseCheck(
+            async () => {
+                const snapshot = await getDocs(collection(db, 'accountingTransactions'));
+                let batch = writeBatch(db);
+                let count = 0;
+                let total = 0;
+                for (const docSnap of snapshot.docs) {
+                    batch.update(docSnap.ref, { status: 'review' });
+                    count++;
+                    total++;
+                    if (count >= FIRESTORE_BATCH_LIMIT) {
+                        await batch.commit();
+                        batch = writeBatch(db);
+                        count = 0;
+                    }
+                }
+                if (count > 0) await batch.commit();
+                return total;
+            },
+            () => 0
         );
     },
 };
@@ -1063,120 +1122,152 @@ export const chartOfAccountsService = {
         );
     },
 
-    // Seed initial restaurant chart of accounts
+    // Delete all accounts
+    async deleteAll(): Promise<void> {
+        return withFirebaseCheck(
+            async () => {
+                const snapshot = await getDocs(collection(db, 'chartOfAccounts'));
+                const deletions = snapshot.docs.map(d => deleteDoc(doc(db, 'chartOfAccounts', d.id)));
+                await Promise.all(deletions);
+            }
+        );
+    },
+
+    // Seed restaurant chart of accounts from CSV hierarchy
     async seedRestaurantAccounts(): Promise<void> {
         return withFirebaseCheck(
             async () => {
-                const restaurantAccounts: Omit<Account, 'id'>[] = [
-                    // ASSETS (1000-1999)
-                    { code: '1000', name: 'Cash on Hand', type: 'asset', description: 'Physical cash in registers and safe', isActive: true },
-                    { code: '1010', name: 'Cash in Bank - Operating Account', type: 'asset', description: 'Main business checking account', isActive: true },
-                    { code: '1020', name: 'GCash Account', type: 'asset', description: 'Digital wallet for mobile payments', isActive: true },
-                    { code: '1030', name: 'Card Payment Processor', type: 'asset', description: 'Pending settlements from card transactions', isActive: true },
-                    { code: '1100', name: 'Accounts Receivable', type: 'asset', description: 'Money owed by customers', isActive: true },
-                    { code: '1200', name: 'Inventory - Food', type: 'asset', description: 'Food ingredients and supplies', isActive: true },
-                    { code: '1210', name: 'Inventory - Beverages', type: 'asset', description: 'Drinks and beverage supplies', isActive: true },
-                    { code: '1220', name: 'Inventory - Supplies', type: 'asset', description: 'Non-food operating supplies', isActive: true },
-                    { code: '1300', name: 'Prepaid Expenses', type: 'asset', description: 'Rent, insurance paid in advance', isActive: true },
-                    { code: '1500', name: 'Equipment', type: 'asset', description: 'Kitchen equipment, furniture, fixtures', isActive: true },
-                    { code: '1510', name: 'Accumulated Depreciation', type: 'asset', description: 'Depreciation of fixed assets', isActive: true },
+                const ts = new Date().toISOString();
+                const add = (data: Omit<Account, 'id'>) =>
+                    addDoc(collection(db, 'chartOfAccounts'), { ...data, createdAt: ts });
 
-                    // LIABILITIES (2000-2999)
-                    { code: '2000', name: 'Accounts Payable', type: 'liability', description: 'Money owed to suppliers', isActive: true },
-                    { code: '2100', name: 'Credit Card Payable', type: 'liability', description: 'Business credit card balances', isActive: true },
-                    { code: '2200', name: 'Sales Tax Payable', type: 'liability', description: 'Tax collected from customers', isActive: true },
-                    { code: '2300', name: 'Wages Payable', type: 'liability', description: 'Unpaid employee wages', isActive: true },
-                    { code: '2310', name: 'SSS Contributions Payable', type: 'liability', description: 'Social Security contributions', isActive: true },
-                    { code: '2320', name: 'PhilHealth Contributions Payable', type: 'liability', description: 'Health insurance contributions', isActive: true },
-                    { code: '2330', name: 'Pag-IBIG Contributions Payable', type: 'liability', description: 'Housing fund contributions', isActive: true },
-                    { code: '2340', name: 'Withholding Tax Payable', type: 'liability', description: 'Employee tax withholdings', isActive: true },
-                    { code: '2500', name: 'Loans Payable', type: 'liability', description: 'Business loans and financing', isActive: true },
+                // ── LEVEL 0: Categories ──────────────────────────────────
+                const cats: Record<string, string> = {};
 
-                    // EQUITY (3000-3999)
-                    { code: '3000', name: 'Owner\'s Capital', type: 'equity', description: 'Owner\'s investment in business', isActive: true },
-                    { code: '3100', name: 'Owner\'s Drawings', type: 'equity', description: 'Owner withdrawals', isActive: true },
-                    { code: '3900', name: 'Retained Earnings', type: 'equity', description: 'Accumulated profits', isActive: true },
-
-                    // REVENUE (4000-4999)
-                    { code: '4000', name: 'Food Sales', type: 'revenue', description: 'Revenue from food items', isActive: true },
-                    { code: '4100', name: 'Beverage Sales', type: 'revenue', description: 'Revenue from beverages', isActive: true },
-                    { code: '4200', name: 'Service Charge Income', type: 'revenue', description: 'Service charges collected', isActive: true },
-                    { code: '4300', name: 'Catering Revenue', type: 'revenue', description: 'Special events and catering', isActive: true },
-                    { code: '4400', name: 'Delivery Sales', type: 'revenue', description: 'Online and delivery orders', isActive: true },
-                    { code: '4900', name: 'Other Income', type: 'revenue', description: 'Miscellaneous income', isActive: true },
-
-                    // COST OF GOODS SOLD (5000-5999)
-                    { code: '5000', name: 'Cost of Food Sold', type: 'expense', description: 'Direct cost of food ingredients', isActive: true },
-                    { code: '5100', name: 'Cost of Beverages Sold', type: 'expense', description: 'Direct cost of beverages', isActive: true },
-                    { code: '5200', name: 'Kitchen Supplies', type: 'expense', description: 'Consumable kitchen supplies', isActive: true },
-
-                    // OPERATING EXPENSES (6000-6999)
-                    // Payroll & Benefits
-                    { code: '6000', name: 'Salaries - Kitchen Staff', type: 'expense', description: 'Cooks, prep staff wages', isActive: true },
-                    { code: '6010', name: 'Salaries - Service Staff', type: 'expense', description: 'Servers, cashiers wages', isActive: true },
-                    { code: '6020', name: 'Salaries - Management', type: 'expense', description: 'Manager, supervisor salaries', isActive: true },
-                    { code: '6050', name: 'Employee Benefits', type: 'expense', description: 'SSS, PhilHealth, Pag-IBIG', isActive: true },
-                    { code: '6060', name: 'Staff Meals', type: 'expense', description: 'Free meals for employees', isActive: true },
-                    { code: '6070', name: 'Overtime Pay', type: 'expense', description: 'Extra hours compensation', isActive: true },
-
-                    // Occupancy Costs
-                    { code: '6100', name: 'Rent Expense', type: 'expense', description: 'Monthly restaurant rent', isActive: true },
-                    { code: '6110', name: 'Property Tax', type: 'expense', description: 'Real estate taxes', isActive: true },
-                    { code: '6120', name: 'Insurance', type: 'expense', description: 'Business insurance premiums', isActive: true },
-
-                    // Utilities
-                    { code: '6200', name: 'Electricity', type: 'expense', description: 'Power consumption', isActive: true },
-                    { code: '6210', name: 'Water', type: 'expense', description: 'Water utility', isActive: true },
-                    { code: '6220', name: 'Gas', type: 'expense', description: 'Cooking gas/LPG', isActive: true },
-                    { code: '6230', name: 'Internet & Phone', type: 'expense', description: 'Communication expenses', isActive: true },
-
-                    // Maintenance & Repairs
-                    { code: '6300', name: 'Equipment Repairs', type: 'expense', description: 'Kitchen equipment maintenance', isActive: true },
-                    { code: '6310', name: 'Facility Maintenance', type: 'expense', description: 'Building and facility upkeep', isActive: true },
-                    { code: '6320', name: 'Cleaning Supplies', type: 'expense', description: 'Janitorial and cleaning materials', isActive: true },
-
-                    // Operating Supplies
-                    { code: '6400', name: 'Disposables', type: 'expense', description: 'To-go containers, cups, utensils', isActive: true },
-                    { code: '6410', name: 'Paper Products', type: 'expense', description: 'Napkins, tissues, receipts', isActive: true },
-                    { code: '6420', name: 'Linens & Uniforms', type: 'expense', description: 'Tablecloths, staff uniforms', isActive: true },
-                    { code: '6430', name: 'Smallwares', type: 'expense', description: 'Plates, glasses, utensils', isActive: true },
-
-                    // Marketing & Promotion
-                    { code: '6500', name: 'Advertising', type: 'expense', description: 'Marketing and promotional costs', isActive: true },
-                    { code: '6510', name: 'Social Media Marketing', type: 'expense', description: 'Online advertising', isActive: true },
-                    { code: '6520', name: 'Promotional Materials', type: 'expense', description: 'Flyers, signage, menus', isActive: true },
-
-                    // Administrative
-                    { code: '6600', name: 'Office Supplies', type: 'expense', description: 'Administrative materials', isActive: true },
-                    { code: '6610', name: 'Licenses & Permits', type: 'expense', description: 'Business permits, health permits', isActive: true },
-                    { code: '6620', name: 'Professional Fees', type: 'expense', description: 'Accounting, legal services', isActive: true },
-                    { code: '6630', name: 'Bank Fees', type: 'expense', description: 'Service charges, transaction fees', isActive: true },
-                    { code: '6640', name: 'Software Subscriptions', type: 'expense', description: 'POS, accounting software', isActive: true },
-
-                    // Transportation & Delivery
-                    { code: '6700', name: 'Delivery Expenses', type: 'expense', description: 'Delivery platform fees', isActive: true },
-                    { code: '6710', name: 'Fuel & Transportation', type: 'expense', description: 'Vehicle fuel, parking', isActive: true },
-                    { code: '6720', name: 'Vehicle Maintenance', type: 'expense', description: 'Delivery vehicle upkeep', isActive: true },
-
-                    // Other Operating Expenses
-                    { code: '6800', name: 'Training & Development', type: 'expense', description: 'Staff training programs', isActive: true },
-                    { code: '6810', name: 'Music & Entertainment', type: 'expense', description: 'Background music licensing', isActive: true },
-                    { code: '6820', name: 'Pest Control', type: 'expense', description: 'Sanitation services', isActive: true },
-                    { code: '6830', name: 'Waste Disposal', type: 'expense', description: 'Garbage collection', isActive: true },
-                    { code: '6900', name: 'Miscellaneous Expense', type: 'expense', description: 'Other operating costs', isActive: true },
-
-                    // Non-Operating Expenses (7000-7999)
-                    { code: '7000', name: 'Interest Expense', type: 'expense', description: 'Loan interest payments', isActive: true },
-                    { code: '7100', name: 'Depreciation Expense', type: 'expense', description: 'Asset depreciation', isActive: true },
-                    { code: '7200', name: 'Loss on Asset Disposal', type: 'expense', description: 'Loss from selling assets', isActive: true },
+                const catDefs: { key: string; code: string; name: string; type: Account['type'] }[] = [
+                    { key: 'bank',        code: '1000', name: 'Bank Accounts',        type: 'bank'      },
+                    { key: 'sales',       code: '4000', name: 'Sales',                type: 'revenue'   },
+                    { key: 'ownersPay',   code: '3000', name: "Owner's Pay",          type: 'equity'    },
+                    { key: 'cogs',        code: '5000', name: 'Cost of Goods Sold',   type: 'expense'   },
+                    { key: 'cleaning',    code: '5100', name: 'Cleaning & Sanitation',type: 'expense'   },
+                    { key: 'delivery',    code: '5200', name: 'Delivery & Logistics', type: 'expense'   },
+                    { key: 'fixedAssets', code: '1500', name: 'Fixed Assets',         type: 'asset'     },
+                    { key: 'govFees',     code: '5300', name: 'Government Fees',      type: 'expense'   },
+                    { key: 'misc',        code: '5400', name: 'Miscellaneous',        type: 'expense'   },
+                    { key: 'officeExp',   code: '5500', name: 'Office Expense',       type: 'expense'   },
+                    { key: 'opExp',       code: '5600', name: 'Operating Expenses',   type: 'expense'   },
+                    { key: 'payroll',     code: '5700', name: 'Payroll Expense',      type: 'expense'   },
+                    { key: 'uncat',       code: '9000', name: 'Uncategorized',        type: 'expense'   },
                 ];
 
-                // Add all accounts
-                for (const account of restaurantAccounts) {
-                    await addDoc(collection(db, 'chartOfAccounts'), {
-                        ...account,
-                        createdAt: new Date().toISOString(),
-                    });
+                for (const c of catDefs) {
+                    const ref = await add({ code: c.code, name: c.name, type: c.type, isActive: true });
+                    cats[c.key] = ref.id;
+                }
+
+                // ── LEVEL 1: Sub Categories ──────────────────────────────
+                const subs: Record<string, string> = {};
+
+                const subDefs: { key: string; parentKey: string; name: string; type: Account['type'] }[] = [
+                    // Bank Accounts
+                    { key: 'bank_cash',   parentKey: 'bank',        name: 'Cash',                       type: 'bank'    },
+                    { key: 'bank_rcbc',   parentKey: 'bank',        name: 'RCBC',                       type: 'bank'    },
+                    { key: 'bank_gcash',  parentKey: 'bank',        name: 'GCash',                      type: 'bank'    },
+                    // Sales
+                    { key: 'sales_sales', parentKey: 'sales',       name: 'Sales',                      type: 'revenue' },
+                    // Owner's Pay
+                    { key: 'op_capital',  parentKey: 'ownersPay',   name: 'Capital',                    type: 'equity'  },
+                    // Cost of Goods Sold
+                    { key: 'cogs_bar',    parentKey: 'cogs',        name: 'Bar',                        type: 'expense' },
+                    { key: 'cogs_kitch',  parentKey: 'cogs',        name: 'Kitchen',                    type: 'expense' },
+                    { key: 'cogs_bak',    parentKey: 'cogs',        name: 'Bakery',                     type: 'expense' },
+                    // Cleaning & Sanitation
+                    { key: 'clean_jan',   parentKey: 'cleaning',    name: 'Cleaning & Janitorial',      type: 'expense' },
+                    // Delivery & Logistics
+                    { key: 'del_park',    parentKey: 'delivery',    name: 'Parking Fee',                type: 'expense' },
+                    { key: 'del_travel',  parentKey: 'delivery',    name: 'Travel Fee',                 type: 'expense' },
+                    { key: 'del_deliv',   parentKey: 'delivery',    name: 'Delivery Fee',               type: 'expense' },
+                    // Fixed Assets
+                    { key: 'fa_bar',      parentKey: 'fixedAssets', name: 'Bar',                        type: 'asset'   },
+                    // Government Fees
+                    { key: 'gov_legal',   parentKey: 'govFees',     name: 'Legal Expense',              type: 'expense' },
+                    // Miscellaneous
+                    { key: 'misc_xmas',   parentKey: 'misc',        name: 'Christmas Party',            type: 'expense' },
+                    // Office Expense
+                    { key: 'off_sup',     parentKey: 'officeExp',   name: 'Office Supplies',            type: 'expense' },
+                    { key: 'off_meal',    parentKey: 'officeExp',   name: 'Meal',                       type: 'expense' },
+                    // Operating Expenses
+                    { key: 'oe_elec',     parentKey: 'opExp',       name: 'Utilities - Electricity',    type: 'expense' },
+                    { key: 'oe_unif',     parentKey: 'opExp',       name: 'Uniform',                    type: 'expense' },
+                    { key: 'oe_util',     parentKey: 'opExp',       name: 'Utilities',                  type: 'expense' },
+                    { key: 'oe_kitch',    parentKey: 'opExp',       name: 'Kitchen Supplies',           type: 'expense' },
+                    { key: 'oe_repair',   parentKey: 'opExp',       name: 'Repairs & Maintenance',      type: 'expense' },
+                    { key: 'oe_maint',    parentKey: 'opExp',       name: 'Maintenance',                type: 'expense' },
+                    { key: 'oe_barsup',   parentKey: 'opExp',       name: 'Bar Supplies',               type: 'expense' },
+                    { key: 'oe_bar',      parentKey: 'opExp',       name: 'Bar',                        type: 'expense' },
+                    { key: 'oe_clean',    parentKey: 'opExp',       name: 'Cleaning & Janitorial',      type: 'expense' },
+                    { key: 'oe_mktg',     parentKey: 'opExp',       name: 'Marketing & Promotional',    type: 'expense' },
+                    { key: 'oe_biz',      parentKey: 'opExp',       name: 'Business Expense',           type: 'expense' },
+                    // Payroll Expense
+                    { key: 'pay_sc',      parentKey: 'payroll',     name: 'Service Charge',             type: 'expense' },
+                    { key: 'pay_scd',     parentKey: 'payroll',     name: 'Service Charge Distribution',type: 'expense' },
+                    { key: 'pay_emp',     parentKey: 'payroll',     name: 'Employee Payroll',           type: 'expense' },
+                ];
+
+                for (const s of subDefs) {
+                    const ref = await add({ code: '', name: s.name, type: s.type, isActive: true, parentId: cats[s.parentKey] });
+                    subs[s.key] = ref.id;
+                }
+
+                // ── LEVEL 2: Accounts (leaf nodes) ───────────────────────
+                const leafDefs: { parentKey: string; name: string; type: Account['type'] }[] = [
+                    // Sales > Sales
+                    { parentKey: 'sales_sales', name: 'Sales',                   type: 'revenue' },
+                    // Cost of Goods Sold > Bar
+                    { parentKey: 'cogs_bar',    name: 'Supplies',                type: 'expense' },
+                    { parentKey: 'cogs_bar',    name: 'Packaging',               type: 'expense' },
+                    { parentKey: 'cogs_bar',    name: 'Packaging & Disposables', type: 'expense' },
+                    { parentKey: 'cogs_bar',    name: 'Delivery Fee',            type: 'expense' },
+                    // Cost of Goods Sold > Kitchen
+                    { parentKey: 'cogs_kitch',  name: 'Supplies',                type: 'expense' },
+                    { parentKey: 'cogs_kitch',  name: 'Staff Meal',              type: 'expense' },
+                    { parentKey: 'cogs_kitch',  name: 'Delivery Fee',            type: 'expense' },
+                    { parentKey: 'cogs_kitch',  name: 'Packaging & Disposables', type: 'expense' },
+                    // Cost of Goods Sold > Bakery
+                    { parentKey: 'cogs_bak',    name: 'Supplies',                type: 'expense' },
+                    { parentKey: 'cogs_bak',    name: 'Packaging & Disposables', type: 'expense' },
+                    { parentKey: 'cogs_bak',    name: 'Delivery Fee',            type: 'expense' },
+                    // Cleaning & Sanitation > Cleaning & Janitorial
+                    { parentKey: 'clean_jan',   name: 'Cleaning Supplies',       type: 'expense' },
+                    // Delivery & Logistics > Parking Fee
+                    { parentKey: 'del_park',    name: 'Delivery Fee',            type: 'expense' },
+                    // Fixed Assets > Bar
+                    { parentKey: 'fa_bar',      name: 'Cafe Equipment',          type: 'asset'   },
+                    // Office Expense > Office Supplies
+                    { parentKey: 'off_sup',     name: 'Small Equipment',         type: 'expense' },
+                    // Operating Expenses > Utilities
+                    { parentKey: 'oe_util',     name: 'Gas',                     type: 'expense' },
+                    // Operating Expenses > Kitchen Supplies
+                    { parentKey: 'oe_kitch',    name: 'Small Equipment',         type: 'expense' },
+                    // Operating Expenses > Repairs & Maintenance
+                    { parentKey: 'oe_repair',   name: 'Equipment Repairs',       type: 'expense' },
+                    { parentKey: 'oe_repair',   name: 'Small Equipment',         type: 'expense' },
+                    { parentKey: 'oe_repair',   name: 'Maintenance Supplies',    type: 'expense' },
+                    // Operating Expenses > Maintenance
+                    { parentKey: 'oe_maint',    name: 'Facility Repair',         type: 'expense' },
+                    // Operating Expenses > Bar Supplies
+                    { parentKey: 'oe_barsup',   name: 'Small Equipment',         type: 'expense' },
+                    // Operating Expenses > Bar
+                    { parentKey: 'oe_bar',      name: 'Small Equipment',         type: 'expense' },
+                    // Operating Expenses > Cleaning & Janitorial
+                    { parentKey: 'oe_clean',    name: 'Cleaning Supplies',       type: 'expense' },
+                    // Operating Expenses > Marketing & Promotional
+                    { parentKey: 'oe_mktg',     name: 'Decorations',             type: 'expense' },
+                    { parentKey: 'oe_mktg',     name: 'Event',                   type: 'expense' },
+                ];
+
+                for (const l of leafDefs) {
+                    await add({ code: '', name: l.name, type: l.type, isActive: true, parentId: subs[l.parentKey] });
                 }
             }
         );

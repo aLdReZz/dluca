@@ -214,6 +214,7 @@ export interface AccountingTransaction {
     accountId?: string; // Link to Chart of Accounts
     createdAt?: string;
     updatedAt?: string;
+    status?: 'review' | 'categorized';
 }
 
 export interface AccountBalance {
