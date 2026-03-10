@@ -186,7 +186,7 @@ const ProfitAndLoss: React.FC = () => {
         const filteredTransactions = transactions.filter(txn => {
             const txnDate = new Date(txn.date);
             if (txnDate < start || txnDate > end) return false;
-            return !txn.status || txn.status === 'categorized';
+            return txn.status === 'categorized';
         });
 
         // Helper function to get parent account or self
@@ -218,9 +218,17 @@ const ProfitAndLoss: React.FC = () => {
                 account = accountMap.get(txn.accountId)!;
                 accountType = account.type;
             } else if ((txn as any).category) {
-                // Try to find account by category name
-                const categoryName = (txn as any).category;
-                const matchingAccount = accounts.find(acc => acc.name === categoryName);
+                const categoryName = (txn as any).category as string;
+                // Try direct name match first
+                let matchingAccount = accounts.find(acc => acc.name === categoryName);
+                // Handle hierarchical path "A > B > C" — try each segment from most specific
+                if (!matchingAccount && categoryName.includes('>')) {
+                    const segments = categoryName.split('>').map((s: string) => s.trim()).reverse();
+                    for (const seg of segments) {
+                        matchingAccount = accounts.find(acc => acc.name === seg);
+                        if (matchingAccount) break;
+                    }
+                }
                 if (matchingAccount) {
                     account = matchingAccount;
                     accountType = matchingAccount.type;
