@@ -182,10 +182,11 @@ const ProfitAndLoss: React.FC = () => {
         // Create account lookup map
         const accountMap = new Map(accounts.map(acc => [acc.id, acc]));
 
-        // Filter transactions by date range
+        // Filter transactions by date range — only include categorized (not in review)
         const filteredTransactions = transactions.filter(txn => {
             const txnDate = new Date(txn.date);
-            return txnDate >= start && txnDate <= end;
+            if (txnDate < start || txnDate > end) return false;
+            return !txn.status || txn.status === 'categorized';
         });
 
         // Helper function to get parent account or self
