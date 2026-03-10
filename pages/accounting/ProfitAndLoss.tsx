@@ -432,170 +432,185 @@ const ProfitAndLoss: React.FC = () => {
             </div>
 
             {/* P&L Statement */}
-            <div className="flex-1 overflow-auto px-6 py-6">
+            <div className="flex-1 overflow-auto px-4 lg:px-8 py-6">
                 {!profitLossData ? (
                     <div className="bg-bg-secondary rounded-xl border border-border-color p-12 text-center">
                         <DocumentChartBarIcon className="w-16 h-16 mx-auto mb-4 text-text-secondary/50" />
                         <p className="text-text-secondary">Select a date range to view the profit and loss statement</p>
                     </div>
                 ) : (
-                    <div className="max-w-4xl mx-auto">
-                        <div className="bg-bg-secondary rounded-xl border border-border-color overflow-hidden">
-                            {/* Company Header */}
-                            <div className="bg-bg-tertiary px-6 py-4 border-b border-border-color text-center">
-                                <h2 className="text-lg font-bold text-text-primary">D'Luca</h2>
-                                <h3 className="text-sm font-semibold text-text-secondary mt-1">PROFIT AND LOSS</h3>
-                                <p className="text-xs text-text-secondary mt-1">
-                                    {formatDateForDisplay(startDate)} - {formatDateForDisplay(endDate)}
-                                </p>
-                            </div>
-
-                            {/* Revenue Section */}
-                            <div className="px-6 py-4 border-b border-border-color">
-                                <h4 className="text-sm font-bold text-accent-green mb-3">REVENUE</h4>
-                                <div className="space-y-2 text-sm">
-                                    {profitLossData.revenueCategories.length === 0 ? (
-                                        <div className="text-text-secondary pl-4 text-xs italic">
-                                            No revenue recorded for this period.
-                                        </div>
-                                    ) : (
-                                        profitLossData.revenueCategories.map((category, index) => (
-                                            <div key={index} className="space-y-1">
-                                                <div className="flex justify-between font-medium">
-                                                    <div
-                                                        className={`flex items-center gap-2 ${category.children.length > 0 ? 'cursor-pointer hover:bg-hover-bg rounded px-2 py-1 -mx-2' : ''}`}
-                                                        onClick={() => category.children.length > 0 && toggleRevenueCategory(index)}
-                                                    >
-                                                        {category.children.length > 0 && (
-                                                            <ChevronDownIcon className={`w-4 h-4 text-text-secondary transition-transform ${expandedRevenue.has(index) ? '' : '-rotate-90'}`} />
-                                                        )}
-                                                        <span className="text-text-primary">{category.name}</span>
-                                                    </div>
-                                                    <span
-                                                        className="text-text-primary cursor-pointer hover:text-accent-blue hover:underline select-none"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            showTransactionDetails(category.name);
-                                                        }}
-                                                    >
-                                                        {formatPeso(category.amount)}
-                                                    </span>
-                                                </div>
-                                                {category.children.length > 0 && expandedRevenue.has(index) && (
-                                                    <div className="pl-6 space-y-1">
-                                                        {category.children.map((child, childIndex) => (
-                                                            <div key={childIndex} className="flex justify-between text-xs">
-                                                                <span className="text-text-secondary">{child.name}</span>
-                                                                <span
-                                                                    className="text-text-secondary cursor-pointer hover:text-accent-blue hover:underline select-none"
-                                                                    onClick={() => showTransactionDetails(child.name)}
-                                                                >
-                                                                    {formatPeso(child.amount)}
-                                                                </span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))
-                                    )}
-                                    {profitLossData.uncategorized.filter(item => item.name === 'Uncategorized Income').map((item, index) => (
-                                        <div key={`unc-${index}`} className="flex justify-between">
-                                            <span className="text-text-secondary pl-4 italic">{item.name}</span>
-                                            <span className="text-text-primary font-medium">{formatPeso(item.amount)}</span>
-                                        </div>
-                                    ))}
-                                    <div className="flex justify-between pt-2 border-t border-border-color font-semibold">
-                                        <span className="text-text-primary">Total Revenue</span>
-                                        <span className="text-text-primary">{formatPeso(profitLossData.totalRevenue)}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Expenses */}
-                            <div className="px-6 py-4 border-b border-border-color">
-                                <h4 className="text-sm font-bold text-accent-red mb-3">EXPENSES</h4>
-                                <div className="space-y-2 text-sm">
-                                    {profitLossData.expenseCategories.length === 0 ? (
-                                        <div className="text-text-secondary pl-4 text-xs italic">
-                                            No expenses recorded for this period.
-                                        </div>
-                                    ) : (
-                                        profitLossData.expenseCategories.map((category, index) => (
-                                            <div key={index} className="space-y-1">
-                                                <div className="flex justify-between font-medium">
-                                                    <div
-                                                        className={`flex items-center gap-2 ${category.children.length > 0 ? 'cursor-pointer hover:bg-hover-bg rounded px-2 py-1 -mx-2' : ''}`}
-                                                        onClick={() => category.children.length > 0 && toggleExpenseCategory(index)}
-                                                    >
-                                                        {category.children.length > 0 && (
-                                                            <ChevronDownIcon className={`w-4 h-4 text-text-secondary transition-transform ${expandedExpenses.has(index) ? '' : '-rotate-90'}`} />
-                                                        )}
-                                                        <span className="text-text-primary">{category.name}</span>
-                                                    </div>
-                                                    <span
-                                                        className="text-text-primary cursor-pointer hover:text-accent-blue hover:underline select-none"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            showTransactionDetails(category.name);
-                                                        }}
-                                                    >
-                                                        {formatPeso(category.amount)}
-                                                    </span>
-                                                </div>
-                                                {category.children.length > 0 && expandedExpenses.has(index) && (
-                                                    <div className="pl-6 space-y-1">
-                                                        {category.children.map((child, childIndex) => (
-                                                            <div key={childIndex} className="flex justify-between text-xs">
-                                                                <span className="text-text-secondary">{child.name}</span>
-                                                                <span
-                                                                    className="text-text-secondary cursor-pointer hover:text-accent-blue hover:underline select-none"
-                                                                    onClick={() => showTransactionDetails(child.name)}
-                                                                >
-                                                                    {formatPeso(child.amount)}
-                                                                </span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))
-                                    )}
-                                    {profitLossData.uncategorized.filter(item => item.name === 'Uncategorized Expense').map((item, index) => (
-                                        <div key={`unc-${index}`} className="flex justify-between">
-                                            <span className="text-text-secondary pl-4 italic">{item.name}</span>
-                                            <span className="text-text-primary font-medium">{formatPeso(item.amount)}</span>
-                                        </div>
-                                    ))}
-                                    <div className="flex justify-between pt-2 border-t border-border-color font-semibold">
-                                        <span className="text-text-primary">Total Expenses</span>
-                                        <span className="text-text-primary">{formatPeso(profitLossData.totalExpenses)}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Net Income */}
-                            <div className="px-6 py-4 bg-bg-tertiary">
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-lg font-bold pt-2">
-                                        <span className="text-text-primary">NET INCOME</span>
-                                        <span className={profitLossData.netIncome >= 0 ? 'text-accent-green' : 'text-accent-red'}>
-                                            {formatPeso(profitLossData.netIncome)}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between text-xs">
-                                        <span className="text-text-secondary">Net Profit Margin</span>
-                                        <span className="text-text-secondary font-semibold">{profitLossData.netProfitMargin.toFixed(2)}%</span>
-                                    </div>
-                                </div>
-                            </div>
+                    <div className="max-w-3xl mx-auto">
+                        {/* Company Header */}
+                        <div className="text-center mb-6">
+                            <h2 className="text-xl font-bold text-text-primary">D'Luca</h2>
+                            <p className="text-sm font-semibold text-text-secondary mt-0.5">Profit and Loss</p>
+                            <p className="text-xs text-text-secondary mt-0.5">
+                                {formatDateForDisplay(startDate)} - {formatDateForDisplay(endDate)}
+                            </p>
                         </div>
 
-                        {/* Print Note */}
-                        <div className="mt-4 text-center">
-                            <p className="text-xs text-text-secondary">
-                                Note: Expenses are grouped by transaction description. Update the Chart of Accounts to link transactions to specific expense categories.
-                            </p>
+                        {/* Table */}
+                        <div className="bg-bg-secondary rounded-xl border border-border-color overflow-hidden">
+                            {/* Column Header */}
+                            <div className="flex justify-between items-center px-5 py-2.5 border-b border-border-color bg-bg-tertiary">
+                                <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider"></span>
+                                <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">TOTAL</span>
+                            </div>
+
+                            {/* INCOME */}
+                            <div className="border-b border-border-color">
+                                {/* Section Header */}
+                                <div className="flex justify-between items-center px-5 py-2 bg-bg-tertiary/50">
+                                    <span className="text-sm font-semibold text-text-primary">Income</span>
+                                </div>
+
+                                {profitLossData.revenueCategories.length === 0 && profitLossData.uncategorized.filter(i => i.name === 'Uncategorized Income').length === 0 ? (
+                                    <div className="px-8 py-2 text-sm text-text-secondary italic">No income recorded for this period.</div>
+                                ) : (
+                                    <>
+                                        {profitLossData.revenueCategories.map((category, index) => (
+                                            <div key={index}>
+                                                {/* Parent category row */}
+                                                <div
+                                                    className="flex justify-between items-center px-8 py-2 hover:bg-hover-bg/30 cursor-pointer group"
+                                                    onClick={() => toggleRevenueCategory(index)}
+                                                >
+                                                    <div className="flex items-center gap-1.5">
+                                                        <ChevronDownIcon className={`w-3.5 h-3.5 text-text-secondary transition-transform flex-shrink-0 ${expandedRevenue.has(index) ? '' : '-rotate-90'}`} />
+                                                        <span className="text-sm text-text-primary">{category.name}</span>
+                                                    </div>
+                                                    <span
+                                                        className="text-sm text-text-primary tabular-nums cursor-pointer group-hover:text-accent-blue"
+                                                        onClick={(e) => { e.stopPropagation(); showTransactionDetails(category.name); }}
+                                                    >
+                                                        {formatPeso(category.amount)}
+                                                    </span>
+                                                </div>
+                                                {/* Children */}
+                                                {expandedRevenue.has(index) && category.children.map((child, ci) => (
+                                                    <div key={ci} className="flex justify-between items-center pl-14 pr-5 py-1.5 hover:bg-hover-bg/20">
+                                                        <span className="text-sm text-text-secondary">{child.name}</span>
+                                                        <span
+                                                            className="text-sm text-text-secondary tabular-nums cursor-pointer hover:text-accent-blue"
+                                                            onClick={() => showTransactionDetails(child.name)}
+                                                        >
+                                                            {formatPeso(child.amount)}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                                {/* Total for parent if expanded */}
+                                                {expandedRevenue.has(index) && category.children.length > 0 && (
+                                                    <div className="flex justify-between items-center pl-8 pr-5 py-1.5 border-t border-border-color/50 bg-bg-tertiary/30">
+                                                        <span className="text-sm font-semibold text-text-primary">Total {category.name}</span>
+                                                        <span className="text-sm font-semibold text-text-primary tabular-nums">{formatPeso(category.amount)}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                        {profitLossData.uncategorized.filter(i => i.name === 'Uncategorized Income').map((item, idx) => (
+                                            <div key={idx} className="flex justify-between items-center px-8 py-2 hover:bg-hover-bg/30">
+                                                <span className="text-sm text-text-secondary italic">{item.name}</span>
+                                                <span className="text-sm text-text-primary tabular-nums">{formatPeso(item.amount)}</span>
+                                            </div>
+                                        ))}
+                                    </>
+                                )}
+
+                                {/* Total Income */}
+                                <div className="flex justify-between items-center px-5 py-2.5 border-t border-border-color bg-bg-tertiary/50">
+                                    <span className="text-sm font-bold text-text-primary">Total Income</span>
+                                    <span className="text-sm font-bold text-text-primary tabular-nums">{formatPeso(profitLossData.totalRevenue)}</span>
+                                </div>
+                            </div>
+
+                            {/* GROSS PROFIT */}
+                            <div className="flex justify-between items-center px-5 py-3 border-b border-border-color bg-bg-tertiary">
+                                <span className="text-sm font-bold text-text-primary tracking-wide">GROSS PROFIT</span>
+                                <span className={`text-sm font-bold tabular-nums ${profitLossData.totalRevenue >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                                    {formatPeso(profitLossData.totalRevenue)}
+                                </span>
+                            </div>
+
+                            {/* EXPENSES */}
+                            <div className="border-b border-border-color">
+                                <div className="flex justify-between items-center px-5 py-2 bg-bg-tertiary/50">
+                                    <span className="text-sm font-semibold text-text-primary">Expenses</span>
+                                </div>
+
+                                {profitLossData.expenseCategories.length === 0 && profitLossData.uncategorized.filter(i => i.name === 'Uncategorized Expense').length === 0 ? (
+                                    <div className="px-8 py-2 text-sm text-text-secondary italic">No expenses recorded for this period.</div>
+                                ) : (
+                                    <>
+                                        {profitLossData.expenseCategories.map((category, index) => (
+                                            <div key={index}>
+                                                <div
+                                                    className="flex justify-between items-center px-8 py-2 hover:bg-hover-bg/30 cursor-pointer group"
+                                                    onClick={() => toggleExpenseCategory(index)}
+                                                >
+                                                    <div className="flex items-center gap-1.5">
+                                                        <ChevronDownIcon className={`w-3.5 h-3.5 text-text-secondary transition-transform flex-shrink-0 ${expandedExpenses.has(index) ? '' : '-rotate-90'}`} />
+                                                        <span className="text-sm text-text-primary">{category.name}</span>
+                                                    </div>
+                                                    <span
+                                                        className="text-sm text-text-primary tabular-nums cursor-pointer group-hover:text-accent-blue"
+                                                        onClick={(e) => { e.stopPropagation(); showTransactionDetails(category.name); }}
+                                                    >
+                                                        {formatPeso(category.amount)}
+                                                    </span>
+                                                </div>
+                                                {expandedExpenses.has(index) && category.children.map((child, ci) => (
+                                                    <div key={ci} className="flex justify-between items-center pl-14 pr-5 py-1.5 hover:bg-hover-bg/20">
+                                                        <span className="text-sm text-text-secondary">{child.name}</span>
+                                                        <span
+                                                            className="text-sm text-text-secondary tabular-nums cursor-pointer hover:text-accent-blue"
+                                                            onClick={() => showTransactionDetails(child.name)}
+                                                        >
+                                                            {formatPeso(child.amount)}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                                {expandedExpenses.has(index) && category.children.length > 0 && (
+                                                    <div className="flex justify-between items-center pl-8 pr-5 py-1.5 border-t border-border-color/50 bg-bg-tertiary/30">
+                                                        <span className="text-sm font-semibold text-text-primary">Total {category.name}</span>
+                                                        <span className="text-sm font-semibold text-text-primary tabular-nums">{formatPeso(category.amount)}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                        {profitLossData.uncategorized.filter(i => i.name === 'Uncategorized Expense').map((item, idx) => (
+                                            <div key={idx} className="flex justify-between items-center px-8 py-2 hover:bg-hover-bg/30">
+                                                <span className="text-sm text-text-secondary italic">{item.name}</span>
+                                                <span className="text-sm text-text-primary tabular-nums">{formatPeso(item.amount)}</span>
+                                            </div>
+                                        ))}
+                                    </>
+                                )}
+
+                                {/* Total Expenses */}
+                                <div className="flex justify-between items-center px-5 py-2.5 border-t border-border-color bg-bg-tertiary/50">
+                                    <span className="text-sm font-bold text-text-primary">Total Expenses</span>
+                                    <span className="text-sm font-bold text-text-primary tabular-nums">{formatPeso(profitLossData.totalExpenses)}</span>
+                                </div>
+                            </div>
+
+                            {/* NET OPERATING INCOME */}
+                            <div className="flex justify-between items-center px-5 py-3 border-b border-border-color bg-bg-tertiary">
+                                <span className="text-sm font-bold text-text-primary tracking-wide">NET OPERATING INCOME</span>
+                                <span className={`text-sm font-bold tabular-nums ${profitLossData.netIncome >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                                    {formatPeso(profitLossData.netIncome)}
+                                </span>
+                            </div>
+
+                            {/* NET INCOME */}
+                            <div className="flex justify-between items-center px-5 py-4 bg-bg-tertiary/80">
+                                <div>
+                                    <span className="text-base font-bold text-text-primary tracking-wide">NET INCOME</span>
+                                    <div className="text-xs text-text-secondary mt-0.5">Net Profit Margin: {profitLossData.netProfitMargin.toFixed(2)}%</div>
+                                </div>
+                                <span className={`text-base font-bold tabular-nums ${profitLossData.netIncome >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                                    {formatPeso(profitLossData.netIncome)}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 )}
