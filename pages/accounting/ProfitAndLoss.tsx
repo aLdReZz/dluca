@@ -52,29 +52,22 @@ const ProfitAndLoss: React.FC = () => {
     // Expanded categories state
     const [expandedRevenue, setExpandedRevenue] = useState<Set<number>>(new Set());
     const [expandedExpenses, setExpandedExpenses] = useState<Set<number>>(new Set());
+    const [expandedChildren, setExpandedChildren] = useState<Set<string>>(new Set());
 
     // Transaction detail modal state
     const [selectedTransactions, setSelectedTransactions] = useState<AccountingTransaction[] | null>(null);
     const [modalTitle, setModalTitle] = useState('');
 
     const toggleRevenueCategory = (index: number) => {
-        const newExpanded = new Set(expandedRevenue);
-        if (newExpanded.has(index)) {
-            newExpanded.delete(index);
-        } else {
-            newExpanded.add(index);
-        }
-        setExpandedRevenue(newExpanded);
+        setExpandedRevenue(prev => { const s = new Set(prev); s.has(index) ? s.delete(index) : s.add(index); return s; });
     };
 
     const toggleExpenseCategory = (index: number) => {
-        const newExpanded = new Set(expandedExpenses);
-        if (newExpanded.has(index)) {
-            newExpanded.delete(index);
-        } else {
-            newExpanded.add(index);
-        }
-        setExpandedExpenses(newExpanded);
+        setExpandedExpenses(prev => { const s = new Set(prev); s.has(index) ? s.delete(index) : s.add(index); return s; });
+    };
+
+    const toggleChild = (key: string) => {
+        setExpandedChildren(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
     };
 
     // Function to apply date filter
@@ -148,28 +141,51 @@ const ProfitAndLoss: React.FC = () => {
     };
 
     // Function to show transaction details
-    const showTransactionDetails = (accountName: string, accountId?: string) => {
+    // fullPath can be a top-level group ("Cost of Goods Sold") or full path ("Cost of Goods Sold > Bakery > Supplies")
+    const showTransactionDetails = (fullPath: string) => {
         if (!startDate || !endDate) return;
 
         const start = new Date(startDate + 'T00:00:00');
         const end = new Date(endDate + 'T23:59:59');
+        const isTopLevel = !fullPath.includes('>');
 
-        // Filter transactions for this account
         const accountTransactions = transactions.filter(txn => {
+            if (txn.status !== 'categorized') return false;
             const txnDate = new Date(txn.date);
             if (txnDate < start || txnDate > end) return false;
 
-            // Match by account ID or account name
-            if (accountId && txn.accountId === accountId) return true;
-            if ((txn as any).category === accountName) return true;
+            // Match against category path string
+            const cat = ((txn as any).category as string | undefined)?.trim();
+            if (cat) {
+                if (isTopLevel) {
+                    // Match any transaction whose first segment equals fullPath
+                    const firstSeg = cat.split('>')[0].trim();
+                    if (firstSeg === fullPath) return true;
+                } else {
+                    // Match exact path or deeper paths that start with this path
+                    if (cat === fullPath || cat.startsWith(fullPath + ' >') || cat.startsWith(fullPath + '>')) return true;
+                }
+            }
 
-            // Check if transaction belongs to this account
+            // Match via Chart of Accounts
             const account = accounts.find(acc => acc.id === txn.accountId);
-            return account?.name === accountName;
+            if (account) {
+                if (isTopLevel) {
+                    if (account.name === fullPath) return true;
+                    const parent = account.parentId ? accounts.find(a => a.id === account.parentId) : null;
+                    if (parent?.name === fullPath) return true;
+                } else {
+                    // sub-path: check if account name matches last segment
+                    const lastSeg = fullPath.split('>').pop()?.trim() ?? '';
+                    if (account.name === lastSeg) return true;
+                }
+            }
+
+            return false;
         });
 
         setSelectedTransactions(accountTransactions);
-        setModalTitle(accountName);
+        setModalTitle(fullPath);
     };
 
     // Calculate P&L data
@@ -202,101 +218,90 @@ const ProfitAndLoss: React.FC = () => {
             code: string;
             name: string;
             amount: number;
-            children: { code: string; name: string; amount: number }[];
+            children: {
+                name: string;
+                amount: number;
+                grandchildren: { name: string; amount: number }[];
+            }[];
         }
 
         const revenueCategories = new Map<string, CategoryGroup>();
         const expenseCategories = new Map<string, CategoryGroup>();
         const uncategorizedItems: { name: string; amount: number }[] = [];
 
-        filteredTransactions.forEach(txn => {
-            let account: Account | undefined;
-            let accountType = 'uncategorized';
-
-            // Get account from Chart of Accounts
-            if (txn.accountId && accountMap.has(txn.accountId)) {
-                account = accountMap.get(txn.accountId)!;
-                accountType = account.type;
-            } else if ((txn as any).category) {
-                const categoryName = (txn as any).category as string;
-                // Try direct name match first
-                let matchingAccount = accounts.find(acc => acc.name === categoryName);
-                // Handle hierarchical path "A > B > C" — try each segment from most specific
-                if (!matchingAccount && categoryName.includes('>')) {
-                    const segments = categoryName.split('>').map((s: string) => s.trim()).reverse();
-                    for (const seg of segments) {
-                        matchingAccount = accounts.find(acc => acc.name === seg);
-                        if (matchingAccount) break;
-                    }
-                }
-                if (matchingAccount) {
-                    account = matchingAccount;
-                    accountType = matchingAccount.type;
+        const addToGroup = (
+            map: Map<string, ReturnType<typeof map.get> & object>,
+            groupKey: string, groupName: string, groupCode: string,
+            childName: string | null, grandchildName: string | null,
+            amount: number
+        ) => {
+            if (!map.has(groupKey)) {
+                (map as any).set(groupKey, { code: groupCode, name: groupName, amount: 0, children: [] });
+            }
+            const cat = (map as any).get(groupKey)!;
+            cat.amount += amount;
+            if (childName) {
+                let child = cat.children.find((c: any) => c.name === childName);
+                if (!child) { child = { name: childName, amount: 0, grandchildren: [] }; cat.children.push(child); }
+                child.amount += amount;
+                if (grandchildName) {
+                    const gc = child.grandchildren.find((g: any) => g.name === grandchildName);
+                    if (gc) gc.amount += amount;
+                    else child.grandchildren.push({ name: grandchildName, amount });
                 }
             }
+        };
 
-            // Group by parent category
-            if (txn.type === 'credit' && accountType === 'revenue' && account) {
+        filteredTransactions.forEach(txn => {
+            let groupKey: string;
+            let groupName: string;
+            let childName: string | null = null;
+            let grandchildName: string | null = null;
+            let accountType = 'uncategorized';
+            let groupCode = '';
+
+            if (txn.accountId && accountMap.has(txn.accountId)) {
+                const account = accountMap.get(txn.accountId)!;
+                accountType = account.type;
                 const parent = getParentOrSelf(account);
-                if (!revenueCategories.has(parent.id)) {
-                    revenueCategories.set(parent.id, {
-                        code: parent.code,
-                        name: parent.name,
-                        amount: 0,
-                        children: []
-                    });
-                }
-                const category = revenueCategories.get(parent.id)!;
-                category.amount += txn.amount;
+                groupName = parent.name;
+                groupKey = groupName;
+                groupCode = parent.code;
+                if (account.parentId) childName = account.name;
+            } else if ((txn as any).category) {
+                const categoryPath = (txn as any).category as string;
+                const segments = categoryPath.split('>').map((s: string) => s.trim());
 
-                // If this is a child account, add to children
-                if (account.parentId) {
-                    const existingChild = category.children.find(c => c.name === account.name);
-                    if (existingChild) {
-                        existingChild.amount += txn.amount;
-                    } else {
-                        category.children.push({
-                            code: account.code,
-                            name: account.name,
-                            amount: txn.amount
-                        });
-                    }
-                }
-            } else if (txn.type === 'debit' && accountType === 'expense' && account) {
-                const parent = getParentOrSelf(account);
-                if (!expenseCategories.has(parent.id)) {
-                    expenseCategories.set(parent.id, {
-                        code: parent.code,
-                        name: parent.name,
-                        amount: 0,
-                        children: []
-                    });
-                }
-                const category = expenseCategories.get(parent.id)!;
-                category.amount += txn.amount;
+                groupName = segments[0];
+                groupKey = groupName;
+                childName = segments.length > 1 ? segments[1] : null;
+                grandchildName = segments.length > 2 ? segments.slice(2).join(' > ') : null;
 
-                // If this is a child account, add to children
-                if (account.parentId) {
-                    const existingChild = category.children.find(c => c.name === account.name);
-                    if (existingChild) {
-                        existingChild.amount += txn.amount;
-                    } else {
-                        category.children.push({
-                            code: account.code,
-                            name: account.name,
-                            amount: txn.amount
-                        });
-                    }
+                for (const seg of [...segments].reverse()) {
+                    const found = accounts.find(acc => acc.name === seg);
+                    if (found) { accountType = found.type; groupCode = found.code; break; }
+                }
+                if (accountType === 'uncategorized') {
+                    const found = accounts.find(acc => acc.name === groupName);
+                    if (found) { accountType = found.type; groupCode = found.code; }
                 }
             } else {
-                // Uncategorized transactions
-                const category = txn.type === 'credit' ? 'Uncategorized Income' : 'Uncategorized Expense';
-                const existing = uncategorizedItems.find(item => item.name === category);
-                if (existing) {
-                    existing.amount += txn.amount;
-                } else {
-                    uncategorizedItems.push({ name: category, amount: txn.amount });
-                }
+                const label = txn.type === 'credit' ? 'Uncategorized Income' : 'Uncategorized Expense';
+                const existing = uncategorizedItems.find(item => item.name === label);
+                if (existing) existing.amount += txn.amount;
+                else uncategorizedItems.push({ name: label, amount: txn.amount });
+                return;
+            }
+
+            if (txn.type === 'credit' && accountType === 'revenue') {
+                addToGroup(revenueCategories as any, groupKey, groupName, groupCode, childName, grandchildName, txn.amount);
+            } else if (txn.type === 'debit' && accountType === 'expense') {
+                addToGroup(expenseCategories as any, groupKey, groupName, groupCode, childName, grandchildName, txn.amount);
+            } else {
+                const label = txn.type === 'credit' ? 'Uncategorized Income' : 'Uncategorized Expense';
+                const existing = uncategorizedItems.find(item => item.name === label);
+                if (existing) existing.amount += txn.amount;
+                else uncategorizedItems.push({ name: label, amount: txn.amount });
             }
         });
 
@@ -471,35 +476,43 @@ const ProfitAndLoss: React.FC = () => {
                                         {profitLossData.revenueCategories.map((category, index) => (
                                             <div key={index}>
                                                 {/* Parent category row */}
-                                                <div
-                                                    className="flex justify-between items-center px-8 py-2 hover:bg-hover-bg/30 cursor-pointer group"
-                                                    onClick={() => toggleRevenueCategory(index)}
-                                                >
-                                                    <div className="flex items-center gap-1.5">
-                                                        <ChevronDownIcon className={`w-3.5 h-3.5 text-text-secondary transition-transform flex-shrink-0 ${expandedRevenue.has(index) ? '' : '-rotate-90'}`} />
-                                                        <span className="text-sm text-text-primary">{category.name}</span>
-                                                    </div>
+                                                <div className="flex justify-between items-center px-8 py-2 hover:bg-hover-bg/30 group">
                                                     <span
-                                                        className="text-sm text-text-primary tabular-nums cursor-pointer group-hover:text-accent-blue"
-                                                        onClick={(e) => { e.stopPropagation(); showTransactionDetails(category.name); }}
+                                                        className="text-sm text-text-primary hover:text-accent-blue cursor-pointer flex-1"
+                                                        onClick={() => toggleRevenueCategory(index)}
+                                                    >{category.name}</span>
+                                                    <span
+                                                        className="text-sm text-text-primary tabular-nums hover:text-accent-blue cursor-pointer"
+                                                        onClick={() => showTransactionDetails(category.name)}
                                                     >
                                                         {formatPeso(category.amount)}
                                                     </span>
                                                 </div>
-                                                {/* Children */}
-                                                {expandedRevenue.has(index) && category.children.map((child, ci) => (
-                                                    <div key={ci} className="flex justify-between items-center pl-14 pr-5 py-1.5 hover:bg-hover-bg/20">
-                                                        <span className="text-sm text-text-secondary">{child.name}</span>
-                                                        <span
-                                                            className="text-sm text-text-secondary tabular-nums cursor-pointer hover:text-accent-blue"
-                                                            onClick={() => showTransactionDetails(child.name)}
-                                                        >
-                                                            {formatPeso(child.amount)}
-                                                        </span>
+                                                {/* Children (mid-level) */}
+                                                {expandedRevenue.has(index) && (category as any).children.map((child: any, ci: number) => (
+                                                    <div key={ci}>
+                                                        <div className="flex justify-between items-center pl-12 pr-5 py-1.5 hover:bg-hover-bg/20">
+                                                            <span
+                                                                className="text-sm text-text-secondary hover:text-accent-blue cursor-pointer flex-1"
+                                                                onClick={() => toggleChild(category.name + '::' + child.name)}
+                                                            >{child.name}</span>
+                                                            <span
+                                                                className="text-sm text-text-secondary tabular-nums hover:text-accent-blue cursor-pointer"
+                                                                onClick={() => showTransactionDetails(category.name + ' > ' + child.name)}
+                                                            >{formatPeso(child.amount)}</span>
+                                                        </div>
+                                                        {/* Grandchildren */}
+                                                        {expandedChildren.has(category.name + '::' + child.name) && child.grandchildren.map((gc: any, gi: number) => (
+                                                            <div key={gi} className="flex justify-between items-center pl-20 pr-5 py-1 hover:bg-hover-bg/10 cursor-pointer"
+                                                                onClick={() => showTransactionDetails(category.name + ' > ' + child.name + ' > ' + gc.name)}>
+                                                                <span className="text-xs text-text-secondary/70">{gc.name}</span>
+                                                                <span className="text-xs text-text-secondary/70 tabular-nums">{formatPeso(gc.amount)}</span>
+                                                            </div>
+                                                        ))}
                                                     </div>
                                                 ))}
                                                 {/* Total for parent if expanded */}
-                                                {expandedRevenue.has(index) && category.children.length > 0 && (
+                                                {expandedRevenue.has(index) && (category as any).children.length > 0 && (
                                                     <div className="flex justify-between items-center pl-8 pr-5 py-1.5 border-t border-border-color/50 bg-bg-tertiary/30">
                                                         <span className="text-sm font-semibold text-text-primary">Total {category.name}</span>
                                                         <span className="text-sm font-semibold text-text-primary tabular-nums">{formatPeso(category.amount)}</span>
@@ -523,14 +536,6 @@ const ProfitAndLoss: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* GROSS PROFIT */}
-                            <div className="flex justify-between items-center px-5 py-3 border-b border-border-color bg-bg-tertiary">
-                                <span className="text-sm font-bold text-text-primary tracking-wide">GROSS PROFIT</span>
-                                <span className={`text-sm font-bold tabular-nums ${profitLossData.totalRevenue >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
-                                    {formatPeso(profitLossData.totalRevenue)}
-                                </span>
-                            </div>
-
                             {/* EXPENSES */}
                             <div className="border-b border-border-color">
                                 <div className="flex justify-between items-center px-5 py-2 bg-bg-tertiary/50">
@@ -543,33 +548,42 @@ const ProfitAndLoss: React.FC = () => {
                                     <>
                                         {profitLossData.expenseCategories.map((category, index) => (
                                             <div key={index}>
-                                                <div
-                                                    className="flex justify-between items-center px-8 py-2 hover:bg-hover-bg/30 cursor-pointer group"
-                                                    onClick={() => toggleExpenseCategory(index)}
-                                                >
-                                                    <div className="flex items-center gap-1.5">
-                                                        <ChevronDownIcon className={`w-3.5 h-3.5 text-text-secondary transition-transform flex-shrink-0 ${expandedExpenses.has(index) ? '' : '-rotate-90'}`} />
-                                                        <span className="text-sm text-text-primary">{category.name}</span>
-                                                    </div>
+                                                <div className="flex justify-between items-center px-8 py-2 hover:bg-hover-bg/30 group">
                                                     <span
-                                                        className="text-sm text-text-primary tabular-nums cursor-pointer group-hover:text-accent-blue"
-                                                        onClick={(e) => { e.stopPropagation(); showTransactionDetails(category.name); }}
+                                                        className="text-sm text-text-primary hover:text-accent-blue cursor-pointer flex-1"
+                                                        onClick={() => toggleExpenseCategory(index)}
+                                                    >{category.name}</span>
+                                                    <span
+                                                        className="text-sm text-text-primary tabular-nums hover:text-accent-blue cursor-pointer"
+                                                        onClick={() => showTransactionDetails(category.name)}
                                                     >
                                                         {formatPeso(category.amount)}
                                                     </span>
                                                 </div>
-                                                {expandedExpenses.has(index) && category.children.map((child, ci) => (
-                                                    <div key={ci} className="flex justify-between items-center pl-14 pr-5 py-1.5 hover:bg-hover-bg/20">
-                                                        <span className="text-sm text-text-secondary">{child.name}</span>
-                                                        <span
-                                                            className="text-sm text-text-secondary tabular-nums cursor-pointer hover:text-accent-blue"
-                                                            onClick={() => showTransactionDetails(child.name)}
-                                                        >
-                                                            {formatPeso(child.amount)}
-                                                        </span>
+                                                {/* Children (mid-level) */}
+                                                {expandedExpenses.has(index) && (category as any).children.map((child: any, ci: number) => (
+                                                    <div key={ci}>
+                                                        <div className="flex justify-between items-center pl-12 pr-5 py-1.5 hover:bg-hover-bg/20">
+                                                            <span
+                                                                className="text-sm text-text-secondary hover:text-accent-blue cursor-pointer flex-1"
+                                                                onClick={() => toggleChild(category.name + '::' + child.name)}
+                                                            >{child.name}</span>
+                                                            <span
+                                                                className="text-sm text-text-secondary tabular-nums hover:text-accent-blue cursor-pointer"
+                                                                onClick={() => showTransactionDetails(category.name + ' > ' + child.name)}
+                                                            >{formatPeso(child.amount)}</span>
+                                                        </div>
+                                                        {/* Grandchildren */}
+                                                        {expandedChildren.has(category.name + '::' + child.name) && child.grandchildren.map((gc: any, gi: number) => (
+                                                            <div key={gi} className="flex justify-between items-center pl-20 pr-5 py-1 hover:bg-hover-bg/10 cursor-pointer"
+                                                                onClick={() => showTransactionDetails(category.name + ' > ' + child.name + ' > ' + gc.name)}>
+                                                                <span className="text-xs text-text-secondary/70">{gc.name}</span>
+                                                                <span className="text-xs text-text-secondary/70 tabular-nums">{formatPeso(gc.amount)}</span>
+                                                            </div>
+                                                        ))}
                                                     </div>
                                                 ))}
-                                                {expandedExpenses.has(index) && category.children.length > 0 && (
+                                                {expandedExpenses.has(index) && (category as any).children.length > 0 && (
                                                     <div className="flex justify-between items-center pl-8 pr-5 py-1.5 border-t border-border-color/50 bg-bg-tertiary/30">
                                                         <span className="text-sm font-semibold text-text-primary">Total {category.name}</span>
                                                         <span className="text-sm font-semibold text-text-primary tabular-nums">{formatPeso(category.amount)}</span>

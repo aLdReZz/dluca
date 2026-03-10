@@ -304,10 +304,11 @@ const Transactions: React.FC = () => {
     const [dateFilter, setDateFilter] = useState<string>('all');
     const [startDate, setStartDate] = useState<string>('');
     const [endDate, setEndDate] = useState<string>('');
+    const [searchQuery, setSearchQuery] = useState<string>('');
 
     const applyDateFilter = (filter: string) => {
         const now = new Date();
-        const fmt = (d: Date) => d.toISOString().split('T')[0];
+        const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         setDateFilter(filter);
         if (filter === 'this-month') {
             setStartDate(fmt(new Date(now.getFullYear(), now.getMonth(), 1)));
@@ -449,13 +450,18 @@ const Transactions: React.FC = () => {
 
     // Filter transactions by selected bank and date range
     const filteredTransactions = useMemo(() => {
+        const start = startDate ? new Date(startDate + 'T00:00:00') : null;
+        const end = endDate ? new Date(endDate + 'T23:59:59') : null;
+        const q = searchQuery.trim().toLowerCase();
         return sortedTransactions.filter(t => {
-            if (selectedBank && (t as any).bank !== selectedBank) return false;
-            if (startDate && t.date < startDate) return false;
-            if (endDate && t.date > endDate) return false;
+            if (selectedBank && (t as any).bank?.toLowerCase() !== selectedBank.toLowerCase()) return false;
+            const txnDate = new Date(t.date);
+            if (start && txnDate < start) return false;
+            if (end && txnDate > end) return false;
+            if (q && !t.description?.toLowerCase().includes(q)) return false;
             return true;
         });
-    }, [sortedTransactions, selectedBank, startDate, endDate]);
+    }, [sortedTransactions, selectedBank, startDate, endDate, searchQuery]);
 
     // Split into review vs categorized
     const reviewTransactions = useMemo(() => {
@@ -580,7 +586,7 @@ const Transactions: React.FC = () => {
 
         return bankAccounts.map(bank => {
             const bankTransactions = sortedTransactions.filter(
-                t => (t as any).bank === bank.name
+                t => (t as any).bank?.toLowerCase() === bank.name.toLowerCase()
             );
 
             const income = bankTransactions
@@ -1161,6 +1167,29 @@ const Transactions: React.FC = () => {
                             className="bg-bg-tertiary border border-border-color rounded-lg px-2 py-1.5 text-sm text-text-primary focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
                         />
                     </div>
+                </div>
+            </div>
+
+            {/* Search Bar */}
+            <div className="px-4 lg:px-6 pb-3">
+                <div className="relative">
+                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+                    </svg>
+                    <input
+                        type="text"
+                        placeholder="Search description..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="w-full bg-bg-tertiary border border-border-color rounded-lg pl-9 pr-9 py-2 text-sm text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
+                    />
+                    {searchQuery && (
+                        <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    )}
                 </div>
             </div>
 
