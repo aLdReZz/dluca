@@ -300,6 +300,37 @@ const Transactions: React.FC = () => {
         bank: ''
     });
 
+    // Date filter state
+    const [dateFilter, setDateFilter] = useState<string>('all');
+    const [startDate, setStartDate] = useState<string>('');
+    const [endDate, setEndDate] = useState<string>('');
+
+    const applyDateFilter = (filter: string) => {
+        const now = new Date();
+        const fmt = (d: Date) => d.toISOString().split('T')[0];
+        setDateFilter(filter);
+        if (filter === 'this-month') {
+            setStartDate(fmt(new Date(now.getFullYear(), now.getMonth(), 1)));
+            setEndDate(fmt(new Date(now.getFullYear(), now.getMonth() + 1, 0)));
+        } else if (filter === 'last-month') {
+            setStartDate(fmt(new Date(now.getFullYear(), now.getMonth() - 1, 1)));
+            setEndDate(fmt(new Date(now.getFullYear(), now.getMonth(), 0)));
+        } else if (filter === 'this-quarter') {
+            const q = Math.floor(now.getMonth() / 3);
+            setStartDate(fmt(new Date(now.getFullYear(), q * 3, 1)));
+            setEndDate(fmt(new Date(now.getFullYear(), (q + 1) * 3, 0)));
+        } else if (filter === 'this-year') {
+            setStartDate(fmt(new Date(now.getFullYear(), 0, 1)));
+            setEndDate(fmt(new Date(now.getFullYear(), 11, 31)));
+        } else if (filter === 'last-year') {
+            setStartDate(fmt(new Date(now.getFullYear() - 1, 0, 1)));
+            setEndDate(fmt(new Date(now.getFullYear() - 1, 11, 31)));
+        } else {
+            setStartDate('');
+            setEndDate('');
+        }
+    };
+
     // Tab state
     const [activeTab, setActiveTab] = useState<'review' | 'categorized'>('review');
     const [reviewCategories, setReviewCategories] = useState<Record<string, string>>({});
@@ -416,11 +447,15 @@ const Transactions: React.FC = () => {
         });
     }, [allTransactions]);
 
-    // Filter transactions by selected bank
+    // Filter transactions by selected bank and date range
     const filteredTransactions = useMemo(() => {
-        if (!selectedBank) return sortedTransactions;
-        return sortedTransactions.filter(t => (t as any).bank === selectedBank);
-    }, [sortedTransactions, selectedBank]);
+        return sortedTransactions.filter(t => {
+            if (selectedBank && (t as any).bank !== selectedBank) return false;
+            if (startDate && t.date < startDate) return false;
+            if (endDate && t.date > endDate) return false;
+            return true;
+        });
+    }, [sortedTransactions, selectedBank, startDate, endDate]);
 
     // Split into review vs categorized
     const reviewTransactions = useMemo(() => {
@@ -1085,6 +1120,47 @@ const Transactions: React.FC = () => {
                             No bank accounts found. Add bank accounts in Chart of Accounts.
                         </div>
                     )}
+                </div>
+            </div>
+
+            {/* Date Filters */}
+            <div className="px-4 lg:px-6 pb-2">
+                <div className="flex flex-wrap items-center gap-2">
+                    {[
+                        { key: 'all', label: 'All Dates' },
+                        { key: 'this-month', label: 'This Month' },
+                        { key: 'last-month', label: 'Last Month' },
+                        { key: 'this-quarter', label: 'This Quarter' },
+                        { key: 'this-year', label: 'This Year' },
+                        { key: 'last-year', label: 'Last Year' },
+                    ].map(f => (
+                        <button
+                            key={f.key}
+                            onClick={() => applyDateFilter(f.key)}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                dateFilter === f.key
+                                    ? 'bg-accent-blue text-white'
+                                    : 'bg-bg-tertiary text-text-secondary hover:bg-hover-bg border border-border-color'
+                            }`}
+                        >
+                            {f.label}
+                        </button>
+                    ))}
+                    <div className="flex items-center gap-1.5 ml-1">
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={e => { setStartDate(e.target.value); setDateFilter('custom'); }}
+                            className="bg-bg-tertiary border border-border-color rounded-lg px-2 py-1.5 text-sm text-text-primary focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
+                        />
+                        <span className="text-text-secondary text-sm">—</span>
+                        <input
+                            type="date"
+                            value={endDate}
+                            onChange={e => { setEndDate(e.target.value); setDateFilter('custom'); }}
+                            className="bg-bg-tertiary border border-border-color rounded-lg px-2 py-1.5 text-sm text-text-primary focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
+                        />
+                    </div>
                 </div>
             </div>
 
