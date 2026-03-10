@@ -6,6 +6,7 @@ import DeleteConfirmationModal from '../../components/DeleteConfirmationModal';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import DatePickerInput from '../../components/DatePickerInput';
 import { PlusIcon, PencilIcon, TrashIcon, BanknotesIcon, ArrowTrendingUpIcon, ChartBarIcon, XMarkIcon, CheckIcon, ChevronUpIcon, ChevronDownIcon, ArrowsUpDownIcon } from '../../components/Icons';
+import CategoryAutocomplete from '../../components/CategoryAutocomplete';
 
 const formatPeso = (amount: number) => {
     return '₱' + amount.toLocaleString('en-PH', {
@@ -69,173 +70,7 @@ const SortableHeader: React.FC<{
     );
 };
 
-const CategoryAutocomplete: React.FC<{
-    value: string;
-    onChange: (value: string) => void;
-    options: { id: string; name: string }[];
-    placeholder?: string;
-    className?: string;
-}> = ({ value, onChange, options, placeholder = 'Select or type category', className = '' }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [inputValue, setInputValue] = useState(value);
-    const [selectedIndex, setSelectedIndex] = useState(-1);
-    const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
-    const wrapperRef = useRef<HTMLDivElement>(null);
-    const optionsRef = useRef<(HTMLDivElement | null)[]>([]);
 
-    useEffect(() => {
-        setInputValue(value);
-    }, [value]);
-
-    useEffect(() => {
-        const updatePosition = () => {
-            if (wrapperRef.current && isOpen) {
-                const rect = wrapperRef.current.getBoundingClientRect();
-                setDropdownPosition({
-                    top: rect.bottom + 4,
-                    left: rect.left,
-                    width: rect.width
-                });
-            }
-        };
-
-        if (isOpen) {
-            updatePosition();
-            window.addEventListener('scroll', updatePosition, true);
-            window.addEventListener('resize', updatePosition);
-        }
-
-        return () => {
-            window.removeEventListener('scroll', updatePosition, true);
-            window.removeEventListener('resize', updatePosition);
-        };
-    }, [isOpen]);
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-                setSelectedIndex(-1);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    const filteredOptions = useMemo(() => {
-        if (!inputValue) return options;
-        return options.filter(option =>
-            option.name.toLowerCase().includes(inputValue.toLowerCase())
-        );
-    }, [inputValue, options]);
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newValue = e.target.value;
-        setInputValue(newValue);
-        onChange(newValue);
-        setIsOpen(true);
-        setSelectedIndex(-1);
-    };
-
-    const handleSelectOption = (optionName: string) => {
-        setInputValue(optionName);
-        onChange(optionName);
-        setIsOpen(false);
-        setSelectedIndex(-1);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (!isOpen && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
-            setIsOpen(true);
-            setSelectedIndex(0);
-            e.preventDefault();
-            return;
-        }
-
-        if (!isOpen) return;
-
-        switch (e.key) {
-            case 'ArrowDown':
-                e.preventDefault();
-                setSelectedIndex(prev => {
-                    const newIndex = prev < filteredOptions.length - 1 ? prev + 1 : prev;
-                    // Scroll into view
-                    setTimeout(() => {
-                        optionsRef.current[newIndex]?.scrollIntoView({ block: 'nearest' });
-                    }, 0);
-                    return newIndex;
-                });
-                break;
-            case 'ArrowUp':
-                e.preventDefault();
-                setSelectedIndex(prev => {
-                    const newIndex = prev > 0 ? prev - 1 : 0;
-                    // Scroll into view
-                    setTimeout(() => {
-                        optionsRef.current[newIndex]?.scrollIntoView({ block: 'nearest' });
-                    }, 0);
-                    return newIndex;
-                });
-                break;
-            case 'Enter':
-                e.preventDefault();
-                if (selectedIndex >= 0 && selectedIndex < filteredOptions.length) {
-                    handleSelectOption(filteredOptions[selectedIndex].name);
-                }
-                break;
-            case 'Tab':
-                if (selectedIndex >= 0 && selectedIndex < filteredOptions.length) {
-                    handleSelectOption(filteredOptions[selectedIndex].name);
-                }
-                // Don't preventDefault - allow Tab to move to next field
-                break;
-            case 'Escape':
-                e.preventDefault();
-                setIsOpen(false);
-                setSelectedIndex(-1);
-                break;
-        }
-    };
-
-    return (
-        <div ref={wrapperRef} className="relative">
-            <input
-                type="text"
-                value={inputValue}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                onFocus={() => setIsOpen(true)}
-                placeholder={placeholder}
-                className={className}
-                autoComplete="off"
-            />
-            {isOpen && filteredOptions.length > 0 && (
-                <div className="fixed z-[9999] bg-bg-primary border border-border-color rounded-xl shadow-lg max-h-60 overflow-y-auto"
-                     data-autocomplete-dropdown="true"
-                     style={{
-                         top: `${dropdownPosition.top}px`,
-                         left: `${dropdownPosition.left}px`,
-                         width: `${dropdownPosition.width}px`
-                     }}>
-                    {filteredOptions.map((option, index) => (
-                        <div
-                            key={option.id}
-                            ref={el => optionsRef.current[index] = el}
-                            onClick={() => handleSelectOption(option.name)}
-                            className={`px-3 py-2 cursor-pointer transition-colors text-sm text-text-primary ${
-                                index === selectedIndex
-                                    ? 'bg-accent-blue text-white'
-                                    : 'hover:bg-hover-bg'
-                            }`}
-                        >
-                            {option.name}
-                        </div>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-};
 
 const SummaryCard: React.FC<{
     title: string;
@@ -698,7 +533,12 @@ const Transactions: React.FC = () => {
         if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return cleaned;
         const withYear = /\d{4}/.test(cleaned) ? cleaned : `${cleaned} ${new Date().getFullYear()}`;
         const d = new Date(withYear);
-        if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+        if (!isNaN(d.getTime())) {
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
         return cleaned;
     };
 
@@ -768,6 +608,13 @@ const Transactions: React.FC = () => {
             } else if (selectedAccount) {
                 transactionType = selectedAccount.type === 'revenue' || selectedAccount.type === 'liability' || selectedAccount.type === 'equity' ? 'credit' : 'debit';
             }
+            // Match bank column to a Chart of Accounts bank account (case-insensitive)
+            // Exact match first to avoid "cash" incorrectly matching "gcash"
+            const bankLower = row.bank.toLowerCase();
+            const matchedBank =
+                bankAccounts.find(b => b.name.toLowerCase() === bankLower) ||
+                bankAccounts.find(b => b.name.toLowerCase().includes(bankLower));
+            const resolvedBank = matchedBank ? matchedBank.name : row.bank;
             return {
                 date: row.date,
                 type: transactionType,
@@ -776,7 +623,7 @@ const Transactions: React.FC = () => {
                 amount: parseFloat(row.amount),
                 account: 'general' as const,
                 category: row.category,
-                bank: row.bank,
+                bank: resolvedBank,
                 accountId: selectedAccount?.id,
                 status: 'review' as const
             };
@@ -822,8 +669,9 @@ const Transactions: React.FC = () => {
         }
 
         try {
-            // Find the account from Chart of Accounts to determine transaction type
-            const selectedAccount = categoryAccounts.find(acc => acc.name === editCategory);
+            // Find the account from Chart of Accounts by the last segment of the full path
+            const lastSegment = editCategory.split('>').pop()?.trim() || editCategory;
+            const selectedAccount = categoryAccounts.find(acc => acc.name === lastSegment);
             let transactionType: 'credit' | 'debit' = 'debit';
 
             if (selectedAccount) {
@@ -1033,6 +881,24 @@ const Transactions: React.FC = () => {
             await refetch();
         } catch {
             setOperationStatus({ type: 'error', message: 'Failed to confirm some transactions' });
+        } finally {
+            setConfirmingIds(new Set());
+        }
+    };
+
+    // Batch delete all selected review transactions
+    const handleBatchDeleteReview = async () => {
+        const ids = Array.from(selectedReviewIds);
+        if (!ids.length) return;
+        if (!confirm(`Delete ${ids.length} transaction${ids.length !== 1 ? 's' : ''}? This cannot be undone.`)) return;
+        setConfirmingIds(new Set(ids));
+        try {
+            await Promise.all(ids.map(id => deleteTransaction(id)));
+            setSelectedReviewIds(new Set());
+            setOperationStatus({ type: 'success', message: `${ids.length} transaction${ids.length !== 1 ? 's' : ''} deleted` });
+            await refetch();
+        } catch {
+            setOperationStatus({ type: 'error', message: 'Failed to delete some transactions' });
         } finally {
             setConfirmingIds(new Set());
         }
@@ -1309,6 +1175,9 @@ const Transactions: React.FC = () => {
                                     <button onClick={handleBatchConfirm} className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-green text-white rounded-lg hover:bg-accent-green/90 text-sm font-medium transition-colors">
                                         <CheckIcon className="w-4 h-4" /> Confirm All
                                     </button>
+                                    <button onClick={handleBatchDeleteReview} className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-red/80 text-white rounded-lg hover:bg-accent-red text-sm font-medium transition-colors">
+                                        <XMarkIcon className="w-4 h-4" /> Delete All
+                                    </button>
                                     <button onClick={() => setSelectedReviewIds(new Set())} className="px-3 py-1.5 bg-bg-tertiary text-text-secondary rounded-lg hover:bg-hover-bg text-sm transition-colors">Clear</button>
                                 </div>
                             )}
@@ -1323,10 +1192,10 @@ const Transactions: React.FC = () => {
                                                     className="w-4 h-4 rounded border-border-color bg-bg-secondary text-accent-blue cursor-pointer" />
                                             </th>
                                             <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary" style={{width:'120px'}}>Date</th>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Description</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary" style={{width:'200px'}}>Description</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary" style={{width:'340px'}}>Category</th>
                                             <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary" style={{width:'120px'}}>Bank</th>
                                             <th className="px-4 py-3 text-right text-sm font-semibold text-text-primary" style={{width:'130px'}}>Amount</th>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary" style={{width:'220px'}}>Category</th>
                                             <th className="px-4 py-3 text-center text-sm font-semibold text-text-primary" style={{width:'90px'}}>Actions</th>
                                         </tr>
                                     </thead>
@@ -1350,12 +1219,6 @@ const Transactions: React.FC = () => {
                                                     <td className="px-4 py-3 text-sm text-text-primary">
                                                         <div className="truncate" title={transaction.description}>{transaction.description}</div>
                                                     </td>
-                                                    <td className="px-4 py-3 text-sm text-text-secondary">{(transaction as any).bank || '-'}</td>
-                                                    <td className="px-4 py-3 text-sm text-right font-medium whitespace-nowrap">
-                                                        <span className={transaction.type === 'credit' ? 'text-accent-green' : 'text-accent-red'}>
-                                                            {transaction.type === 'credit' ? '+' : '-'}{formatPeso(transaction.amount)}
-                                                        </span>
-                                                    </td>
                                                     <td className="px-4 py-2">
                                                         <CategoryAutocomplete
                                                             value={localCategory}
@@ -1364,6 +1227,12 @@ const Transactions: React.FC = () => {
                                                             placeholder="Select category"
                                                             className="w-full bg-bg-primary border border-border-color rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-accent-blue focus:border-accent-blue"
                                                         />
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm text-text-secondary">{(transaction as any).bank || '-'}</td>
+                                                    <td className="px-4 py-3 text-sm text-right font-medium whitespace-nowrap">
+                                                        <span className={transaction.type === 'credit' ? 'text-accent-green' : 'text-accent-red'}>
+                                                            {transaction.type === 'credit' ? '+' : '-'}{formatPeso(transaction.amount)}
+                                                        </span>
                                                     </td>
                                                     <td className="px-4 py-3">
                                                         <div className="flex items-center justify-center gap-1.5">
