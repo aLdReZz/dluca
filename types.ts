@@ -94,6 +94,7 @@ export interface Employee {
     salaryDeductions?: SalaryDeduction[];
     additionalIncome?: AdditionalIncome[];
     serviceChargeEnabled?: boolean; // Whether employee receives service charge distribution
+    serviceChargeStartDate?: string; // Date from which service charge is enabled (YYYY-MM-DD)
 }
 
 export interface AttendanceRecord {

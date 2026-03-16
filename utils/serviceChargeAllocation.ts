@@ -236,6 +236,9 @@ export const calculateServiceChargeDistribution = ({
                 if (employee.serviceChargeEnabled === false) {
                     continue;
                 }
+                if (employee.serviceChargeStartDate && dateKey < employee.serviceChargeStartDate) {
+                    continue;
+                }
 
                 const minutes = manualEntriesForDate?.[employee.id] ?? 0;
                 if (minutes !== 0) {
@@ -252,6 +255,9 @@ export const calculateServiceChargeDistribution = ({
             for (const employee of employees) {
                 // Skip employees who don't have service charge enabled
                 if (employee.serviceChargeEnabled === false) {
+                    continue;
+                }
+                if (employee.serviceChargeStartDate && dateKey < employee.serviceChargeStartDate) {
                     continue;
                 }
 

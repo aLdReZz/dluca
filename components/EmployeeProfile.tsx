@@ -938,29 +938,54 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
 
                             <div className="mt-6 pt-6 border-t border-border-color">
                                 <h4 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">Settings</h4>
-                                <div className="flex items-center justify-between bg-bg-primary rounded-lg p-3">
-                                    <div>
-                                        <p className="text-sm font-medium text-text-primary">Service Charge</p>
-                                        <p className="text-xs text-text-secondary">Include in distribution</p>
-                                    </div>
-                                    <button
-                                        onClick={() => {
-                                            const updated = {
-                                                ...employee,
-                                                serviceChargeEnabled: employee.serviceChargeEnabled !== false ? false : true
-                                            };
-                                            onUpdateEmployee(updated);
-                                        }}
-                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                                            employee.serviceChargeEnabled !== false ? 'bg-accent-blue' : 'bg-gray-600'
-                                        }`}
-                                    >
-                                        <span
-                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                                employee.serviceChargeEnabled !== false ? 'translate-x-6' : 'translate-x-1'
+                                <div className="bg-bg-primary rounded-lg p-3 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium text-text-primary">Service Charge</p>
+                                            <p className="text-xs text-text-secondary">Include in distribution</p>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                const updated = {
+                                                    ...employee,
+                                                    serviceChargeEnabled: employee.serviceChargeEnabled !== false ? false : true
+                                                };
+                                                onUpdateEmployee(updated);
+                                            }}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                                employee.serviceChargeEnabled !== false ? 'bg-accent-blue' : 'bg-gray-600'
                                             }`}
-                                        />
-                                    </button>
+                                        >
+                                            <span
+                                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                                    employee.serviceChargeEnabled !== false ? 'translate-x-6' : 'translate-x-1'
+                                                }`}
+                                            />
+                                        </button>
+                                    </div>
+                                    {employee.serviceChargeEnabled !== false && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-text-secondary whitespace-nowrap">Start date</span>
+                                            <input
+                                                type="date"
+                                                value={employee.serviceChargeStartDate || ''}
+                                                onChange={(e) => {
+                                                    onUpdateEmployee({
+                                                        ...employee,
+                                                        serviceChargeStartDate: e.target.value || undefined,
+                                                    });
+                                                }}
+                                                className="flex-1 text-xs bg-bg-secondary border border-border-color rounded px-2 py-1 text-text-primary focus:outline-none focus:border-accent-blue"
+                                            />
+                                            {employee.serviceChargeStartDate && (
+                                                <button
+                                                    onClick={() => onUpdateEmployee({ ...employee, serviceChargeStartDate: undefined })}
+                                                    className="text-text-secondary hover:text-accent-red transition-colors text-xs"
+                                                    title="Clear start date"
+                                                >✕</button>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
