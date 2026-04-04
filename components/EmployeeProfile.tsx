@@ -164,34 +164,38 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
     }, [employee.id]);
 
     const [isEditMode, setIsEditMode] = useState(false);
-    const [editFields, setEditFields] = useState({ name: '', position: '', rate: '', rateEffectiveDate: '', phone: '', email: '', department: '', bankAccount: '', paymentMode: '' });
+    const [editFields, setEditFields] = useState({ name: '', position: '', phone: '', email: '', department: '', bankAccount: '', paymentMode: '' });
+    const [showRateChangeForm, setShowRateChangeForm] = useState(false);
+    const [newRateInput, setNewRateInput] = useState('');
+    const [newRateEffectiveDate, setNewRateEffectiveDate] = useState('');
 
     const handleEnterEditMode = () => {
         setEditFields({
             name: localEmployee.name,
             position: localEmployee.position,
-            rate: String(localEmployee.rate),
-            rateEffectiveDate: new Date().toISOString().split('T')[0],
             phone: localEmployee.phone || '',
             email: localEmployee.email || '',
             department: localEmployee.department || '',
             bankAccount: localEmployee.bankAccount || '',
             paymentMode: localEmployee.paymentMode || '',
         });
+        setShowRateChangeForm(false);
+        setNewRateInput('');
+        setNewRateEffectiveDate(new Date().toISOString().split('T')[0]);
         setIsEditMode(true);
     };
 
     const handleSaveAll = () => {
         let final = localEmployee;
         if (isEditMode) {
-            const newRate = parseFloat(editFields.rate);
-            const rateChanged = !isNaN(newRate) && newRate > 0 && newRate !== localEmployee.rate;
+            const newRate = parseFloat(newRateInput);
+            const rateChanged = showRateChangeForm && !isNaN(newRate) && newRate > 0 && newRate !== localEmployee.rate;
 
             let updatedRateHistory = localEmployee.rateHistory || [];
             let appliedRate = localEmployee.rate;
 
             if (rateChanged) {
-                const effectiveDate = editFields.rateEffectiveDate || new Date().toISOString().split('T')[0];
+                const effectiveDate = newRateEffectiveDate || new Date().toISOString().split('T')[0];
                 const newEntry: RateHistoryEntry = {
                     id: Date.now().toString(),
                     rate: newRate,
@@ -228,12 +232,16 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         setLocalEmployee(final);
         setIsDirty(false);
         setIsEditMode(false);
+        setShowRateChangeForm(false);
+        setNewRateInput('');
     };
 
     const handleCancelAll = () => {
         setLocalEmployee(employee);
         setIsDirty(false);
         setIsEditMode(false);
+        setShowRateChangeForm(false);
+        setNewRateInput('');
     };
 
     const [committedRange, setCommittedRange] = useState(() => {
@@ -1015,13 +1023,22 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                         <div className="grid grid-cols-2 gap-2 pt-2">
                                             <div>
                                                 <label className="text-xs text-text-secondary mb-1 block">Daily Rate (₱)</label>
-                                                <input
-                                                    type="number"
-                                                    value={editFields.rate}
-                                                    onChange={e => setEditFields(f => ({ ...f, rate: e.target.value }))}
-                                                    placeholder="Rate"
-                                                    className="w-full text-sm bg-bg-primary border border-border-color rounded-lg px-2 py-1.5 text-text-primary focus:outline-none focus:border-accent-blue"
-                                                />
+                                                <div className="flex items-center gap-1.5">
+                                                    <div className="flex-1 text-sm bg-bg-primary border border-border-color rounded-lg px-2 py-1.5 text-text-primary font-medium">
+                                                        {showRateChangeForm && parseFloat(newRateInput) > 0
+                                                            ? <span className="text-accent-green">₱{parseFloat(newRateInput).toLocaleString()}</span>
+                                                            : <span>₱{localEmployee.rate.toLocaleString()}</span>
+                                                        }
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setShowRateChangeForm(v => !v); setNewRateInput(''); }}
+                                                        className={`p-1.5 rounded-lg transition-colors ${showRateChangeForm ? 'bg-accent-red/20 text-accent-red hover:bg-accent-red/30' : 'bg-accent-blue/20 text-accent-blue hover:bg-accent-blue/30'}`}
+                                                        title={showRateChangeForm ? 'Cancel rate change' : 'Change rate'}
+                                                    >
+                                                        {showRateChangeForm ? <XMarkIcon className="w-3.5 h-3.5" /> : <PlusIcon className="w-3.5 h-3.5" />}
+                                                    </button>
+                                                </div>
                                             </div>
                                             <div>
                                                 <label className="text-xs text-text-secondary mb-1 block">Department</label>
@@ -1034,16 +1051,30 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                                 />
                                             </div>
                                         </div>
-                                        {parseFloat(editFields.rate) > 0 && parseFloat(editFields.rate) !== localEmployee.rate && (
-                                            <div className="bg-accent-blue/10 border border-accent-blue/30 rounded-lg px-3 py-2">
-                                                <label className="text-xs font-medium text-accent-blue mb-1 block">Rate change effective from</label>
-                                                <input
-                                                    type="date"
-                                                    value={editFields.rateEffectiveDate}
-                                                    onChange={e => setEditFields(f => ({ ...f, rateEffectiveDate: e.target.value }))}
-                                                    className="w-full text-sm bg-bg-primary border border-border-color rounded-lg px-2 py-1.5 text-text-primary focus:outline-none focus:border-accent-blue"
-                                                />
-                                                <p className="text-[10px] text-text-secondary mt-1">The new rate will apply from this date forward</p>
+                                        {showRateChangeForm && (
+                                            <div className="bg-accent-blue/10 border border-accent-blue/30 rounded-lg px-3 py-2.5 space-y-2">
+                                                <p className="text-xs font-semibold text-accent-blue">New Daily Rate</p>
+                                                <div className="relative">
+                                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-secondary text-sm">₱</span>
+                                                    <input
+                                                        type="number"
+                                                        value={newRateInput}
+                                                        onChange={e => setNewRateInput(e.target.value)}
+                                                        placeholder={String(localEmployee.rate)}
+                                                        autoFocus
+                                                        className="w-full pl-6 pr-2 py-1.5 text-sm bg-bg-primary border border-border-color rounded-lg text-text-primary focus:outline-none focus:border-accent-blue"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-text-secondary mb-1 block">Effective from</label>
+                                                    <input
+                                                        type="date"
+                                                        value={newRateEffectiveDate}
+                                                        onChange={e => setNewRateEffectiveDate(e.target.value)}
+                                                        className="w-full text-sm bg-bg-primary border border-border-color rounded-lg px-2 py-1.5 text-text-primary focus:outline-none focus:border-accent-blue"
+                                                    />
+                                                </div>
+                                                <p className="text-[10px] text-text-secondary">New rate applies from this date forward</p>
                                             </div>
                                         )}
                                         <div>
