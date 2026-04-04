@@ -164,13 +164,14 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
     }, [employee.id]);
 
     const [isEditMode, setIsEditMode] = useState(false);
-    const [editFields, setEditFields] = useState({ name: '', position: '', rate: '', phone: '', email: '', department: '', bankAccount: '', paymentMode: '' });
+    const [editFields, setEditFields] = useState({ name: '', position: '', rate: '', rateEffectiveDate: '', phone: '', email: '', department: '', bankAccount: '', paymentMode: '' });
 
     const handleEnterEditMode = () => {
         setEditFields({
             name: localEmployee.name,
             position: localEmployee.position,
             rate: String(localEmployee.rate),
+            rateEffectiveDate: new Date().toISOString().split('T')[0],
             phone: localEmployee.phone || '',
             email: localEmployee.email || '',
             department: localEmployee.department || '',
@@ -184,11 +185,38 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         let final = localEmployee;
         if (isEditMode) {
             const newRate = parseFloat(editFields.rate);
+            const rateChanged = !isNaN(newRate) && newRate > 0 && newRate !== localEmployee.rate;
+
+            let updatedRateHistory = localEmployee.rateHistory || [];
+            let appliedRate = localEmployee.rate;
+
+            if (rateChanged) {
+                const effectiveDate = editFields.rateEffectiveDate || new Date().toISOString().split('T')[0];
+                const newEntry: RateHistoryEntry = {
+                    id: Date.now().toString(),
+                    rate: newRate,
+                    effectiveDate,
+                    notes: 'Rate updated from employee profile',
+                };
+                const existingIndex = updatedRateHistory.findIndex(e => e.effectiveDate === effectiveDate);
+                if (existingIndex >= 0) {
+                    updatedRateHistory = updatedRateHistory.map((e, i) => i === existingIndex ? { ...e, rate: newRate } : e);
+                } else {
+                    updatedRateHistory = [...updatedRateHistory, newEntry].sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate));
+                }
+                const today = new Date().toISOString().split('T')[0];
+                const latest = [...updatedRateHistory]
+                    .filter(e => e.effectiveDate <= today)
+                    .sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate))[0];
+                appliedRate = latest?.rate ?? newRate;
+            }
+
             final = {
                 ...localEmployee,
                 name: editFields.name.trim() || localEmployee.name,
                 position: editFields.position.trim() || localEmployee.position,
-                rate: isNaN(newRate) || newRate <= 0 ? localEmployee.rate : newRate,
+                rate: appliedRate,
+                rateHistory: updatedRateHistory,
                 phone: editFields.phone.trim() || undefined,
                 email: editFields.email.trim() || undefined,
                 department: editFields.department.trim() || undefined,
@@ -1006,6 +1034,18 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                                 />
                                             </div>
                                         </div>
+                                        {parseFloat(editFields.rate) > 0 && parseFloat(editFields.rate) !== localEmployee.rate && (
+                                            <div className="bg-accent-blue/10 border border-accent-blue/30 rounded-lg px-3 py-2">
+                                                <label className="text-xs font-medium text-accent-blue mb-1 block">Rate change effective from</label>
+                                                <input
+                                                    type="date"
+                                                    value={editFields.rateEffectiveDate}
+                                                    onChange={e => setEditFields(f => ({ ...f, rateEffectiveDate: e.target.value }))}
+                                                    className="w-full text-sm bg-bg-primary border border-border-color rounded-lg px-2 py-1.5 text-text-primary focus:outline-none focus:border-accent-blue"
+                                                />
+                                                <p className="text-[10px] text-text-secondary mt-1">The new rate will apply from this date forward</p>
+                                            </div>
+                                        )}
                                         <div>
                                             <label className="text-xs text-text-secondary mb-1 block">Phone</label>
                                             <input
