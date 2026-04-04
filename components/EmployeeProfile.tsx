@@ -110,7 +110,7 @@ const formatPeso = (amount: number) => {
     });
 };
 
-const OVERTIME_RATE_MULTIPLIER = 1.5;
+const OVERTIME_RATE_MULTIPLIER = 1.25;
 
 const Tag: React.FC<{text: string, type: 'present' | 'off' | 'absent' | 'late'}> = ({text, type}) => {
     const classes = { 
@@ -149,6 +149,65 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
     const [editingRateDateKey, setEditingRateDateKey] = useState<string | null>(null);
     const [tempRate, setTempRate] = useState('');
 
+    const [localEmployee, setLocalEmployee] = useState<Employee>(employee);
+    const [isDirty, setIsDirty] = useState(false);
+
+    const updateLocal = (updated: Employee) => {
+        setLocalEmployee(updated);
+        setIsDirty(true);
+    };
+
+    useEffect(() => {
+        setLocalEmployee(employee);
+        setIsDirty(false);
+        setIsEditMode(false);
+    }, [employee.id]);
+
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [editFields, setEditFields] = useState({ name: '', position: '', rate: '', phone: '', email: '', department: '', bankAccount: '', paymentMode: '' });
+
+    const handleEnterEditMode = () => {
+        setEditFields({
+            name: localEmployee.name,
+            position: localEmployee.position,
+            rate: String(localEmployee.rate),
+            phone: localEmployee.phone || '',
+            email: localEmployee.email || '',
+            department: localEmployee.department || '',
+            bankAccount: localEmployee.bankAccount || '',
+            paymentMode: localEmployee.paymentMode || '',
+        });
+        setIsEditMode(true);
+    };
+
+    const handleSaveAll = () => {
+        let final = localEmployee;
+        if (isEditMode) {
+            const newRate = parseFloat(editFields.rate);
+            final = {
+                ...localEmployee,
+                name: editFields.name.trim() || localEmployee.name,
+                position: editFields.position.trim() || localEmployee.position,
+                rate: isNaN(newRate) || newRate <= 0 ? localEmployee.rate : newRate,
+                phone: editFields.phone.trim() || undefined,
+                email: editFields.email.trim() || undefined,
+                department: editFields.department.trim() || undefined,
+                bankAccount: editFields.bankAccount.trim() || undefined,
+                paymentMode: editFields.paymentMode.trim() || undefined,
+            };
+        }
+        onUpdateEmployee(final);
+        setLocalEmployee(final);
+        setIsDirty(false);
+        setIsEditMode(false);
+    };
+
+    const handleCancelAll = () => {
+        setLocalEmployee(employee);
+        setIsDirty(false);
+        setIsEditMode(false);
+    };
+
     const [committedRange, setCommittedRange] = useState(() => {
         const date = new Date();
         const start = new Date(date.getFullYear(), date.getMonth(), 1);
@@ -168,14 +227,14 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
     });
     
     const handleOvertimeDecision = (dateKey: string, overtimeMinutes: number, approved: boolean) => {
-        const currentApprovedOT = employee.approvedOvertime || {};
+        const currentApprovedOT = localEmployee.approvedOvertime || {};
         const newApprovedOT = { ...currentApprovedOT };
         if (approved) {
             newApprovedOT[dateKey] = overtimeMinutes;
         } else {
-            newApprovedOT[dateKey] = 0; // Explicitly rejected
+            newApprovedOT[dateKey] = 0;
         }
-        onUpdateEmployee({ ...employee, approvedOvertime: newApprovedOT });
+        updateLocal({ ...localEmployee, approvedOvertime: newApprovedOT });
         setEditingOtDateKey(null);
     };
 
@@ -185,7 +244,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         const amount = parseFloat(newDeductionAmount);
         if (isNaN(amount) || amount <= 0) return;
 
-        const currentDeductions = employee.salaryDeductions || [];
+        const currentDeductions = localEmployee.salaryDeductions || [];
         const newDeduction: SalaryDeduction = {
             id: Date.now().toString(),
             description: newDeductionReason.trim(),
@@ -193,8 +252,8 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             date: newDeductionDate || new Date().toISOString().split('T')[0],
         };
 
-        onUpdateEmployee({
-            ...employee,
+        updateLocal({
+            ...localEmployee,
             salaryDeductions: [...currentDeductions, newDeduction],
         });
 
@@ -218,7 +277,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         const amount = parseFloat(newDeductionAmount);
         if (isNaN(amount) || amount <= 0) return;
 
-        const currentDeductions = employee.salaryDeductions || [];
+        const currentDeductions = localEmployee.salaryDeductions || [];
         const updatedDeductions = currentDeductions.map(d =>
             d.id === editingDeductionId
                 ? {
@@ -230,8 +289,8 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                 : d
         );
 
-        onUpdateEmployee({
-            ...employee,
+        updateLocal({
+            ...localEmployee,
             salaryDeductions: updatedDeductions,
         });
 
@@ -249,9 +308,9 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
     };
 
     const handleRemoveDeduction = (deductionId: number) => {
-        const currentDeductions = employee.salaryDeductions || [];
-        onUpdateEmployee({
-            ...employee,
+        const currentDeductions = localEmployee.salaryDeductions || [];
+        updateLocal({
+            ...localEmployee,
             salaryDeductions: currentDeductions.filter(d => d.id !== deductionId),
         });
     };
@@ -262,7 +321,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         const amount = parseFloat(newIncomeAmount);
         if (isNaN(amount) || amount <= 0) return;
 
-        const currentIncome = employee.additionalIncome || [];
+        const currentIncome = localEmployee.additionalIncome || [];
         const newIncome: AdditionalIncome = {
             id: Date.now().toString(),
             description: newIncomeReason.trim(),
@@ -270,8 +329,8 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             date: newIncomeDate || new Date().toISOString().split('T')[0],
         };
 
-        onUpdateEmployee({
-            ...employee,
+        updateLocal({
+            ...localEmployee,
             additionalIncome: [...currentIncome, newIncome],
         });
 
@@ -295,7 +354,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         const amount = parseFloat(newIncomeAmount);
         if (isNaN(amount) || amount <= 0) return;
 
-        const currentIncome = employee.additionalIncome || [];
+        const currentIncome = localEmployee.additionalIncome || [];
         const updatedIncome = currentIncome.map(i =>
             i.id === editingIncomeId
                 ? {
@@ -307,8 +366,8 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                 : i
         );
 
-        onUpdateEmployee({
-            ...employee,
+        updateLocal({
+            ...localEmployee,
             additionalIncome: updatedIncome,
         });
 
@@ -326,21 +385,19 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
     };
 
     const handleRemoveIncome = (incomeId: string) => {
-        const currentIncome = employee.additionalIncome || [];
-        onUpdateEmployee({
-            ...employee,
+        const currentIncome = localEmployee.additionalIncome || [];
+        updateLocal({
+            ...localEmployee,
             additionalIncome: currentIncome.filter(i => i.id !== incomeId),
         });
     };
 
     const handleScheduleEdit = (dateKey: string) => {
-        const schedule = employee.schedule[dateKey];
-        // If schedule exists and is marked as OFF, set to 'OFF' to show in dropdown
+        const schedule = localEmployee.schedule[dateKey];
         if (schedule?.off) {
             setTempScheduleIn('OFF');
             setTempScheduleOut('OFF');
         } else {
-            // Otherwise, use the actual schedule times
             setTempScheduleIn(schedule?.timeIn || '');
             setTempScheduleOut(schedule?.timeOut || '');
         }
@@ -348,22 +405,12 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
     };
 
     const handleScheduleSave = (dateKey: string) => {
-        // Check if either time is set to "OFF"
         if (tempScheduleIn === 'OFF' || tempScheduleOut === 'OFF') {
             const updatedSchedule = {
-                ...employee.schedule,
-                [dateKey]: {
-                    timeIn: '',
-                    timeOut: '',
-                    off: true
-                }
+                ...localEmployee.schedule,
+                [dateKey]: { timeIn: '', timeOut: '', off: true }
             };
-
-            onUpdateEmployee({
-                ...employee,
-                schedule: updatedSchedule
-            });
-
+            updateLocal({ ...localEmployee, schedule: updatedSchedule });
             setEditingSchedule(null);
             setTempScheduleIn('');
             setTempScheduleOut('');
@@ -373,26 +420,17 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         if (!tempScheduleIn || !tempScheduleOut) return;
 
         const updatedSchedule = {
-            ...employee.schedule,
-            [dateKey]: {
-                timeIn: tempScheduleIn,
-                timeOut: tempScheduleOut,
-                off: false
-            }
+            ...localEmployee.schedule,
+            [dateKey]: { timeIn: tempScheduleIn, timeOut: tempScheduleOut, off: false }
         };
-
-        onUpdateEmployee({
-            ...employee,
-            schedule: updatedSchedule
-        });
-
+        updateLocal({ ...localEmployee, schedule: updatedSchedule });
         setEditingSchedule(null);
         setTempScheduleIn('');
         setTempScheduleOut('');
     };
 
     const handleRateEdit = (dateKey: string) => {
-        const currentRate = getRateForDate(employee, dateKey);
+        const currentRate = getRateForDate(localEmployee, dateKey);
         setTempRate(String(currentRate));
         setEditingRateDateKey(dateKey);
     };
@@ -405,7 +443,6 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             return;
         }
 
-        // Add this rate as a new rate history entry
         const newEntry: RateHistoryEntry = {
             id: Date.now().toString(),
             rate: newRate,
@@ -413,33 +450,29 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             notes: 'Updated from Daily Activity Log',
         };
 
-        const currentHistory = employee.rateHistory || [];
-        // Check if there's already an entry for this exact date
+        const currentHistory = localEmployee.rateHistory || [];
         const existingIndex = currentHistory.findIndex(e => e.effectiveDate === dateKey);
 
         let updatedHistory: RateHistoryEntry[];
         if (existingIndex >= 0) {
-            // Update existing entry
             updatedHistory = currentHistory.map((e, i) =>
                 i === existingIndex ? { ...e, rate: newRate } : e
             );
         } else {
-            // Add new entry
             updatedHistory = [...currentHistory, newEntry].sort(
                 (a, b) => a.effectiveDate.localeCompare(b.effectiveDate)
             );
         }
 
-        // Update the current rate if this is the latest applicable rate
         const today = new Date().toISOString().split('T')[0];
         const latestEffectiveRate = [...updatedHistory]
             .filter(entry => entry.effectiveDate <= today)
             .sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate))[0];
 
-        onUpdateEmployee({
-            ...employee,
+        updateLocal({
+            ...localEmployee,
             rateHistory: updatedHistory,
-            rate: latestEffectiveRate?.rate ?? employee.rate,
+            rate: latestEffectiveRate?.rate ?? localEmployee.rate,
         });
 
         setEditingRateDateKey(null);
@@ -447,7 +480,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
     };
 
     const handleAttendanceEdit = (dateKey: string, type: 'in' | 'out' | 'both') => {
-        const record = attendanceRecords.find(r => r.employee.toLowerCase() === employee.name.toLowerCase() && r.date === dateKey);
+        const record = attendanceRecords.find(r => r.employee.toLowerCase() === localEmployee.name.toLowerCase() && r.date === dateKey);
 
         if (type === 'both') {
             setTempTimeIn(record?.timeIn || '');
@@ -468,12 +501,12 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         if (type === 'both') {
             if (!tempTimeIn && !tempTimeOut) return;
 
-            const existingRecord = attendanceRecords.find(r => r.employee.toLowerCase() === employee.name.toLowerCase() && r.date === dateKey);
+            const existingRecord = attendanceRecords.find(r => r.employee.toLowerCase() === localEmployee.name.toLowerCase() && r.date === dateKey);
             let updatedRecords = [...attendanceRecords];
 
             if (existingRecord) {
                 updatedRecords = updatedRecords.map(r => {
-                    if (r.employee.toLowerCase() === employee.name.toLowerCase() && r.date === dateKey) {
+                    if (r.employee.toLowerCase() === localEmployee.name.toLowerCase() && r.date === dateKey) {
                         return {
                             ...r,
                             timeIn: tempTimeIn,
@@ -484,7 +517,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                 });
             } else {
                 updatedRecords.push({
-                    employee: employee.name,
+                    employee: localEmployee.name,
                     date: dateKey,
                     timeIn: tempTimeIn,
                     timeOut: tempTimeOut
@@ -499,13 +532,13 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             const value = type === 'in' ? tempTimeIn : tempTimeOut;
             if (!value) return;
 
-            const existingRecord = attendanceRecords.find(r => r.employee.toLowerCase() === employee.name.toLowerCase() && r.date === dateKey);
+            const existingRecord = attendanceRecords.find(r => r.employee.toLowerCase() === localEmployee.name.toLowerCase() && r.date === dateKey);
 
             let updatedRecords = [...attendanceRecords];
 
             if (existingRecord) {
                 updatedRecords = updatedRecords.map(r => {
-                    if (r.employee.toLowerCase() === employee.name.toLowerCase() && r.date === dateKey) {
+                    if (r.employee.toLowerCase() === localEmployee.name.toLowerCase() && r.date === dateKey) {
                         return {
                             ...r,
                             [type === 'in' ? 'timeIn' : 'timeOut']: value
@@ -515,7 +548,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                 });
             } else {
                 updatedRecords.push({
-                    employee: employee.name,
+                    employee: localEmployee.name,
                     date: dateKey,
                     timeIn: type === 'in' ? value : '',
                     timeOut: type === 'out' ? value : ''
@@ -557,12 +590,12 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
 
         const now = new Date();
         const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-        const employeeRecords = attendanceRecords.filter(r => r.employee.toLowerCase() === employee.name.toLowerCase());
+        const employeeRecords = attendanceRecords.filter(r => r.employee.toLowerCase() === localEmployee.name.toLowerCase());
 
         for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
             const currentDate = new Date(d);
             const dateKey = currentDate.toISOString().split('T')[0];
-            const schedule = employee.schedule[dateKey];
+            const schedule = localEmployee.schedule[dateKey];
             const record = employeeRecords.find(r => r.date === dateKey);
 
             let dailyRecord: any = {
@@ -621,7 +654,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                     if (totalLoginMinutes > 6 * 60) {
                         paidMinutes = Math.max(0, paidMinutes - 60);
                     }
-                    const approvedOtForDay = employee.approvedOvertime?.[dateKey] || 0;
+                    const approvedOtForDay = localEmployee.approvedOvertime?.[dateKey] || 0;
                     dailyRecord.paidHours = paidMinutes + approvedOtForDay;
                 }
             } else if (schedule?.timeIn) {
@@ -633,7 +666,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             log.push(dailyRecord);
         }
         return log.sort((a,b) => a.date - b.date);
-    }, [employee, attendanceRecords, committedRange]);
+    }, [localEmployee, attendanceRecords, committedRange]);
 
     const serviceChargesByDate = useMemo(() => {
         if (!committedRange.start || !committedRange.end) return {};
@@ -679,7 +712,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
     }, [employees, attendanceRecords, salesData, committedRange.start, committedRange.end, serviceChargesByDate]);
 
     const employeeServiceChargeBreakdown = useMemo(() => {
-        const allocation = serviceChargeDistribution.allocations[employee.id];
+        const allocation = serviceChargeDistribution.allocations[localEmployee.id];
         if (!allocation) return undefined;
         const details = allocation.details
             .map(detail => ({
@@ -692,7 +725,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             totalShare: Math.round(allocation.totalShare * 100) / 100,
             details,
         };
-    }, [serviceChargeDistribution, employee.id]);
+    }, [serviceChargeDistribution, localEmployee.id]);
 
     const employeeServiceChargeShare = employeeServiceChargeBreakdown?.totalShare ?? 0;
     const employeeServiceChargeDetails = employeeServiceChargeBreakdown?.details ?? [];
@@ -702,27 +735,26 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
 
         // Calculate regular and overtime pay from daily log for the filtered date range
         const OVERTIME_RATE_MULTIPLIER = 1.25;
-        let totalRegularMinutes = 0;
-        let totalOvertimeMinutes = 0;
+        let totalRegularPay = 0;
+        let totalOvertimePay = 0;
 
         dailyLog.forEach(day => {
             const dateKey = day.date.toISOString().split('T')[0];
             // Only include days within the committed range
             if (dateKey >= committedRange.start && dateKey <= committedRange.end) {
-                const approvedOT = employee.approvedOvertime?.[dateKey] || 0;
+                const dailyRate = getRateForDate(localEmployee, dateKey);
+                const approvedOT = localEmployee.approvedOvertime?.[dateKey] || 0;
                 const paidMinutes = day.paidHours - approvedOT;
 
                 if (paidMinutes > 0) {
-                    totalRegularMinutes += paidMinutes;
+                    totalRegularPay += (paidMinutes / 60) * dailyRate;
                 }
                 if (approvedOT > 0) {
-                    totalOvertimeMinutes += approvedOT;
+                    totalOvertimePay += (approvedOT / 60) * dailyRate * OVERTIME_RATE_MULTIPLIER;
                 }
             }
         });
 
-        const totalRegularPay = (totalRegularMinutes / 60) * employee.rate;
-        const totalOvertimePay = (totalOvertimeMinutes / 60) * employee.rate * OVERTIME_RATE_MULTIPLIER;
         const total = totalRegularPay + totalOvertimePay;
 
         return {
@@ -731,7 +763,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             serviceCharge: 0,
             total: Math.round(total * 100) / 100,
         };
-    }, [dailyLog, employee.rate, employee.approvedOvertime, committedRange]);
+    }, [dailyLog, localEmployee, localEmployee.approvedOvertime, committedRange]);
 
     const summary = useMemo(() => {
         let scheduled = 0, worked = 0, totalDelay = 0, absence = 0, approvedOT = 0, paidMinutes = 0, totalLoginMinutes = 0;
@@ -767,8 +799,8 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             }
             
             const dateKey = log.date.toISOString().split('T')[0];
-            const approvedOtForDay = employee.approvedOvertime?.[dateKey] || 0;
-            
+            const approvedOtForDay = localEmployee.approvedOvertime?.[dateKey] || 0;
+
             worked += log.worked;
             approvedOT += approvedOtForDay;
             
@@ -787,7 +819,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         const difference = (worked + approvedOT) - scheduled;
 
         return { scheduled, worked, difference, totalDelay, absence, approvedOT, lateCount, paidMinutes, totalLoginMinutes };
-    }, [dailyLog, employee.approvedOvertime]);
+    }, [dailyLog, localEmployee.approvedOvertime]);
 
 
     const handleRangeComplete = (newRange: { start: string, end: string }) => {
@@ -801,8 +833,9 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         let daysPresent = 0;
         let daysAbsent = 0;
         let daysLate = 0;
-        let paidRegularMinutes = 0;
         let totalLateMinutes = 0;
+        let regularPay = 0;
+        let overtimePay = 0;
 
         dailyLog.forEach(log => {
             if (log.status === 'Present' || log.status === 'Late') daysPresent++;
@@ -821,7 +854,8 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
             if (log.status === 'Absent') daysAbsent++;
 
             const dateKey = log.date.toISOString().split('T')[0];
-            const approvedOTMinutes = employee.approvedOvertime?.[dateKey] || 0;
+            const dailyRate = getRateForDate(localEmployee, dateKey);
+            const approvedOTMinutes = localEmployee.approvedOvertime?.[dateKey] || 0;
 
             const actualInMinutes = timeStringToMinutes(log.timeIn);
             const actualOutMinutes = timeStringToMinutes(log.timeOut);
@@ -835,14 +869,14 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                 dailyPaidRegularMinutes = Math.max(0, log.worked - 60);
             }
 
-            paidRegularMinutes += dailyPaidRegularMinutes;
-            totalOvertimeHours += approvedOTMinutes / 60;
-        });
-        
-        totalRegularHours = paidRegularMinutes / 60;
+            const dailyRegularHours = dailyPaidRegularMinutes / 60;
+            const dailyOTHours = approvedOTMinutes / 60;
 
-        const regularPay = totalRegularHours * employee.rate;
-        const overtimePay = totalOvertimeHours * employee.rate * OVERTIME_RATE_MULTIPLIER;
+            totalRegularHours += dailyRegularHours;
+            totalOvertimeHours += dailyOTHours;
+            regularPay += dailyRegularHours * dailyRate;
+            overtimePay += dailyOTHours * dailyRate * OVERTIME_RATE_MULTIPLIER;
+        });
         const serviceChargeShare = employeeServiceChargeBreakdown?.totalShare ?? 0;
         const grossPay = regularPay + overtimePay + serviceChargeShare;
 
@@ -850,16 +884,16 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
         const lateDeduction = totalLateMinutes * 0.02;
 
         // Calculate total salary deductions
-        const totalSalaryDeductions = (employee.salaryDeductions || []).reduce((sum, d) => sum + d.amount, 0);
+        const totalSalaryDeductions = (localEmployee.salaryDeductions || []).reduce((sum, d) => sum + d.amount, 0);
 
         const deductions = { sss: 0, philhealth: 0, pagibig: 0, total: 0 };
         const netPay = grossPay - deductions.total - totalSalaryDeductions;
 
         const newRecord: PayrollRecord = {
-            id: employee.id,
-            employee: employee.name,
-            position: employee.position,
-            rate: employee.rate,
+            id: localEmployee.id,
+            employee: localEmployee.name,
+            position: localEmployee.position,
+            rate: localEmployee.rate,
             regularHours: totalRegularHours,
             overtimeHours: totalOvertimeHours,
             totalHours: totalRegularHours + totalOvertimeHours,
@@ -900,14 +934,28 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                <div className="flex-shrink-0 flex justify-between items-center p-4 border-b border-border-color">
                     <h2 className="text-xl font-semibold">Employee Profile</h2>
                      <div className="flex items-center gap-2">
-                        <button onClick={onEdit} className="flex items-center justify-center gap-2 bg-hover-bg text-text-primary px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors hover:bg-opacity-80">
-                            <PencilIcon className="w-4 h-4" />
-                            <span className="hidden sm:inline">Edit</span>
-                        </button>
-                        <button onClick={onDelete} className="flex items-center justify-center gap-2 bg-accent-red/20 text-accent-red px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors hover:bg-accent-red/30">
-                            <TrashIcon className="w-4 h-4" />
-                            <span className="hidden sm:inline">Delete</span>
-                        </button>
+                        {(isDirty || isEditMode) ? (
+                            <>
+                                <button onClick={handleCancelAll} className="flex items-center justify-center gap-2 bg-hover-bg text-text-primary px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors hover:bg-opacity-80">
+                                    <span>Discard</span>
+                                </button>
+                                <button onClick={handleSaveAll} className="flex items-center justify-center gap-2 bg-accent-blue text-white px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors hover:bg-accent-blue/80">
+                                    <CheckIcon className="w-4 h-4" />
+                                    <span>Save Changes</span>
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <button onClick={handleEnterEditMode} className="flex items-center justify-center gap-2 bg-hover-bg text-text-primary px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors hover:bg-opacity-80">
+                                    <PencilIcon className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Edit</span>
+                                </button>
+                                <button onClick={onDelete} className="flex items-center justify-center gap-2 bg-accent-red/20 text-accent-red px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors hover:bg-accent-red/30">
+                                    <TrashIcon className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Delete</span>
+                                </button>
+                            </>
+                        )}
                         <button onClick={onClose} className="p-2 rounded-full text-text-secondary hover:bg-hover-bg transition-colors">
                             <XMarkIcon className="w-6 h-6" />
                         </button>
@@ -918,10 +966,102 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                         <div className="bg-bg-tertiary rounded-xl p-6">
                            <div className="text-center">
                                 <div className="w-24 h-24 rounded-full bg-bg-primary flex items-center justify-center font-bold text-5xl text-text-primary mx-auto">
-                                    {employee.name.charAt(0)}
+                                    {(isEditMode ? editFields.name : localEmployee.name).charAt(0)}
                                 </div>
-                                <h3 className="text-2xl font-semibold mt-4">{employee.name}</h3>
-                                <p className="text-md text-text-secondary">{employee.position}</p>
+                                {isEditMode ? (
+                                    <div className="mt-4 space-y-2">
+                                        <input
+                                            type="text"
+                                            value={editFields.name}
+                                            onChange={e => setEditFields(f => ({ ...f, name: e.target.value }))}
+                                            placeholder="Name"
+                                            className="w-full text-center text-xl font-semibold bg-bg-primary border border-border-color rounded-lg px-3 py-1.5 text-text-primary focus:outline-none focus:border-accent-blue"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={editFields.position}
+                                            onChange={e => setEditFields(f => ({ ...f, position: e.target.value }))}
+                                            placeholder="Position"
+                                            className="w-full text-center text-sm bg-bg-primary border border-border-color rounded-lg px-3 py-1.5 text-text-secondary focus:outline-none focus:border-accent-blue"
+                                        />
+                                        <div className="grid grid-cols-2 gap-2 pt-2">
+                                            <div>
+                                                <label className="text-xs text-text-secondary mb-1 block">Daily Rate (₱)</label>
+                                                <input
+                                                    type="number"
+                                                    value={editFields.rate}
+                                                    onChange={e => setEditFields(f => ({ ...f, rate: e.target.value }))}
+                                                    placeholder="Rate"
+                                                    className="w-full text-sm bg-bg-primary border border-border-color rounded-lg px-2 py-1.5 text-text-primary focus:outline-none focus:border-accent-blue"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs text-text-secondary mb-1 block">Department</label>
+                                                <input
+                                                    type="text"
+                                                    value={editFields.department}
+                                                    onChange={e => setEditFields(f => ({ ...f, department: e.target.value }))}
+                                                    placeholder="Dept"
+                                                    className="w-full text-sm bg-bg-primary border border-border-color rounded-lg px-2 py-1.5 text-text-primary focus:outline-none focus:border-accent-blue"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-text-secondary mb-1 block">Phone</label>
+                                            <input
+                                                type="text"
+                                                value={editFields.phone}
+                                                onChange={e => setEditFields(f => ({ ...f, phone: e.target.value }))}
+                                                placeholder="Phone"
+                                                className="w-full text-sm bg-bg-primary border border-border-color rounded-lg px-2 py-1.5 text-text-primary focus:outline-none focus:border-accent-blue"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-text-secondary mb-1 block">Email</label>
+                                            <input
+                                                type="email"
+                                                value={editFields.email}
+                                                onChange={e => setEditFields(f => ({ ...f, email: e.target.value }))}
+                                                placeholder="Email"
+                                                className="w-full text-sm bg-bg-primary border border-border-color rounded-lg px-2 py-1.5 text-text-primary focus:outline-none focus:border-accent-blue"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-text-secondary mb-1 block">Bank Account</label>
+                                            <input
+                                                type="text"
+                                                value={editFields.bankAccount}
+                                                onChange={e => setEditFields(f => ({ ...f, bankAccount: e.target.value }))}
+                                                placeholder="Bank Account"
+                                                className="w-full text-sm bg-bg-primary border border-border-color rounded-lg px-2 py-1.5 text-text-primary focus:outline-none focus:border-accent-blue"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-text-secondary mb-1 block">Payment Mode</label>
+                                            <input
+                                                type="text"
+                                                value={editFields.paymentMode}
+                                                onChange={e => setEditFields(f => ({ ...f, paymentMode: e.target.value }))}
+                                                placeholder="Cash / Bank / GCash"
+                                                className="w-full text-sm bg-bg-primary border border-border-color rounded-lg px-2 py-1.5 text-text-primary focus:outline-none focus:border-accent-blue"
+                                            />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <h3 className="text-2xl font-semibold mt-4">{localEmployee.name}</h3>
+                                        <p className="text-md text-text-secondary">{localEmployee.position}</p>
+                                        {(localEmployee.phone || localEmployee.email || localEmployee.department || localEmployee.bankAccount || localEmployee.paymentMode) && (
+                                            <div className="mt-2 space-y-1 text-xs text-text-secondary">
+                                                {localEmployee.department && <p>{localEmployee.department}</p>}
+                                                {localEmployee.phone && <p>{localEmployee.phone}</p>}
+                                                {localEmployee.email && <p>{localEmployee.email}</p>}
+                                                {localEmployee.bankAccount && <p>Bank: {localEmployee.bankAccount}</p>}
+                                                {localEmployee.paymentMode && <p>Pay via: {localEmployee.paymentMode}</p>}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
                             </div>
                              <div className="mt-6 pt-6 border-t border-border-color text-center px-4">
                                 <h4 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-4">Performance Overview</h4>
@@ -946,40 +1086,39 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                         </div>
                                         <button
                                             onClick={() => {
-                                                const updated = {
-                                                    ...employee,
-                                                    serviceChargeEnabled: employee.serviceChargeEnabled !== false ? false : true
-                                                };
-                                                onUpdateEmployee(updated);
+                                                updateLocal({
+                                                    ...localEmployee,
+                                                    serviceChargeEnabled: localEmployee.serviceChargeEnabled !== false ? false : true
+                                                });
                                             }}
                                             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                                                employee.serviceChargeEnabled !== false ? 'bg-accent-blue' : 'bg-gray-600'
+                                                localEmployee.serviceChargeEnabled !== false ? 'bg-accent-blue' : 'bg-gray-600'
                                             }`}
                                         >
                                             <span
                                                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                                    employee.serviceChargeEnabled !== false ? 'translate-x-6' : 'translate-x-1'
+                                                    localEmployee.serviceChargeEnabled !== false ? 'translate-x-6' : 'translate-x-1'
                                                 }`}
                                             />
                                         </button>
                                     </div>
-                                    {employee.serviceChargeEnabled !== false && (
+                                    {localEmployee.serviceChargeEnabled !== false && (
                                         <div className="flex items-center gap-2">
                                             <span className="text-xs text-text-secondary whitespace-nowrap">Start date</span>
                                             <input
                                                 type="date"
-                                                value={employee.serviceChargeStartDate || ''}
+                                                value={localEmployee.serviceChargeStartDate || ''}
                                                 onChange={(e) => {
-                                                    onUpdateEmployee({
-                                                        ...employee,
+                                                    updateLocal({
+                                                        ...localEmployee,
                                                         serviceChargeStartDate: e.target.value || undefined,
                                                     });
                                                 }}
                                                 className="flex-1 text-xs bg-bg-secondary border border-border-color rounded px-2 py-1 text-text-primary focus:outline-none focus:border-accent-blue"
                                             />
-                                            {employee.serviceChargeStartDate && (
+                                            {localEmployee.serviceChargeStartDate && (
                                                 <button
-                                                    onClick={() => onUpdateEmployee({ ...employee, serviceChargeStartDate: undefined })}
+                                                    onClick={() => updateLocal({ ...localEmployee, serviceChargeStartDate: undefined })}
                                                     className="text-text-secondary hover:text-accent-red transition-colors text-xs"
                                                     title="Clear start date"
                                                 >✕</button>
@@ -1101,10 +1240,10 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                 )}
 
                                 <div className="space-y-1 max-h-40 overflow-y-auto">
-                                    {employee.salaryDeductions && employee.salaryDeductions.length > 0 ? (
-                                        employee.salaryDeductions
+                                    {localEmployee.salaryDeductions && localEmployee.salaryDeductions.length > 0 ? (
+                                        localEmployee.salaryDeductions
                                             .filter(deduction => {
-                                                if (!deduction.date) return true; // Include items without dates
+                                                if (!deduction.date) return true;
                                                 return deduction.date >= committedRange.start && deduction.date <= committedRange.end;
                                             })
                                             .map((deduction, index) => (
@@ -1141,11 +1280,11 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                     )}
                                 </div>
 
-                                {employee.salaryDeductions && employee.salaryDeductions.filter(d => !d.date || (d.date >= committedRange.start && d.date <= committedRange.end)).length > 0 && (
+                                {localEmployee.salaryDeductions && localEmployee.salaryDeductions.filter(d => !d.date || (d.date >= committedRange.start && d.date <= committedRange.end)).length > 0 && (
                                     <div className="mt-2 pt-2 border-t border-border-color flex items-center justify-between">
                                         <span className="text-[10px] font-medium text-text-secondary uppercase">Total</span>
                                         <span className="text-sm font-bold text-accent-red">
-                                            {formatPeso(employee.salaryDeductions.filter(d => !d.date || (d.date >= committedRange.start && d.date <= committedRange.end)).reduce((sum, d) => sum + d.amount, 0))}
+                                            {formatPeso(localEmployee.salaryDeductions.filter(d => !d.date || (d.date >= committedRange.start && d.date <= committedRange.end)).reduce((sum, d) => sum + d.amount, 0))}
                                         </span>
                                     </div>
                                 )}
@@ -1263,10 +1402,10 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                 )}
 
                                 <div className="space-y-1 max-h-40 overflow-y-auto">
-                                    {employee.additionalIncome && employee.additionalIncome.length > 0 ? (
-                                        employee.additionalIncome
+                                    {localEmployee.additionalIncome && localEmployee.additionalIncome.length > 0 ? (
+                                        localEmployee.additionalIncome
                                             .filter(income => {
-                                                if (!income.date) return true; // Include items without dates
+                                                if (!income.date) return true;
                                                 return income.date >= committedRange.start && income.date <= committedRange.end;
                                             })
                                             .map((income, index) => (
@@ -1303,11 +1442,11 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                     )}
                                 </div>
 
-                                {employee.additionalIncome && employee.additionalIncome.filter(i => !i.date || (i.date >= committedRange.start && i.date <= committedRange.end)).length > 0 && (
+                                {localEmployee.additionalIncome && localEmployee.additionalIncome.filter(i => !i.date || (i.date >= committedRange.start && i.date <= committedRange.end)).length > 0 && (
                                     <div className="mt-2 pt-2 border-t border-border-color flex items-center justify-between">
                                         <span className="text-[10px] font-medium text-text-secondary uppercase">Total</span>
                                         <span className="text-sm font-bold text-accent-green">
-                                            {formatPeso(employee.additionalIncome.filter(i => !i.date || (i.date >= committedRange.start && i.date <= committedRange.end)).reduce((sum, i) => sum + i.amount, 0))}
+                                            {formatPeso(localEmployee.additionalIncome.filter(i => !i.date || (i.date >= committedRange.start && i.date <= committedRange.end)).reduce((sum, i) => sum + i.amount, 0))}
                                         </span>
                                     </div>
                                 )}
@@ -1426,7 +1565,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                         <tbody className="divide-y divide-border-color/50">
                                             {dailyLog.map(log => {
                                                 const dateKey = log.date.toISOString().split('T')[0];
-                                                const approvedMinutes = employee.approvedOvertime?.[dateKey];
+                                                const approvedMinutes = localEmployee.approvedOvertime?.[dateKey];
                                                 return (
                                                     <tr key={log.date.toISOString()} className="hover:bg-bg-secondary/50">
                                                         <td className="px-2 py-1.5 font-medium whitespace-nowrap text-center">{log.date.toLocaleDateString('en-US', {day: '2-digit', month: 'short', timeZone: 'UTC'})}</td>
@@ -1628,7 +1767,7 @@ const EmployeeProfile: React.FC<EmployeeProfileProps> = ({ employee, employees, 
                                 <div className="block md:hidden space-y-2">
                                     {dailyLog.map(log => {
                                         const dateKey = log.date.toISOString().split('T')[0];
-                                        const approvedMinutes = employee.approvedOvertime?.[dateKey];
+                                        const approvedMinutes = localEmployee.approvedOvertime?.[dateKey];
                                         return (
                                             <div key={log.date.toISOString()} className="bg-bg-secondary p-2.5 rounded-lg text-sm">
                                                 <div className="flex justify-between items-center mb-1.5 pb-1.5 border-b border-border-color">

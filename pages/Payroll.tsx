@@ -111,7 +111,7 @@ const SummaryCard: React.FC<{title: string, value: string, icon: React.FC<{class
 );
 
 
-const OVERTIME_RATE_MULTIPLIER = 1.5;
+const OVERTIME_RATE_MULTIPLIER = 1.25;
 
 const Payroll: React.FC<PayrollProps> = ({ employees: propEmployees, attendanceRecords: propAttendanceRecords, payrollRecords: propPayrollRecords, setPayrollRecords: setPropPayrollRecords, salesData, manualPaidMinutes, manualGhostMinutes }) => {
     // Fetch employees from Firebase
